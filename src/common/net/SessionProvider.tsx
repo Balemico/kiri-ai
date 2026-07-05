@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
 import { joinRoom, type Room } from "trystero/nostr";
 import { distributeSpecials, type CardId, type GameAction, type Team } from "../game";
+import { trackGameMode } from "../analytics";
 import { SessionContext } from "./SessionContext";
 import type { Mode, SessionStatus, SessionValue } from "./types";
 import type { NetMessage, Placement } from "./protocol";
@@ -58,6 +59,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
 	const roomRef = useRef<Room | null>(null);
 	const sendRef = useRef<((msg: NetMessage) => void) | null>(null);
+	const localSessionRef = useRef(0);
+	const trackedSessionRef = useRef<string | null>(null);
 	// The engine's raw dispatch, bound once GameProvider mounts. Messages that arrive before then
 	// are queued and flushed on bind (tiny window; human placement is seconds away regardless).
 	const receiverRef = useRef<Dispatch<GameAction> | null>(null);
@@ -188,6 +191,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 		receiverRef.current = null;
 		pendingRef.current = [];
 		infoRef.current = { isHost: false, localTeam: null, specials: null };
+		trackedSessionRef.current = null;
 		setMode("local");
 		setStatus("menu");
 		setLocalTeam(null);
@@ -198,6 +202,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 	}, []);
 
 	const startLocal = useCallback(() => {
+		localSessionRef.current += 1;
 		setMode("local");
 		setLocalTeam(null);
 		setActiveTeam("red");
@@ -223,6 +228,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 		},
 		[]
 	);
+
+	useEffect(() => {
+		if (status !== "playing") return;
+		const sessionId = mode === "local" ? `passplay-${localSessionRef.current}` : `multiplayer-${roomKeyword ?? "unknown"}`;
+		if (trackedSessionRef.current === sessionId) return;
+		trackedSessionRef.current = sessionId;
+		trackGameMode(mode === "local" ? "passplay" : "multiplayer");
+	}, [status, mode, roomKeyword]);
 
 	const viewerTeam: Team = mode === "local" ? activeTeam : localTeam ?? "red";
 
