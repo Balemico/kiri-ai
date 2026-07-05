@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode } from "react";
-import { joinRoom, type Room } from "trystero/nostr";
+import { joinRoom, getRelaySockets, type Room } from "trystero/nostr";
 import { distributeSpecials, type CardId, type GameAction, type Team } from "../game";
 import { trackGameMode } from "../analytics";
 import { SessionContext } from "./SessionContext";
@@ -136,13 +136,29 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 	/** Join a Trystero room and wire the message channel. */
 	const connect = useCallback(
 		(keyword: string): Room => {
-			const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, keyword);
+			// `onJoinError` fires on password/handshake failures (incl. handshake timeout).
+			const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, keyword, {
+				onJoinError: (details) => console.error("[net] join error", details),
+			});
 			const channel = room.makeAction("msg");
 			roomRef.current = room;
 			// Cast through unknown: our JSON messages satisfy Trystero's DataPayload at runtime.
 			sendRef.current = (msg: NetMessage) => void channel.send(msg as unknown as Parameters<typeof channel.send>[0]);
 			channel.onMessage = (data) => handleMessage(data as unknown as NetMessage);
-			room.onPeerLeave = () => setStatus("peer-left");
+			room.onPeerLeave = (peerId) => {
+				console.warn("[net] peer left", peerId);
+				setStatus("peer-left");
+			};
+
+			// Signaling health: log which Nostr relays actually connected. If this stays empty the two
+			// devices can NEVER find each other (relay problem, not WebRTC). If relays are connected but
+			// `onPeerJoin` never fires cross-network, it's a WebRTC/TURN problem instead.
+			window.setTimeout(() => {
+				const sockets = getRelaySockets() as Record<string, WebSocket>;
+				const entries = Object.entries(sockets);
+				const open = entries.filter(([, ws]) => ws.readyState === WebSocket.OPEN).map(([url]) => url);
+				console.info(`[net] relay sockets: ${open.length}/${entries.length} open`, open);
+			}, 3000);
 			return room;
 		},
 		[handleMessage]
@@ -160,7 +176,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 			setSpecials(sp);
 			setStatus("waiting");
 			const room = connect(keyword);
-			room.onPeerJoin = () => {
+			room.onPeerJoin = (peerId) => {
+				console.info("[net] peer joined (host)", peerId);
 				// Proactively send init; the guest's hello also triggers it as an ordering fallback.
 				sendRef.current?.({ kind: "init", specials: sp, hostTeam: color });
 				setStatus("playing");
@@ -179,7 +196,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 			setStatus("waiting");
 			const room = connect(keyword);
 			// Ask the host for the shared setup (guarantees both listeners are up before init flows).
-			room.onPeerJoin = () => sendRef.current?.({ kind: "hello" });
+			room.onPeerJoin = (peerId) => {
+				console.info("[net] peer joined (guest)", peerId);
+				sendRef.current?.({ kind: "hello" });
+			};
 		},
 		[connect]
 	);
