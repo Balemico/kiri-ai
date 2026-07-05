@@ -159,8 +159,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 		[handleMessage]
 	);
 
+	// Room topics are a case-sensitive hash of appId+keyword, and mobile keyboards auto-capitalize
+	// the first letter — "Test" and "test" would be two different rooms that never meet (the display
+	// font masks the difference by rendering everything uppercase). Normalize at the single entry point.
+	const normalizeKeyword = (keyword: string) => keyword.trim().toLowerCase();
+
 	const createRoom = useCallback(
-		(keyword: string, color: Team) => {
+		(rawKeyword: string, color: Team) => {
+			const keyword = normalizeKeyword(rawKeyword);
 			const sp = distributeSpecials();
 			infoRef.current = { isHost: true, localTeam: color, specials: sp };
 			setMode("online");
@@ -184,7 +190,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 	);
 
 	const joinRoomFn = useCallback(
-		(keyword: string) => {
+		(rawKeyword: string) => {
+			const keyword = normalizeKeyword(rawKeyword);
 			infoRef.current = { isHost: false, localTeam: null, specials: null };
 			setMode("online");
 			setIsHost(false);

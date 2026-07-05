@@ -110,6 +110,11 @@ export const TextField = ({
 		type="text"
 		value={value}
 		placeholder={placeholder}
+		// Room keywords are case-sensitive at the transport level; stop mobile keyboards from
+		// silently capitalizing or "correcting" them (the display font hides the difference).
+		autoCapitalize="none"
+		autoCorrect="off"
+		spellCheck={false}
 		onChange={(e) => onChange(e.target.value)}
 		onKeyDown={(e) => {
 			if (e.key === "Enter") onEnter?.();
