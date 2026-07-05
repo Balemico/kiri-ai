@@ -13,6 +13,8 @@
  *     `VITE_TURN_CREDENTIAL`. This is also the `yarn dev` path (Vite doesn't serve `/api`).
  */
 
+import { setDiag } from "./diagnostics";
+
 const STUN_ONLY: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
 
 let cached: { servers: RTCIceServer[]; expiresAt: number } | null = null;
@@ -25,8 +27,13 @@ const staticFallback = (): RTCIceServer[] => {
 		.filter(Boolean);
 	const username = import.meta.env.VITE_TURN_USERNAME as string | undefined;
 	const credential = import.meta.env.VITE_TURN_CREDENTIAL as string | undefined;
-	if (turnUrls?.length && username && credential) servers.push({ urls: turnUrls, username, credential });
-	else console.warn("[net] STUN only — PC↔mobile (CGNAT) connections will likely fail without TURN.");
+	if (turnUrls?.length && username && credential) {
+		servers.push({ urls: turnUrls, username, credential });
+		setDiag({ ice: "TURN statico (env)" });
+	} else {
+		console.warn("[net] STUN only — PC↔mobile (CGNAT) connections will likely fail without TURN.");
+		setDiag({ ice: "SOLO STUN — TURN assente!" });
+	}
 	return servers;
 };
 
@@ -35,13 +42,18 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
 	const raw = import.meta.env.VITE_ICE_SERVERS as string | undefined;
 	if (raw) {
 		try {
-			return JSON.parse(raw) as RTCIceServer[];
+			const servers = JSON.parse(raw) as RTCIceServer[];
+			setDiag({ ice: "ICE override (env)" });
+			return servers;
 		} catch {
 			console.warn("VITE_ICE_SERVERS is not valid JSON — ignoring it.");
 		}
 	}
 
-	if (cached && Date.now() < cached.expiresAt) return cached.servers;
+	if (cached && Date.now() < cached.expiresAt) {
+		setDiag({ ice: "TURN Cloudflare attivo" });
+		return cached.servers;
+	}
 
 	try {
 		const res = await fetch("/api/turn-credentials");
@@ -51,6 +63,7 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
 		// Refresh 5 min before expiry so a credential never goes stale mid-handshake.
 		cached = { servers: iceServers, expiresAt: Date.now() + Math.max(ttl - 300, 60) * 1000 };
 		console.info(`[net] TURN credentials fetched (ttl ${ttl}s)`);
+		setDiag({ ice: "TURN Cloudflare attivo" });
 		return iceServers;
 	} catch (err) {
 		console.warn("[net] TURN credential fetch failed — falling back to static ICE config.", err);

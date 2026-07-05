@@ -4,6 +4,7 @@ import { distributeSpecials, type CardId, type GameAction, type Team } from "../
 import { trackGameMode } from "../analytics";
 import { SessionContext } from "./SessionContext";
 import { getIceServers } from "./iceServers";
+import { setDiag } from "./diagnostics";
 import type { Mode, SessionStatus, SessionValue } from "./types";
 import type { NetMessage, Placement } from "./protocol";
 
@@ -111,11 +112,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 	const connect = useCallback(
 		async (keyword: string): Promise<Room | null> => {
 			const gen = connectGenRef.current;
+			setDiag({ joinError: null });
 			const iceServers = await getIceServers();
 			if (gen !== connectGenRef.current) return null;
 			// `onJoinError` fires on password/handshake failures (incl. handshake timeout).
 			const room = joinRoom({ appId: APP_ID, rtcConfig: { iceServers } }, keyword, {
-				onJoinError: (details) => console.error("[net] join error", details),
+				onJoinError: (details) => {
+					console.error("[net] join error", details);
+					setDiag({ joinError: typeof details === "string" ? details : JSON.stringify(details) });
+				},
 			});
 			const channel = room.makeAction("msg");
 			roomRef.current = room;
