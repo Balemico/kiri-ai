@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(yarn lint *)",
+      "Bash(yarn build *)",
+      "Bash(npx tsc *)",
+      "Bash(ls CLAUDE.md)",
+      "Bash(head -40 README.md)",
+      "Bash(python3 -c \"import PIL; print\\('PIL', PIL.__version__\\)\")",
+      "Bash(python3 -m pip install --quiet --user pillow numpy)",
+      "Bash(python3 -c \"import PIL, numpy; print\\('OK', PIL.__version__, numpy.__version__\\)\")",
+      "Bash(python3 scripts/cutout_layers.py)",
+      "Bash(file public/images/backgroud/[0-4]-*.jpeg)",
+      "Bash(yarn test *)"
+    ]
+  }
+}

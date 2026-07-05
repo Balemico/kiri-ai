@@ -1,0 +1,10 @@
+@font-face {
+	font-family: "Hirokawa";
+	src:
+		url("Hirokawa/HirokawaRegular.woff2") format("woff2"),
+		url("Hirokawa/HirokawaRegular.woff") format("woff"),
+		url("Hirokawa/HirokawaRegular.ttf") format("truetype");
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
