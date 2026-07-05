@@ -3,43 +3,13 @@ import { joinRoom, getRelaySockets, type Room } from "trystero/nostr";
 import { distributeSpecials, type CardId, type GameAction, type Team } from "../game";
 import { trackGameMode } from "../analytics";
 import { SessionContext } from "./SessionContext";
+import { getIceServers } from "./iceServers";
 import type { Mode, SessionStatus, SessionValue } from "./types";
 import type { NetMessage, Placement } from "./protocol";
 
 /** Namespaces the P2P rooms — only clients sharing this appId (+ the keyword) can find each other. */
 const APP_ID = "kiri-ai-duel-v1";
 const other = (t: Team): Team => (t === "red" ? "blue" : "red");
-
-/**
- * WebRTC ICE servers. Trystero handles signaling but sets NO ICE servers by default, so peers only
- * gather host candidates (often mDNS) and the connection can fail with "ICE failed, add a TURN server".
- *  - STUN discovers each peer's public address → fixes most same-network / localhost / two-tab cases.
- *  - TURN relays the stream when a direct P2P path is blocked (restrictive NAT / firewall) — the
- *    guaranteed fallback. The bundled TURN is a best-effort public relay; for reliable cross-network
- *    play provide your own via `VITE_ICE_SERVERS` (a JSON array of RTCIceServer).
- */
-// Kept to ≤4 URLs — Trystero warns that 5+ ICE servers slow discovery down.
-const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
-	{ urls: "stun:stun.l.google.com:19302" },
-	{
-		urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443?transport=tcp"],
-		username: "openrelayproject",
-		credential: "openrelayproject",
-	},
-];
-
-const ICE_SERVERS: RTCIceServer[] = (() => {
-	const raw = import.meta.env.VITE_ICE_SERVERS as string | undefined;
-	if (!raw) return DEFAULT_ICE_SERVERS;
-	try {
-		return JSON.parse(raw) as RTCIceServer[];
-	} catch {
-		console.warn("VITE_ICE_SERVERS is not valid JSON — falling back to the default ICE servers.");
-		return DEFAULT_ICE_SERVERS;
-	}
-})();
-
-const RTC_CONFIG: RTCConfiguration = { iceServers: ICE_SERVERS };
 
 type Specials = { red: CardId; blue: CardId };
 
@@ -59,6 +29,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
 	const roomRef = useRef<Room | null>(null);
 	const sendRef = useRef<((msg: NetMessage) => void) | null>(null);
+	// Bumped on leave/unmount: a `connect` that was awaiting TURN credentials when the user left
+	// sees a stale generation and bails instead of creating a room nobody owns.
+	const connectGenRef = useRef(0);
 	const localSessionRef = useRef(0);
 	const trackedSessionRef = useRef<string | null>(null);
 	// The engine's raw dispatch, bound once GameProvider mounts. Messages that arrive before then
@@ -133,11 +106,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 		[applyOrQueue]
 	);
 
-	/** Join a Trystero room and wire the message channel. */
+	/** Fetch ICE servers (short-lived TURN credentials), then join a Trystero room and wire the
+	 * message channel. Returns null if the session was left while credentials were in flight. */
 	const connect = useCallback(
-		(keyword: string): Room => {
+		async (keyword: string): Promise<Room | null> => {
+			const gen = connectGenRef.current;
+			const iceServers = await getIceServers();
+			if (gen !== connectGenRef.current) return null;
 			// `onJoinError` fires on password/handshake failures (incl. handshake timeout).
-			const room = joinRoom({ appId: APP_ID, rtcConfig: RTC_CONFIG }, keyword, {
+			const room = joinRoom({ appId: APP_ID, rtcConfig: { iceServers } }, keyword, {
 				onJoinError: (details) => console.error("[net] join error", details),
 			});
 			const channel = room.makeAction("msg");
@@ -175,13 +152,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 			setRoomKeyword(keyword);
 			setSpecials(sp);
 			setStatus("waiting");
-			const room = connect(keyword);
-			room.onPeerJoin = (peerId) => {
-				console.info("[net] peer joined (host)", peerId);
-				// Proactively send init; the guest's hello also triggers it as an ordering fallback.
-				sendRef.current?.({ kind: "init", specials: sp, hostTeam: color });
-				setStatus("playing");
-			};
+			void connect(keyword).then((room) => {
+				if (!room) return;
+				room.onPeerJoin = (peerId) => {
+					console.info("[net] peer joined (host)", peerId);
+					// Proactively send init; the guest's hello also triggers it as an ordering fallback.
+					sendRef.current?.({ kind: "init", specials: sp, hostTeam: color });
+					setStatus("playing");
+				};
+			});
 		},
 		[connect]
 	);
@@ -194,17 +173,20 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 			setLocalTeam(null);
 			setRoomKeyword(keyword);
 			setStatus("waiting");
-			const room = connect(keyword);
-			// Ask the host for the shared setup (guarantees both listeners are up before init flows).
-			room.onPeerJoin = (peerId) => {
-				console.info("[net] peer joined (guest)", peerId);
-				sendRef.current?.({ kind: "hello" });
-			};
+			void connect(keyword).then((room) => {
+				if (!room) return;
+				// Ask the host for the shared setup (guarantees both listeners are up before init flows).
+				room.onPeerJoin = (peerId) => {
+					console.info("[net] peer joined (guest)", peerId);
+					sendRef.current?.({ kind: "hello" });
+				};
+			});
 		},
 		[connect]
 	);
 
 	const leave = useCallback(() => {
+		connectGenRef.current += 1;
 		void roomRef.current?.leave();
 		roomRef.current = null;
 		sendRef.current = null;
@@ -241,9 +223,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 	const advanceActiveTeam = useCallback(() => setActiveTeam((t) => other(t)), []);
 	const resetActiveTeam = useCallback(() => setActiveTeam("red"), []);
 
-	// Leave the room if the provider ever unmounts.
+	// Leave the room if the provider ever unmounts (and cancel any in-flight connect).
 	useEffect(
 		() => () => {
+			connectGenRef.current += 1;
 			void roomRef.current?.leave();
 		},
 		[]
