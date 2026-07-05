@@ -11,10 +11,10 @@ import { Backdrop, Panel, InkButton } from "./ui";
  * other); the ICE label = whether a TURN relay is available for the WebRTC hop itself.
  */
 const NetDiagLine = () => {
-	const { ice, joinError, relays } = useNetDiagnostics();
+	const { ice, joinError, relays, rtc } = useNetDiagnostics();
 	return (
 		<p style={{ margin: 0, fontSize: 11, opacity: 0.55, textAlign: "center", letterSpacing: 1, lineHeight: 1.6 }}>
-			relay {relays ? `${relays.open}/${relays.total}` : "…"} · {ice ?? "ICE…"}
+			relay {relays ? `${relays.open}/${relays.total}` : "…"} · {ice ?? "ICE…"} · rtc {rtc ?? "–"}
 			{joinError && (
 				<>
 					<br />

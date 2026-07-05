@@ -12,6 +12,19 @@ import type { NetMessage, Placement } from "./protocol";
 const APP_ID = "kiri-ai-duel-v1";
 const other = (t: Team): Team => (t === "red" ? "blue" : "red");
 
+/**
+ * Pinned signaling relays. Trystero's default Nostr list is hash-sampled and often lands on flaky
+ * community relays that accept the websocket but drop/reject events — both peers then sit at 5/5
+ * "open" relays without ever seeing each other. These are large, permissive, long-lived relays.
+ */
+const RELAY_URLS = [
+	"wss://relay.damus.io",
+	"wss://nos.lol",
+	"wss://relay.primal.net",
+	"wss://nostr.mom",
+	"wss://offchain.pub",
+];
+
 type Specials = { red: CardId; blue: CardId };
 
 /**
@@ -116,7 +129,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 			const iceServers = await getIceServers();
 			if (gen !== connectGenRef.current) return null;
 			// `onJoinError` fires on password/handshake failures (incl. handshake timeout).
-			const room = joinRoom({ appId: APP_ID, rtcConfig: { iceServers } }, keyword, {
+			const room = joinRoom({ appId: APP_ID, relayConfig: { urls: RELAY_URLS }, rtcConfig: { iceServers } }, keyword, {
 				onJoinError: (details) => {
 					console.error("[net] join error", details);
 					setDiag({ joinError: typeof details === "string" ? details : JSON.stringify(details) });

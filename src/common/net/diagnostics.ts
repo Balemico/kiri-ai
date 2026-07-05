@@ -6,14 +6,33 @@ import { getRelaySockets } from "trystero/nostr";
  * console, so the connection health (signaling relays, ICE/TURN source, join errors) must be
  * readable ON SCREEN to debug PC↔mobile sessions.
  */
-type NetDiag = { ice: string | null; joinError: string | null };
+type NetDiag = { ice: string | null; joinError: string | null; rtc: string | null };
 
-let snapshot: NetDiag = { ice: null, joinError: null };
+let snapshot: NetDiag = { ice: null, joinError: null, rtc: null };
 const listeners = new Set<() => void>();
 
 export const setDiag = (patch: Partial<NetDiag>) => {
 	snapshot = { ...snapshot, ...patch };
 	listeners.forEach((l) => l());
+};
+
+/**
+ * Trystero doesn't expose its RTCPeerConnections, so wrap the constructor to surface ICE progress
+ * in the lobby. Behavior is untouched — we only listen to state events. Reading the `rtc` label:
+ *  - stays empty while waiting → peers never even found each other (signaling problem);
+ *  - "checking" → offer/answer exchanged, ICE probing paths (signaling OK);
+ *  - "failed" → no path found even via TURN (TURN/credentials problem);
+ *  - "connected" → the WebRTC hop is fine.
+ */
+const NativePC = window.RTCPeerConnection;
+let pcCount = 0;
+window.RTCPeerConnection = class extends NativePC {
+	constructor(...args: ConstructorParameters<typeof RTCPeerConnection>) {
+		super(...args);
+		const id = ++pcCount;
+		setDiag({ rtc: `#${id} creata` });
+		this.addEventListener("iceconnectionstatechange", () => setDiag({ rtc: `#${id} ${this.iceConnectionState}` }));
+	}
 };
 
 const subscribe = (l: () => void) => {
