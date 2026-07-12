@@ -30,10 +30,13 @@ const NetDiagLine = () => {
 	);
 };
 
-/** Shared cross-fade wrapper: every lobby screen slides/fades in the SAME column — the panorama never blinks. */
-const ScreenFade = ({ children, id }: { children: ReactNode; id: string }) => (
+/**
+ * Shared cross-fade wrapper: every lobby screen slides/fades in the SAME column — the panorama
+ * never blinks. Each CALL SITE must set a unique `key` — AnimatePresence diffs its direct
+ * children, so the key has to live on the ScreenFade element itself for exits to run.
+ */
+const ScreenFade = ({ children }: { children: ReactNode }) => (
 	<motion.div
-		key={id}
 		initial={{ opacity: 0, y: 14 }}
 		animate={{ opacity: 1, y: 0 }}
 		exit={{ opacity: 0, y: -10 }}
@@ -56,6 +59,13 @@ export const Lobby = () => {
 	const [introDone, setIntroDone] = useState(() => introPlayed || !!reduced);
 	const skip3D = useRef<() => void>(() => {});
 
+	// Stable identity so LobbyScene's register effect doesn't re-run on every Lobby render.
+	const registerSkip = useCallback((fn: () => void) => {
+		skip3D.current = fn;
+	}, []);
+
+	// Synchronously re-entrant: skip3D.current() makes LobbyScene fire onIntroEnd (= this function)
+	// again in the same tick — it terminates because LobbyScene's done.current guard trips first.
 	const finishIntro = useCallback(() => {
 		introPlayed = true;
 		skip3D.current();
@@ -72,7 +82,7 @@ export const Lobby = () => {
 
 	return (
 		<div style={{ position: "fixed", inset: 0, zIndex: 3000, overflow: "hidden" }} onPointerDown={introDone ? undefined : finishIntro}>
-			<LobbyScene intro={!introDone} registerSkip={(fn) => (skip3D.current = fn)} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
+			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
 
 			{/* Calligraphy watermark behind the column (landscape flavour; harmless in portrait). */}
 			<motion.img
@@ -97,17 +107,17 @@ export const Lobby = () => {
 				<AnimatePresence mode="wait">
 					{status === "menu" &&
 						(screen === "root" ? (
-							<ScreenFade id="root">
+							<ScreenFade key="root">
 								<Menu onMultiplayer={() => setScreen("mp")} delayFor={delayFor} />
 							</ScreenFade>
 						) : (
-							<ScreenFade id="mp">
+							<ScreenFade key="mp">
 								<MultiplayerLobby onBack={() => setScreen("root")} />
 							</ScreenFade>
 						))}
 
 					{status === "waiting" && (
-						<ScreenFade id="waiting">
+						<ScreenFade key="waiting">
 							<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 15, letterSpacing: 2 }}>
 								In attesa… condividi la parola chiave
 							</p>
@@ -123,7 +133,7 @@ export const Lobby = () => {
 					)}
 
 					{status === "peer-left" && (
-						<ScreenFade id="peer-left">
+						<ScreenFade key="peer-left">
 							<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 17, letterSpacing: 2 }}>
 								Avversario uscito — la partita è stata interrotta
 							</p>
