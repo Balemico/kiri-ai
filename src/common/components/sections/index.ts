@@ -8,3 +8,4 @@ export * from "./ConfirmButton";
 export * from "./WinBanner";
 export * from "./Scene";
 export * from "./LobbyScene";
+export * from "./InkTransition";

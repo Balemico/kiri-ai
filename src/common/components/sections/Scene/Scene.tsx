@@ -1,5 +1,5 @@
-import { Suspense } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Suspense, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
 import { FitCamera, Lights, Floor } from "../../atoms";
 import { Battlefield } from "../Battlefield";
@@ -18,6 +18,18 @@ import { useAutoReveal } from "../../../hooks/useAutoReveal";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
 
+/** Fires `onReady` on the first rendered frame — the veil holds until the scene truly exists. */
+const ReadySignal = ({ onReady }: { onReady?: () => void }) => {
+	const fired = useRef(false);
+	useFrame(() => {
+		if (!fired.current) {
+			fired.current = true;
+			onReady?.();
+		}
+	});
+	return null;
+};
+
 /**
  * Everything that lives inside the R3F canvas. Orientation is derived from the SAME `size` all the
  * scene geometry reads (`useThree(s => s.size)`), NOT a separate `matchMedia` window query. Those are
@@ -26,7 +38,15 @@ import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
  * orientation against the old aspect (and vice versa), which dislocated them. Reading one source keeps
  * the orientation flag and the aspect always consistent within a render.
  */
-const SceneContents = ({ showInterface }: { showInterface: boolean }) => {
+const SceneContents = ({
+	showInterface,
+	entrance,
+	onReady,
+}: {
+	showInterface: boolean;
+	entrance: "fly" | "none";
+	onReady?: () => void;
+}) => {
 	const size = useThree((s) => s.size);
 	// Portrait = canvas taller than (or as tall as) wide — same convention as `(orientation: portrait)`.
 	const isPortrait = size.height >= size.width;
@@ -65,12 +85,21 @@ const SceneContents = ({ showInterface }: { showInterface: boolean }) => {
 					<CardNameReveal frame={frame} orientation={orientation} />
 				</>
 			)}
+			{/* key={entrance} keeps the prop threaded until Task 11's IntroFlight consumes it. */}
+			<ReadySignal key={entrance} onReady={onReady} />
 		</>
 	);
 };
 
+export interface SceneProps {
+	/** "fly" = bird-view fly-back reveal on mount (Task: IntroFlight); "none" = instant (default). */
+	entrance?: "fly" | "none";
+	/** Fired once the canvas has produced its first frame — releases the ink veil. */
+	onReady?: () => void;
+}
+
 /** Top-level view: the 3D canvas plus the HTML overlays. */
-export const Scene = () => {
+export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 	// Toggle the whole game interface (hand, HUD, toasts) off to focus on the background scene.
 	const { showInterface } = useControls("Game UI", { showInterface: { value: true, label: "show interface" } }, { collapsed: true });
 	// Sound effects play on resolved actions regardless of the interface toggle.
@@ -91,7 +120,7 @@ export const Scene = () => {
 			{/* Cap the device pixel ratio: high-DPR phones would render 3–4× the pixels, draining GPU/battery
 			    for no visible gain. dpr={[1, 2]} keeps it crisp while bounding the fill cost. */}
 			<Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6], fov: 30 }}>
-				<SceneContents showInterface={showInterface} />
+				<SceneContents showInterface={showInterface} entrance={entrance} onReady={onReady} />
 			</Canvas>
 		</>
 	);
