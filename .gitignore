@@ -39,3 +39,6 @@ build
 
 # Misc
 *.local
+
+# brainstorming visual companion
+.superpowers/
