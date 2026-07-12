@@ -287,7 +287,7 @@ export const LOBBY = {
 } as const;
 
 // --- Intro choreography (entry cinematic, exit veil, fly-back reveal) ---
-// All timings in seconds. Single source for the "Intro" Leva folder + the DOM delays.
+// All timings in seconds. Single source for the entry/exit/flight choreography (compile-time; no Leva folder).
 export const INTRO = {
 	// Entry: stage layers paint far → near, then sun/tree/mist/leaves, then the DOM menu.
 	layerStagger: 0.28,
@@ -295,6 +295,7 @@ export const INTRO = {
 	leavesDelay: 1.8, // leaves become visible (storyboard beat 3)
 	menuDelay: 2.5, // first DOM element (calligraphy) starts painting
 	menuStagger: 0.35, // per-menu-item stagger after menuDelay
+	total: 4.5, // full entry choreography (3D paint-on + DOM menu) — the natural finish beat
 	// Exit veil: brush strokes cover one after another, then "dry" out in order.
 	veilCover: 0.55, // one stroke's sweep duration
 	veilStrokeStagger: 0.14,

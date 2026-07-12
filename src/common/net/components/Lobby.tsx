@@ -88,9 +88,13 @@ export const Lobby = () => {
 			<motion.img
 				src="/images/intro/calligraphy.png"
 				alt=""
-				initial={{ opacity: 0, clipPath: "inset(0 0 100% 0)" }}
-				animate={{ opacity: 0.15, clipPath: "inset(0 0 0% 0)" }}
-				transition={{ delay: delayFor(0), duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+				initial="hidden"
+				animate={introDone ? "skipped" : "painted"}
+				variants={{
+					hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)" },
+					painted: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { delay: delayFor(0), duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
+					skipped: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { duration: 0.3 } },
+				}}
 				style={{ position: "absolute", right: "30%", top: "6%", height: "70%", pointerEvents: "none" }}
 			/>
 
@@ -98,9 +102,13 @@ export const Lobby = () => {
 				<motion.img
 					src="/images/logo/kiri-ai-logo.png"
 					alt="Kiri-ai: The Duel"
-					initial={{ opacity: 0, y: -12, filter: "blur(6px)" }}
-					animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-					transition={{ delay: delayFor(1), duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+					variants={{
+						hidden: { opacity: 0, y: -12, filter: "blur(6px)" },
+						painted: { opacity: 1, y: 0, filter: "blur(0px)", transition: { delay: delayFor(1), duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+						skipped: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.3 } },
+					}}
+					initial="hidden"
+					animate={introDone ? "skipped" : "painted"}
 					style={{ width: "82%", alignSelf: "center", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
 				/>
 
@@ -108,7 +116,7 @@ export const Lobby = () => {
 					{status === "menu" &&
 						(screen === "root" ? (
 							<ScreenFade key="root">
-								<Menu onMultiplayer={() => setScreen("mp")} delayFor={delayFor} />
+								<Menu onMultiplayer={() => setScreen("mp")} delayFor={delayFor} skipped={introDone} />
 							</ScreenFade>
 						) : (
 							<ScreenFade key="mp">

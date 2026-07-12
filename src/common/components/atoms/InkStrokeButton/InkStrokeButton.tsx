@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
 
@@ -21,6 +22,8 @@ export interface InkStrokeButtonProps {
 	seal?: boolean;
 	/** Seconds before the stroke paints itself on (intro choreography; 0 = already painted). */
 	delay?: number;
+	/** True once the intro is skipped/over — snaps straight to the painted look, no mount delay. */
+	skipped?: boolean;
 	style?: CSSProperties;
 }
 
@@ -28,18 +31,32 @@ export interface InkStrokeButtonProps {
  * A floating sumi brush stroke that IS the button: the PNG is a mask over a colour fill, so
  * every tone shares the real brush silhouette. Paints on left→right (clip-path), and on hover
  * the ink "bleeds" — the stroke stretches a touch and the label's tracking opens.
+ *
+ * `skipped` fast-forwards the mount-delayed "painted" choreography: a changed `transition.delay`
+ * alone never restarts an already-scheduled Motion animation, so skipping switches the VARIANT
+ * LABEL to "skipped" instead — Motion re-resolves on a label change, and its per-value "unchanged
+ * target" check means an element already sitting at the painted target (label switched after its
+ * own delay elapsed) doesn't re-animate/flash, it just relabels in place.
  */
-export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, seal = false, delay = 0, style }: InkStrokeButtonProps) => {
+export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, seal = false, delay = 0, skipped = false, style }: InkStrokeButtonProps) => {
 	const mask = `url(${STROKES[variant]})`;
+	// Local paint-complete flag: once the natural "painted" animation finishes, treat the button as
+	// permanently painted (mirrors `skipped`) so un-hovering afterwards returns to the delay-free
+	// target instead of re-applying the mount delay.
+	const [painted, setPainted] = useState(delay === 0);
+	const target = skipped || painted ? "skipped" : "painted";
 	return (
 		<motion.button
 			type="button"
 			disabled={disabled}
 			onClick={onClick}
 			initial="hidden"
-			animate="painted"
+			animate={target}
 			whileHover={disabled ? undefined : "bleed"}
 			whileTap={disabled ? undefined : { scale: 0.97 }}
+			onAnimationComplete={(def) => {
+				if (def === "painted") setPainted(true);
+			}}
 			style={{
 				position: "relative",
 				width: "100%",
@@ -56,6 +73,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				variants={{
 					hidden: { clipPath: "inset(0 100% 0 0)" },
 					painted: { clipPath: "inset(0 0% 0 0)", transition: { delay, duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
+					skipped: { clipPath: "inset(0 0% 0 0)", transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } },
 					bleed: { clipPath: "inset(0 0% 0 0)", scaleX: 1.04, scaleY: 1.08, transition: { duration: 0.25 } },
 				}}
 				style={{
@@ -73,6 +91,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				variants={{
 					hidden: { opacity: 0 },
 					painted: { opacity: 1, letterSpacing: "3px", transition: { delay: delay + 0.25, duration: 0.35 } },
+					skipped: { opacity: 1, letterSpacing: "3px", transition: { duration: 0.2 } },
 					bleed: { opacity: 1, letterSpacing: "4.5px", transition: { duration: 0.25 } },
 				}}
 				style={{
@@ -91,6 +110,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 					variants={{
 						hidden: { opacity: 0, scale: 0.4, rotate: -6 },
 						painted: { opacity: 1, scale: 1, rotate: -6, transition: { delay: delay + 0.45, duration: 0.3 } },
+						skipped: { opacity: 1, scale: 1, rotate: -6, transition: { duration: 0.2 } },
 					}}
 					style={{
 						position: "absolute",

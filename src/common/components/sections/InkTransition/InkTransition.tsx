@@ -27,7 +27,12 @@ export interface InkTransitionProps {
 export const InkTransition = ({ covering, release, onCovered }: InkTransitionProps) => (
 	<AnimatePresence>
 		{covering && (
-			<motion.div key="veil" style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: "none", overflow: "hidden" }} exit={{ opacity: 0 }}>
+			<motion.div
+				key="veil"
+				// While covering the old screen must not accept clicks; once drying (release), the new scene is live.
+				style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: release ? "none" : "auto", overflow: "hidden" }}
+				exit={{ opacity: 0 }}
+			>
 				{STROKES.map((s, i) => (
 					<motion.div
 						key={i}

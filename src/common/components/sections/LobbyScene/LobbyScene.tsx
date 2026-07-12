@@ -84,7 +84,7 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 				undefined,
 				INTRO.leavesDelay,
 			);
-			tl.call(finish, undefined, Math.max(tl.duration(), INTRO.menuDelay));
+			tl.call(finish, undefined, Math.max(tl.duration(), INTRO.total));
 			timeline.current = tl;
 		},
 		[finish, leafVisibleRef],
