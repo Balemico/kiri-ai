@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { MIST_TEXTURE } from "../../../mistTexture";
@@ -20,6 +20,12 @@ export interface MistProps {
 export const Mist = ({ bands, opacity, speed, height, y, width, z = -0.05 }: MistProps) => {
 	const group = useRef<THREE.Group>(null);
 
+	// One clone per band for the component's LIFETIME: the offsets scroll independently, so each
+	// band needs its own texture instance, but a clone per render would leak GPU textures (R3F
+	// auto-disposes only the JSX-declared material, not textures passed via the map prop).
+	const textures = useMemo(() => Array.from({ length: bands }, () => MIST_TEXTURE.clone()), [bands]);
+	useEffect(() => () => textures.forEach((t) => t.dispose()), [textures]);
+
 	// Scroll the texture offset (not the meshes): seamless wrap, zero re-layout.
 	useFrame((state) => {
 		const g = group.current;
@@ -34,9 +40,9 @@ export const Mist = ({ bands, opacity, speed, height, y, width, z = -0.05 }: Mis
 		<group ref={group}>
 			{Array.from({ length: bands }, (_, i) => (
 				<mesh key={i} position={[0, y + (i - (bands - 1) / 2) * height * 0.55, z]} renderOrder={-50 + i}>
+					{/* Per-band renderOrder keeps overlapping translucent bands stable (still well behind the floor at −10). */}
 					<planeGeometry args={[width, height]} />
-					{/* Each band CLONES the texture so the offsets scroll independently. */}
-					<meshBasicMaterial map={MIST_TEXTURE.clone()} transparent opacity={opacity * (1 - i * 0.2)} toneMapped={false} depthWrite={false} />
+					<meshBasicMaterial map={textures[i]} transparent opacity={opacity * (1 - i * 0.2)} toneMapped={false} depthWrite={false} />
 				</mesh>
 			))}
 		</group>
