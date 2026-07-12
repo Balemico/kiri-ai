@@ -85,32 +85,42 @@ export const Lobby = () => {
 			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
 
 			{/* Calligraphy watermark behind the column (landscape flavour; harmless in portrait). */}
-			<motion.img
-				src="/images/intro/calligraphy.png"
-				alt=""
+			{/* Variant labels live on the WRAPPER: a self-animating element would protect its resolved
+			    targets and ignore the skip relabel; the propagation path re-resolves children freely. */}
+			<motion.div
 				initial="hidden"
 				animate={introDone ? "skipped" : "painted"}
-				variants={{
-					hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)" },
-					painted: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { delay: delayFor(0), duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
-					skipped: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { duration: 0.3 } },
-				}}
 				style={{ position: "absolute", right: "30%", top: "6%", height: "70%", pointerEvents: "none" }}
-			/>
+			>
+				<motion.img
+					src="/images/intro/calligraphy.png"
+					alt=""
+					variants={{
+						hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)" },
+						painted: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { delay: delayFor(0), duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
+						skipped: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { duration: 0.3 } },
+					}}
+					style={{ height: "100%" }}
+				/>
+			</motion.div>
 
 			<LobbyColumn>
-				<motion.img
-					src="/images/logo/kiri-ai-logo.png"
-					alt="Kiri-ai: The Duel"
-					variants={{
-						hidden: { opacity: 0, y: -12, filter: "blur(6px)" },
-						painted: { opacity: 1, y: 0, filter: "blur(0px)", transition: { delay: delayFor(1), duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-						skipped: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.3 } },
-					}}
+				<motion.div
 					initial="hidden"
 					animate={introDone ? "skipped" : "painted"}
-					style={{ width: "82%", alignSelf: "center", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
-				/>
+					style={{ width: "82%", alignSelf: "center" }}
+				>
+					<motion.img
+						src="/images/logo/kiri-ai-logo.png"
+						alt="Kiri-ai: The Duel"
+						variants={{
+							hidden: { opacity: 0, y: -12, filter: "blur(6px)" },
+							painted: { opacity: 1, y: 0, filter: "blur(0px)", transition: { delay: delayFor(1), duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+							skipped: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.3 } },
+						}}
+						style={{ width: "100%", display: "block", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
+					/>
+				</motion.div>
 
 				<AnimatePresence mode="wait">
 					{status === "menu" &&
