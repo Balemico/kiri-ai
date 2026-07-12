@@ -5,7 +5,8 @@
 
 import type { LOBBY } from "./layout";
 
-export type LeafFieldConfig = typeof LOBBY.leaves;
+/** LOBBY.leaves' shape with the literal `as const` types widened, so Leva-tuned overrides fit. */
+export type LeafFieldConfig = { [K in keyof typeof LOBBY.leaves]: number };
 
 const TWO_PI = Math.PI * 2;
 const fract = (v: number): number => v - Math.floor(v);
