@@ -17,16 +17,15 @@ export const AppRoot = () => {
 	const playing = status === "playing";
 	const [covered, setCovered] = useState(false);
 	const [sceneReady, setSceneReady] = useState(false);
-	// Leaving the game (leave / peer-left) rearms the veil for the next session. Adjusted during
-	// render (React's "state from props" pattern), NOT in an effect — this repo's eslint-plugin-
-	// react-hooks forbids synchronous setState inside effects (see CLAUDE.md Gotchas).
+	// Any transition of `playing` (either direction) rearms the veil for the next session — so a
+	// theoretically-stale `covered=true` can never leak into a new session. Adjusted during render
+	// (React's "state from props" pattern), NOT in an effect — this repo's eslint-plugin-react-hooks
+	// forbids synchronous setState inside effects (see CLAUDE.md Gotchas).
 	const [prevPlaying, setPrevPlaying] = useState(playing);
 	if (playing !== prevPlaying) {
 		setPrevPlaying(playing);
-		if (!playing) {
-			setCovered(false);
-			setSceneReady(false);
-		}
+		setCovered(false);
+		setSceneReady(false);
 	}
 	// Leave-during-cover race: an in-flight seal animation completing AFTER `playing` flipped false
 	// must never set `covered` back to true (it would make the NEXT session skip the veil). The ref

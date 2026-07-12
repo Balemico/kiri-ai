@@ -1,7 +1,7 @@
-import { Suspense, useRef } from "react";
+import { Suspense, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
-import { FitCamera, Lights, Floor } from "../../atoms";
+import { FitCamera, Lights, Floor, IntroFlight, RevealGroup } from "../../atoms";
 import { Battlefield } from "../Battlefield";
 import { Stage } from "../Stage";
 import { Hand } from "../Hand";
@@ -57,27 +57,52 @@ const SceneContents = ({
 	const frame = isPortrait ? PORTRAIT_SCENE_FRAME : landscapeFrame;
 	// Floor controls are shared so the battleground can rake its pieces onto the SAME tilt the floor uses.
 	const floor = useFloorControls(orientation);
+	// Fly-back reveal staging: 0 = scenery only, 1 = + board, 2 = + hand (= everything). Portrait
+	// skips the flight (the bird view is designed around the landscape composition). State
+	// initialisers only — turn passing and orientation flips must NEVER re-run the staging.
+	const fly = entrance === "fly" && !isPortrait;
+	const [stage, setStage] = useState(fly ? 0 : 2);
+	const [flying, setFlying] = useState(fly);
+	const showBoard = showInterface && stage >= 1;
+	const showHand = showInterface && stage >= 2;
 	return (
 		<>
 			{/* Paper fill behind everything — kept here (not only in Stage) so portrait, with the
 			    Stage hidden, still has the floor's far edge dissolve into paper rather than black. */}
 			<color attach="background" args={[PAPER]} />
 			<Lights />
-			{/* Single locked front view — no orbit; auto-fits the whole frame at any width. */}
-			<FitCamera frame={frame} />
+			{/* Single locked front view — no orbit; auto-fits the whole frame at any width. Yields the
+			    camera to IntroFlight for the duration of the fly-back reveal. */}
+			<FitCamera frame={frame} enabled={!flying} />
+			{flying && (
+				<IntroFlight
+					frame={frame}
+					onBoard={() => setStage((s) => Math.max(s, 1))}
+					onHand={() => setStage((s) => Math.max(s, 2))}
+					onDone={() => setFlying(false)}
+				/>
+			)}
+			{/* Fires once the canvas has produced its first frame — releases the ink veil. */}
+			<ReadySignal onReady={onReady} />
 			{/* Background scenery (top-third parallax strip) — landscape only; dropped in portrait. */}
 			{!isPortrait && <Stage frame={frame} />}
 			{/* The tilted paper ground — lower half in landscape, full screen in portrait. */}
 			<Floor frame={frame} controls={floor} orientation={orientation} />
 			{/* Separate Suspense boundaries so a (re)loading hand never blanks the battlefield —
 			    and card textures are preloaded (useCardTextures), so passing the turn doesn't suspend. */}
-			{showInterface && (
+			{showBoard && (
 				<>
 					<Suspense fallback={null}>
-						<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} />
+						<RevealGroup drop={fly ? 0.4 : 0}>
+							<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} />
+						</RevealGroup>
 					</Suspense>
 					{/* Portrait placeholders marking where each team's played / set-aside cards land. */}
 					<LandingZones frame={frame} orientation={orientation} />
+				</>
+			)}
+			{showHand && (
+				<>
 					<Suspense fallback={null}>
 						<Hand frame={frame} orientation={orientation} />
 					</Suspense>
@@ -85,8 +110,6 @@ const SceneContents = ({
 					<CardNameReveal frame={frame} orientation={orientation} />
 				</>
 			)}
-			{/* key={entrance} keeps the prop threaded until Task 11's IntroFlight consumes it. */}
-			<ReadySignal key={entrance} onReady={onReady} />
 		</>
 	);
 };

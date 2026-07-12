@@ -13,3 +13,5 @@ export * from "./InkBrush";
 export * from "./Mist";
 export * from "./FallingLeaves";
 export * from "./InkStrokeButton";
+export * from "./IntroFlight";
+export * from "./RevealGroup";
