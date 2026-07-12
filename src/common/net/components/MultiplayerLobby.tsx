@@ -1,11 +1,19 @@
 import { useState } from "react";
 import type { Team } from "../../game";
 import { useSession } from "../useSession";
-import { Panel, InkButton, TextField } from "./ui";
+import { InkStrokeButton } from "../../components/atoms";
+import { TextField } from "./ui";
 
 type View = "choose" | "create" | "join";
 
 const TEAM_LABEL: Record<Team, string> = { red: "ROSSO", blue: "BLU" };
+
+const Heading = ({ title, subtitle }: { title: string; subtitle: string }) => (
+	<div style={{ textAlign: "center", color: "#17120e" }}>
+		<h1 style={{ margin: 0, fontSize: 28, letterSpacing: 4, fontFamily: "var(--font-display)" }}>{title}</h1>
+		<p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.65 }}>{subtitle}</p>
+	</div>
+);
 
 /** Multiplayer lobby: create a room (keyword + colour) or join one (keyword → the other colour). */
 export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
@@ -18,51 +26,56 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 
 	if (view === "choose") {
 		return (
-			<Panel title="Multiplayer" subtitle="Crea una partita o unisciti a una esistente">
-				<InkButton tone="red" onClick={() => setView("create")}>
+			<>
+				<Heading title="Multiplayer" subtitle="Crea una partita o unisciti a una esistente" />
+				<InkStrokeButton tone="red" variant={0} onClick={() => setView("create")}>
 					CREA PARTITA
-				</InkButton>
-				<InkButton tone="blue" onClick={() => setView("join")}>
+				</InkStrokeButton>
+				<InkStrokeButton tone="blue" variant={1} onClick={() => setView("join")}>
 					UNISCITI
-				</InkButton>
-				<InkButton tone="ghost" onClick={onBack}>
+				</InkStrokeButton>
+				<InkStrokeButton tone="ghost" variant={2} onClick={onBack}>
 					← INDIETRO
-				</InkButton>
-			</Panel>
+				</InkStrokeButton>
+			</>
 		);
 	}
 
 	if (view === "create") {
 		return (
-			<Panel title="Crea partita" subtitle="Scegli una parola chiave e il tuo colore">
+			<>
+				<Heading title="Crea partita" subtitle="Scegli una parola chiave e il tuo colore" />
 				<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave (es. duello)" onEnter={() => trimmed && createRoom(trimmed, color)} />
 				<div style={{ display: "flex", gap: 10 }}>
 					{(["red", "blue"] as Team[]).map((t) => (
-						<InkButton key={t} tone={color === t ? t : "ghost"} onClick={() => setColor(t)}>
+						<InkStrokeButton key={t} tone={color === t ? t : "ghost"} variant={t === "red" ? 0 : 1} onClick={() => setColor(t)}>
 							{TEAM_LABEL[t]}
-						</InkButton>
+						</InkStrokeButton>
 					))}
 				</div>
-				<InkButton disabled={!trimmed} onClick={() => createRoom(trimmed, color)}>
+				<InkStrokeButton disabled={!trimmed} seal onClick={() => createRoom(trimmed, color)}>
 					CREA E ATTENDI
-				</InkButton>
-				<InkButton tone="ghost" onClick={() => setView("choose")}>
+				</InkStrokeButton>
+				<InkStrokeButton tone="ghost" variant={2} onClick={() => setView("choose")}>
 					← INDIETRO
-				</InkButton>
-			</Panel>
+				</InkStrokeButton>
+			</>
 		);
 	}
 
 	return (
-		<Panel title="Unisciti" subtitle="Inserisci la parola chiave della partita">
+		<>
+			<Heading title="Unisciti" subtitle="Inserisci la parola chiave della partita" />
 			<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave" onEnter={() => trimmed && joinRoom(trimmed)} />
-			<p style={{ margin: 0, fontSize: 12, opacity: 0.6, textAlign: "center" }}>Ti verrà assegnato il colore opposto a chi ha creato la partita.</p>
-			<InkButton disabled={!trimmed} onClick={() => joinRoom(trimmed)}>
+			<p style={{ margin: 0, fontSize: 12, opacity: 0.6, textAlign: "center", color: "#17120e" }}>
+				Ti verrà assegnato il colore opposto a chi ha creato la partita.
+			</p>
+			<InkStrokeButton disabled={!trimmed} seal onClick={() => joinRoom(trimmed)}>
 				UNISCITI
-			</InkButton>
-			<InkButton tone="ghost" onClick={() => setView("choose")}>
+			</InkStrokeButton>
+			<InkStrokeButton tone="ghost" variant={2} onClick={() => setView("choose")}>
 				← INDIETRO
-			</InkButton>
-		</Panel>
+			</InkStrokeButton>
+		</>
 	);
 };

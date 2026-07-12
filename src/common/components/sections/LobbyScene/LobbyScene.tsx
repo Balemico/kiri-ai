@@ -23,6 +23,8 @@ export interface LobbySceneProps {
 	intro: boolean;
 	registerSkip: (skip: () => void) => void;
 	onIntroEnd: () => void;
+	/** True = cap the leaf field to LOBBY.leaves.reducedCount (prefers-reduced-motion / low-end). */
+	reducedLeaves?: boolean;
 }
 
 interface PanoramaProps extends LobbySceneProps {
@@ -34,7 +36,7 @@ interface PanoramaProps extends LobbySceneProps {
  * it is the leaves' source), plus mist and the falling leaves. The entry cinematic is ONE gsap
  * timeline over the layer materials (paint-on far → near) so a tap can `progress(1)` all of it.
  */
-const Panorama = ({ intro, registerSkip, onIntroEnd, leafVisibleRef }: PanoramaProps) => {
+const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleRef }: PanoramaProps) => {
 	const c = useLobbyControls();
 	const size = useThree((s) => s.size);
 	const frame = DEFAULT_SCENE_FRAME;
@@ -97,8 +99,8 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, leafVisibleRef }: PanoramaP
 
 	// Memoized so FallingLeaves' internal per-cfg split cache survives unrelated re-renders.
 	const leafCfg = useMemo(
-		() => ({ ...LOBBY.leaves, count: c.leafCount, windStrength: c.windStrength, drift: c.drift, fallSpeed: c.fallSpeed }),
-		[c.leafCount, c.windStrength, c.drift, c.fallSpeed],
+		() => ({ ...LOBBY.leaves, count: reducedLeaves ? LOBBY.leaves.reducedCount : c.leafCount, windStrength: c.windStrength, drift: c.drift, fallSpeed: c.fallSpeed }),
+		[c.leafCount, c.windStrength, c.drift, c.fallSpeed, reducedLeaves],
 	);
 
 	return (
@@ -177,14 +179,14 @@ const StaticFallback = () => (
 );
 
 /** The lobby's animated backdrop canvas. Fills its parent; pointer events pass through to the page. */
-export const LobbyScene = ({ intro, registerSkip, onIntroEnd }: LobbySceneProps) => {
+export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves }: LobbySceneProps) => {
 	const coarse = useCoarsePointer();
 	const leafVisibleRef = useRef(!intro);
 	return (
 		<div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
 			<Leva collapsed hidden={import.meta.env.PROD || coarse} />
 			<Canvas dpr={coarse ? [1, 1.5] : [1, 2]} camera={{ position: [0, 0, 6], fov: 30 }} fallback={<StaticFallback />}>
-				<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} leafVisibleRef={leafVisibleRef} />
+				<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} reducedLeaves={reducedLeaves} leafVisibleRef={leafVisibleRef} />
 			</Canvas>
 		</div>
 	);
