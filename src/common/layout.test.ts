@@ -35,7 +35,7 @@ describe("intro constants", () => {
 		expect(LOBBY.leaves.emitterY).toBeGreaterThan(LOBBY.leaves.floorY);
 	});
 	it("the natural finish beat covers the whole DOM choreography", () => {
-		// menuDelay + 3 staggers + the slowest per-item tail (seal at delay+0.45 + 0.3 dur = 0.75).
-		expect(INTRO.menuDelay + 3 * INTRO.menuStagger + 0.75).toBeLessThanOrEqual(INTRO.total);
+		// Last beat fires at menuDelay + 3 staggers; 0.8 is the longest per-element paint (calligraphy).
+		expect(INTRO.menuDelay + 3 * INTRO.menuStagger + 0.8).toBeLessThanOrEqual(INTRO.total);
 	});
 });

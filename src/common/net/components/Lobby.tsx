@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSession } from "../useSession";
@@ -13,6 +13,9 @@ import { HankoStamp, LobbyColumn } from "./ui";
 // The cinematic plays once per app load — coming back from a game (or the multiplayer flow)
 // re-enters a lobby that is already "awake".
 let introPlayed = false;
+
+// The DOM choreography has 4 beats: calligraphy (1), logo (2), then the two menu strokes (3, 4).
+const MENU_BEATS = 4;
 
 /** On-screen connection health (mobile has no console) — unchanged behaviour, restyled for paper. */
 const NetDiagLine = () => {
@@ -51,13 +54,31 @@ const ScreenFade = ({ children }: { children: ReactNode }) => (
  * Full-screen lobby (`status !== "playing"`): the living panorama behind, the ink-stroke menu in
  * the right column. First load plays the entry cinematic; a tap anywhere skips it (a tap on a
  * button ALSO activates it — the buttons are clickable as soon as they're visible).
+ *
+ * The DOM choreography is STATE-driven: a `beat` counter advances on the INTRO schedule (via
+ * timeouts) and each element paints on when its beat is reached (hidden → painted is a
+ * target-changing variant switch, which Motion animates immediately). A skip jumps `beat`
+ * straight to the end — mount-scheduled `transition.delay`s would NOT work here, because a
+ * changed delay never restarts a Motion animation that is already pending.
  */
 export const Lobby = () => {
 	const { status, roomKeyword, leave } = useSession();
 	const [screen, setScreen] = useState<"root" | "mp">("root");
 	const reduced = useReducedMotion();
 	const [introDone, setIntroDone] = useState(() => introPlayed || !!reduced);
+	const [beat, setBeat] = useState(() => (introPlayed || !!reduced ? MENU_BEATS : 0));
 	const skip3D = useRef<() => void>(() => {});
+
+	// Advance the beats on the INTRO schedule. Runs once when the intro starts; when introDone
+	// flips (skip or natural end) the cleanup clears any pending timers and the early return
+	// keeps them cleared — finishIntro has already jumped `beat` to the end.
+	useEffect(() => {
+		if (introDone) return;
+		const timers = Array.from({ length: MENU_BEATS }, (_, i) =>
+			window.setTimeout(() => setBeat((b) => Math.max(b, i + 1)), (INTRO.menuDelay + i * INTRO.menuStagger) * 1000),
+		);
+		return () => timers.forEach((t) => window.clearTimeout(t));
+	}, [introDone]);
 
 	// Stable identity so LobbyScene's register effect doesn't re-run on every Lobby render.
 	const registerSkip = useCallback((fn: () => void) => {
@@ -70,10 +91,8 @@ export const Lobby = () => {
 		introPlayed = true;
 		skip3D.current();
 		setIntroDone(true);
+		setBeat(MENU_BEATS);
 	}, []);
-
-	// DOM elements pick their paint-on delay from the intro beat map — 0 once the intro is over.
-	const delayFor = (i: number) => (introDone ? 0 : INTRO.menuDelay + i * INTRO.menuStagger);
 
 	const backToMenu = () => {
 		leave();
@@ -85,48 +104,36 @@ export const Lobby = () => {
 			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
 
 			{/* Calligraphy watermark behind the column (landscape flavour; harmless in portrait). */}
-			{/* Variant labels live on the WRAPPER: a self-animating element would protect its resolved
-			    targets and ignore the skip relabel; the propagation path re-resolves children freely. */}
-			<motion.div
+			<motion.img
+				src="/images/intro/calligraphy.png"
+				alt=""
+				variants={{
+					hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)" },
+					painted: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
+				}}
 				initial="hidden"
-				animate={introDone ? "skipped" : "painted"}
+				animate={beat > 0 ? "painted" : "hidden"}
 				style={{ position: "absolute", right: "30%", top: "6%", height: "70%", pointerEvents: "none" }}
-			>
-				<motion.img
-					src="/images/intro/calligraphy.png"
-					alt=""
-					variants={{
-						hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)" },
-						painted: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { delay: delayFor(0), duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
-						skipped: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { duration: 0.3 } },
-					}}
-					style={{ height: "100%" }}
-				/>
-			</motion.div>
+			/>
 
 			<LobbyColumn>
-				<motion.div
+				<motion.img
+					src="/images/logo/kiri-ai-logo.png"
+					alt="Kiri-ai: The Duel"
+					variants={{
+						hidden: { opacity: 0, y: -12, filter: "blur(6px)" },
+						painted: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+					}}
 					initial="hidden"
-					animate={introDone ? "skipped" : "painted"}
-					style={{ width: "82%", alignSelf: "center" }}
-				>
-					<motion.img
-						src="/images/logo/kiri-ai-logo.png"
-						alt="Kiri-ai: The Duel"
-						variants={{
-							hidden: { opacity: 0, y: -12, filter: "blur(6px)" },
-							painted: { opacity: 1, y: 0, filter: "blur(0px)", transition: { delay: delayFor(1), duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
-							skipped: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.3 } },
-						}}
-						style={{ width: "100%", display: "block", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
-					/>
-				</motion.div>
+					animate={beat > 1 ? "painted" : "hidden"}
+					style={{ width: "82%", alignSelf: "center", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
+				/>
 
 				<AnimatePresence mode="wait">
 					{status === "menu" &&
 						(screen === "root" ? (
 							<ScreenFade key="root">
-								<Menu onMultiplayer={() => setScreen("mp")} delayFor={delayFor} skipped={introDone} />
+								<Menu onMultiplayer={() => setScreen("mp")} beat={beat} />
 							</ScreenFade>
 						) : (
 							<ScreenFade key="mp">
