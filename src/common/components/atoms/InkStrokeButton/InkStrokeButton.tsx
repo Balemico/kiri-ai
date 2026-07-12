@@ -48,8 +48,8 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				background: "none",
 				border: "none",
 				cursor: disabled ? "default" : "pointer",
-				opacity: disabled ? 0.4 : 1,
 				...style,
+				opacity: disabled ? 0.4 : 1,
 			}}
 		>
 			<motion.span
@@ -89,8 +89,8 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 			{seal && (
 				<motion.span
 					variants={{
-						hidden: { opacity: 0, scale: 0.4 },
-						painted: { opacity: 1, scale: 1, transition: { delay: delay + 0.45, duration: 0.3 } },
+						hidden: { opacity: 0, scale: 0.4, rotate: -6 },
+						painted: { opacity: 1, scale: 1, rotate: -6, transition: { delay: delay + 0.45, duration: 0.3 } },
 					}}
 					style={{
 						position: "absolute",
@@ -101,7 +101,6 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 						marginTop: -8,
 						background: "#b73225",
 						borderRadius: 4,
-						transform: "rotate(-6deg)",
 						boxShadow: "0 2px 6px rgba(0, 0, 0, 0.3)",
 					}}
 				/>

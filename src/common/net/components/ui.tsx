@@ -152,8 +152,8 @@ export const usePortraitWindow = (): boolean => {
 /** Vermilion seal stamp — the waiting room's keyword reads as a hanko pressed on the paper. */
 export const HankoStamp = ({ children }: { children: ReactNode }) => (
 	<motion.div
-		initial={{ opacity: 0, scale: 1.4 }}
-		animate={{ opacity: 1, scale: 1 }}
+		initial={{ opacity: 0, scale: 1.4, rotate: -2.5 }}
+		animate={{ opacity: 1, scale: 1, rotate: -2.5 }}
 		transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
 		style={{
 			alignSelf: "center",
@@ -164,7 +164,6 @@ export const HankoStamp = ({ children }: { children: ReactNode }) => (
 			fontSize: 26,
 			letterSpacing: 4,
 			borderRadius: 10,
-			transform: "rotate(-2.5deg)",
 			boxShadow: "0 6px 18px rgba(0, 0, 0, 0.3), inset 0 0 12px rgba(0, 0, 0, 0.22)",
 			textTransform: "uppercase",
 		}}
