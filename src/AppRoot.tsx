@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import { GameProvider } from "./common/state";
 import { Scene, InkTransition } from "./common/components/sections";
@@ -28,6 +28,14 @@ export const AppRoot = () => {
 			setSceneReady(false);
 		}
 	}
+	// Leave-during-cover race: an in-flight seal animation completing AFTER `playing` flipped false
+	// must never set `covered` back to true (it would make the NEXT session skip the veil). The ref
+	// mirrors the live value (written in an effect — render-time ref writes are lint-forbidden), and
+	// the callback below guards on it rather than on a possibly-stale closure capture.
+	const playingRef = useRef(playing);
+	useEffect(() => {
+		playingRef.current = playing;
+	}, [playing]);
 
 	const showGame = playing && (covered || reduced);
 
@@ -41,7 +49,16 @@ export const AppRoot = () => {
 					<Scene entrance={reduced ? "none" : "fly"} onReady={() => setSceneReady(true)} />
 				</GameProvider>
 			)}
-			{!reduced && <InkTransition covering={playing} release={sceneReady} onCovered={() => setCovered(true)} />}
+			{/* Guarded on the LIVE session (ref): see the leave-during-cover race note above. */}
+			{!reduced && (
+				<InkTransition
+					covering={playing}
+					release={sceneReady}
+					onCovered={() => {
+						if (playingRef.current) setCovered(true);
+					}}
+				/>
+			)}
 		</>
 	);
 };
