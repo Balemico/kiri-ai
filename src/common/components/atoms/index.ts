@@ -11,3 +11,4 @@ export * from "./LandingZone";
 export * from "./Typography";
 export * from "./InkBrush";
 export * from "./Mist";
+export * from "./FallingLeaves";
