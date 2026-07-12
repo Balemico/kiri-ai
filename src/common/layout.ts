@@ -244,6 +244,83 @@ export const STAGE_LAYERS: StageLayer[] = [
 	{ url: "/images/backgroud/4-tree.png", depth: 0.62, phase: 0.6, y: 0.05 },
 ];
 
+// --- Lobby panorama (menu backdrop) ---
+// The lobby reuses the game's stage art but re-stages it: the maple tree is anchored to the LEFT
+// edge, bigger and nearer, because its canopy is the SOURCE of the falling leaves (they detach
+// from it and drift right across the scene — never spawn mid-air). Single source for the "Lobby"
+// Leva folder.
+export const LOBBY = {
+	// Tree re-staging (offsets applied on top of the shared layer size/position).
+	treeX: -2.1, // world-x shift left
+	treeY: -0.1,
+	treeScale: 1.45, // multiplier on the shared panel size
+	// Leaf particle field. Every leaf is born inside the canopy-aligned emitter box and dies
+	// below the visible bottom, then re-enters from the canopy (deterministic per-index cycle).
+	leaves: {
+		count: 36,
+		reducedCount: 4, // prefers-reduced-motion / low-end fallback
+		emitterX: -1.9, // canopy centre (world)
+		emitterY: 1.25,
+		emitterWidth: 1.5,
+		emitterHeight: 0.7,
+		floorY: -2.3, // below the frame bottom → leaves exit off-screen
+		fallSpeed: 0.22, // world units/s, base
+		fallJitter: 0.5, // ±50% per-leaf speed variance
+		drift: 0.3, // steady rightward wind (units/s at gust 1)
+		sway: 0.16, // lateral flutter amplitude
+		swayFreq: 0.7, // flutter Hz
+		spinSpeed: 1.1, // tumbling rad/s, base
+		windFreq: 0.11, // global gust Hz (slow)
+		windStrength: 0.6, // gust modulation of the drift (0 = constant wind)
+		minScale: 0.05,
+		maxScale: 0.1,
+		backRatio: 0.25, // fraction rendered on the far plane (smaller/paler, behind the mist)
+	},
+	mist: {
+		bands: 3,
+		height: 0.55, // world height of one band
+		opacity: 0.32,
+		speed: 0.018, // horizontal drift, world units/s
+		y: -0.05, // band-cluster centre relative to the horizon
+	},
+	columnWidthPct: 34, // landscape DOM menu column, % of viewport width
+} as const;
+
+// --- Intro choreography (entry cinematic, exit veil, fly-back reveal) ---
+// All timings in seconds. Single source for the "Intro" Leva folder + the DOM delays.
+export const INTRO = {
+	// Entry: stage layers paint far → near, then sun/tree/mist/leaves, then the DOM menu.
+	layerStagger: 0.28,
+	layerFade: 0.9, // per-layer fade/rise duration
+	leavesDelay: 1.8, // leaves become visible (storyboard beat 3)
+	menuDelay: 2.5, // first DOM element (calligraphy) starts painting
+	menuStagger: 0.35, // per-menu-item stagger after menuDelay
+	// Exit veil: brush strokes cover one after another, then "dry" out in order.
+	veilCover: 0.55, // one stroke's sweep duration
+	veilStrokeStagger: 0.14,
+	veilDry: 0.7, // one stroke's dry/fade-out duration
+	// Fly-back reveal: bird view above the board pulling back to the FitCamera pose.
+	flightDur: 2.5,
+	flightStartHeight: 2.4, // start y above the final camera y
+	flightStartDist: 0.35, // start z as a FRACTION of the final camera distance
+	boardRevealAt: 0.5, // seconds into the flight: board line + pawns mount
+	handRevealAt: 1.5, // seconds into the flight: hand fan cascades in
+} as const;
+
+/** Camera pose (y, z) of the locked front view for a frame + aspect — FitCamera's fit rule as a pure function. */
+export interface CameraPose {
+	y: number;
+	z: number;
+}
+
+export const cameraPose = (frame: SceneFrame, aspect: number, fovDeg: number): CameraPose => {
+	const halfHeight = (frame.top - frame.bottom) / 2;
+	const centerY = (frame.top + frame.bottom) / 2;
+	const tan = Math.tan((fovDeg * Math.PI) / 360); // tan(vFov/2)
+	// Distance that fits the frame vertically vs horizontally — take the larger (no axis clipped).
+	return { y: centerY, z: Math.max(halfHeight / tan, frame.halfWidth / (tan * aspect)) };
+};
+
 // --- Card geometry (world units, at group scale 1) ---
 // The GLB card body renders ~5:7 (see cardAlpha.ts). These are the on-screen
 // footprint of a single card and are used both to frame the scene and to anchor
