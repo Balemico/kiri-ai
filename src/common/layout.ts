@@ -256,7 +256,7 @@ export const LOBBY = {
 	// touching, negative = bleeds below — grounds it firmly). The art is a full-frame panel with
 	// the tree far bottom-left INSIDE the frame, so LobbyScene back-computes the panel centre
 	// from `treeAnchor`.
-	treeEdge: 0.15,
+	treeEdge: 0.6,
 	treeBottom: -0.1,
 	treeScale: 2.4, // sized so that, base at the bottom edge, the canopy still reaches the top
 	// The lobby pushes its horizon DOWN vs the duel's HORIZON_FRACTION (0.4): more painting, less
