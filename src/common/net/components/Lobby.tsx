@@ -14,8 +14,9 @@ import { HankoStamp, LobbyColumn } from "./ui";
 // re-enters a lobby that is already "awake".
 let introPlayed = false;
 
-// The DOM choreography has 4 beats: calligraphy (1), logo (2), then the two menu strokes (3, 4).
-const MENU_BEATS = 4;
+// The DOM choreography has 3 beats: the logo (1), then the two menu strokes (2, 3); the caption
+// under the strokes paints with the last beat.
+const MENU_BEATS = 3;
 
 /** On-screen connection health (mobile has no console) — unchanged behaviour, restyled for paper. */
 const NetDiagLine = () => {
@@ -103,19 +104,6 @@ export const Lobby = () => {
 		<div style={{ position: "fixed", inset: 0, zIndex: 3000, overflow: "hidden" }} onPointerDown={introDone ? undefined : finishIntro}>
 			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
 
-			{/* Calligraphy watermark behind the column (landscape flavour; harmless in portrait). */}
-			<motion.img
-				src="/images/intro/calligraphy.png"
-				alt=""
-				variants={{
-					hidden: { opacity: 0, clipPath: "inset(0 0 100% 0)" },
-					painted: { opacity: 0.15, clipPath: "inset(0 0 0% 0)", transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
-				}}
-				initial="hidden"
-				animate={beat > 0 ? "painted" : "hidden"}
-				style={{ position: "absolute", right: "30%", top: "6%", height: "70%", pointerEvents: "none" }}
-			/>
-
 			<LobbyColumn>
 				<motion.img
 					src="/images/logo/kiri-ai-logo.png"
@@ -125,7 +113,7 @@ export const Lobby = () => {
 						painted: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
 					}}
 					initial="hidden"
-					animate={beat > 1 ? "painted" : "hidden"}
+					animate={beat > 0 ? "painted" : "hidden"}
 					style={{ width: "82%", alignSelf: "center", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
 				/>
 

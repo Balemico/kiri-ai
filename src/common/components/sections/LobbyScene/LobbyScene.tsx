@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, type MutableRefObject } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Leva } from "leva";
 import gsap from "gsap";
 import * as THREE from "three";
@@ -7,7 +7,6 @@ import { FitCamera, Floor, FallingLeaves, Mist, ParallaxLayer } from "../../atom
 import { useFloorControls } from "../../../hooks/useFloorControls";
 import { useLobbyControls } from "../../../hooks/useLobbyControls";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
-import type { LeafFieldConfig } from "../../../leaves";
 import { DEFAULT_SCENE_FRAME, HORIZON_FRACTION, INTRO, LOBBY, PAPER, STAGE, STAGE_LAYERS, frameViewport } from "../../../layout";
 
 const TREE_URL = "/images/backgroud/4-tree.png";
@@ -48,6 +47,15 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	const width = visibleWidth * STAGE.widthOverscan * STAGE.scale;
 	const height = width / STAGE.imageAspect;
 	const centerY = (frame.top + horizonY) / 2 + STAGE.lift;
+
+	// The tree art is a full-frame panel with the tree far bottom-left INSIDE the frame: anchor its
+	// measured centre of mass (LOBBY.treeAnchor) to the tuned WORLD position (treeX/treeY), so the
+	// tree stays put at any aspect — a raw panel offset would drift with the panel width and slide
+	// the tree off-screen. worldX(f) = centerX + (f − 0.5)·W, worldY(f) = centerY + (0.5 − f)·H.
+	const treeWidth = width * c.treeScale;
+	const treeHeight = treeWidth / STAGE.imageAspect;
+	const treeCenterX = c.treeX - (LOBBY.treeAnchor.x - 0.5) * treeWidth;
+	const treeCenterY = c.treeY - (0.5 - LOBBY.treeAnchor.y) * treeHeight;
 
 	// --- Entry cinematic: collect layer materials, then build one master timeline. ---
 	const materials = useRef(new Map<string, THREE.MeshBasicMaterial>());
@@ -133,10 +141,10 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 					phase={0.6}
 					z={STAGE.planeZ + 0.02}
 					renderOrder={-60}
-					width={width * c.treeScale}
-					height={(width * c.treeScale) / STAGE.imageAspect}
-					centerY={centerY + c.treeY}
-					centerX={c.treeX}
+					width={treeWidth}
+					height={treeHeight}
+					centerY={treeCenterY}
+					centerX={treeCenterX}
 					parallaxX={STAGE.parallaxX}
 					parallaxY={STAGE.parallaxY}
 					driftAmp={STAGE.driftAmp}
@@ -146,21 +154,10 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 				<Floor frame={frame} controls={floor} orientation="landscape" />
 			</Suspense>
 			<Mist bands={LOBBY.mist.bands} opacity={c.mistOpacity} speed={c.mistSpeed} height={LOBBY.mist.height} y={horizonY + LOBBY.mist.y} width={visibleWidth * 1.2} />
-			<LeafField cfg={leafCfg} visibleRef={leafVisibleRef} />
+			{/* The field's own clock starts when the ref flips true — an empty canopy shedding leaves
+			    one by one (leafPose staggers detachment from t=0), never a mid-air switch-on. */}
+			<FallingLeaves cfg={leafCfg} armedRef={leafVisibleRef} />
 		</>
-	);
-};
-
-/** Bridges the timeline's imperative "leaves on" flag into the leaf group's visibility. */
-const LeafField = ({ cfg, visibleRef }: { cfg: LeafFieldConfig; visibleRef: MutableRefObject<boolean> }) => {
-	const group = useRef<THREE.Group>(null);
-	useFrame(() => {
-		if (group.current) group.current.visible = visibleRef.current;
-	});
-	return (
-		<group ref={group} visible={false}>
-			<FallingLeaves cfg={cfg} />
-		</group>
 	);
 };
 

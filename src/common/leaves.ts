@@ -1,7 +1,9 @@
 // Pure leaf-field math for the lobby's falling maple leaves — no React, no Three (unit-tested).
-// Each leaf lives on a deterministic per-index cycle: born inside the tree-canopy emitter box,
-// it falls with a per-leaf speed, drifts right on a gusting wind, flutters, tumbles, and once it
-// crosses the kill line it re-enters from the canopy (same spawn column) — never mid-air.
+// Each leaf lives on a deterministic per-index cycle: it DETACHES from the tree-canopy emitter
+// box at its own staggered birth time (the field populates leaf by leaf, never mid-air), scales
+// in as it detaches, falls with a per-leaf speed, drifts right on a gusting wind, flutters,
+// tumbles, and once it crosses the kill line it re-enters from the canopy — growing in again, so
+// a respawn reads as a new leaf detaching rather than a pop.
 
 import type { LOBBY } from "./layout";
 
@@ -19,7 +21,8 @@ export interface LeafSpawn {
 	y0: number;
 	speed: number;
 	cycle: number;
-	phase: number;
+	/** Seconds after the field starts when this leaf FIRST detaches — staggers the population. */
+	birth: number;
 	scale: number;
 	back: boolean;
 }
@@ -35,7 +38,7 @@ export const leafSpawn = (index: number, cfg: LeafFieldConfig): LeafSpawn => {
 		y0,
 		speed,
 		cycle,
-		phase: leafRandom(index, 4) * cycle, // desynchronise the field
+		birth: leafRandom(index, 4) * cfg.birthStagger, // desynchronise by staggering detachment
 		scale: cfg.minScale + leafRandom(index, 5) * (cfg.maxScale - cfg.minScale),
 		back: leafRandom(index, 6) < cfg.backRatio,
 	};
@@ -51,10 +54,19 @@ export interface LeafPose {
 	back: boolean;
 }
 
-/** World pose of leaf `index` at time `t` (seconds). Pure: same (index, t, cfg) → same pose. */
+/**
+ * World pose of leaf `index` at field-time `t` (seconds since the field started, NOT wall clock).
+ * Pure: same (index, t, cfg) → same pose. Before its birth a leaf is parked at its spawn point
+ * at scale 0 (invisible); each (re)birth scales it in over `growSeconds`.
+ */
 export const leafPose = (index: number, t: number, cfg: LeafFieldConfig): LeafPose => {
 	const s = leafSpawn(index, cfg);
-	const elapsed = (t + s.phase) % s.cycle; // seconds since (re)birth
+	const life = t - s.birth;
+	if (life < 0) return { x: s.x0, y: s.y0, rotX: 0, rotY: 0, rotZ: 0, scale: 0, back: s.back };
+	const elapsed = life % s.cycle; // seconds since the current (re)birth
+	// Detach growth (easeOut): 0 at the instant of (re)birth → full size after growSeconds.
+	const g = Math.min(elapsed / Math.max(cfg.growSeconds, 1e-6), 1);
+	const grow = g * (2 - g);
 	const gust = 1 + cfg.windStrength * Math.sin(t * cfg.windFreq * TWO_PI + leafRandom(index, 7) * TWO_PI);
 	const flutter = Math.sin(elapsed * cfg.swayFreq * TWO_PI + leafRandom(index, 8) * TWO_PI) * cfg.sway;
 	return {
@@ -63,7 +75,7 @@ export const leafPose = (index: number, t: number, cfg: LeafFieldConfig): LeafPo
 		rotX: Math.sin(elapsed * cfg.spinSpeed * 0.7 + leafRandom(index, 9) * TWO_PI) * 0.9,
 		rotY: Math.sin(elapsed * cfg.spinSpeed * 0.5 + leafRandom(index, 10) * TWO_PI) * 0.7,
 		rotZ: elapsed * cfg.spinSpeed * (0.5 + leafRandom(index, 11)) + leafRandom(index, 12) * TWO_PI,
-		scale: s.scale,
+		scale: s.scale * grow,
 		back: s.back,
 	};
 };

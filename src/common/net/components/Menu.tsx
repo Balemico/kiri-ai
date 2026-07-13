@@ -1,24 +1,36 @@
+import { motion } from "motion/react";
 import { useSession } from "../useSession";
 import { InkStrokeButton } from "../../components/atoms";
 
 /**
  * Root screen: the two mode strokes floating on the panorama (the logo lives in Lobby's column).
- * `beat` is Lobby's choreography counter — each button paints on when its beat is reached
- * (buttons take beats 3 and 4; the calligraphy and logo take 1 and 2). A skip jumps all beats.
+ * `beat` is Lobby's choreography counter — each element paints on when its beat is reached (the
+ * logo takes beat 1; the buttons take 2 and 3; the caption rides the last beat). A skip jumps
+ * all beats.
  */
 export const Menu = ({ onMultiplayer, beat }: { onMultiplayer: () => void; beat: number }) => {
 	const { startLocal } = useSession();
 	return (
 		<>
-			<InkStrokeButton onClick={startLocal} variant={0} seal visible={beat > 2}>
+			<InkStrokeButton onClick={startLocal} variant={0} seal visible={beat > 1}>
 				PASSA E GIOCA
 			</InkStrokeButton>
-			<InkStrokeButton onClick={onMultiplayer} variant={1} visible={beat > 3}>
+			<InkStrokeButton onClick={onMultiplayer} variant={1} visible={beat > 2}>
 				MULTIPLAYER
 			</InkStrokeButton>
-			<p style={{ margin: "2px 0 0", fontSize: 12, opacity: 0.55, textAlign: "center", lineHeight: 1.5, color: "#17120e" }}>
+			{/* Opacity lives in the variants (Motion owns it) — the caption is part of the choreography,
+			    fading in just after the last stroke instead of sitting on the page from frame one. */}
+			<motion.p
+				variants={{
+					hidden: { opacity: 0 },
+					painted: { opacity: 0.55, transition: { delay: 0.25, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+				}}
+				initial="hidden"
+				animate={beat > 2 ? "painted" : "hidden"}
+				style={{ margin: "2px 0 0", fontSize: 12, textAlign: "center", lineHeight: 1.5, color: "#17120e" }}
+			>
 				Passa e gioca sullo stesso dispositivo, oppure sfida un avversario online.
-			</p>
+			</motion.p>
 		</>
 	);
 };

@@ -250,18 +250,25 @@ export const STAGE_LAYERS: StageLayer[] = [
 // from it and drift right across the scene — never spawn mid-air). Single source for the "Lobby"
 // Leva folder.
 export const LOBBY = {
-	// Tree re-staging (offsets applied on top of the shared layer size/position).
-	treeX: -2.1, // world-x shift left
-	treeY: -0.1,
+	// Tree re-staging. `treeX/treeY` are the WORLD coordinates of the tree's centre of mass: the
+	// art is a full-frame panel with the tree far bottom-left INSIDE the frame, so LobbyScene
+	// back-computes the panel centre from `treeAnchor` — anchoring the mass keeps the tree put at
+	// any viewport aspect (a raw panel offset drifts with the panel width and slides off-screen).
+	treeX: -2.3,
+	treeY: 0.35,
 	treeScale: 1.45, // multiplier on the shared panel size
+	// Alpha-weighted centre of the tree inside 4-tree.png, as fractions of the frame (measured at
+	// alpha > 160 — the soft ground wash below that threshold is ignored). Remeasure if the art
+	// is regenerated: scripts note in CLAUDE.md.
+	treeAnchor: { x: 0.17, y: 0.79 },
 	// Leaf particle field. Every leaf is born inside the canopy-aligned emitter box and dies
 	// below the visible bottom, then re-enters from the canopy (deterministic per-index cycle).
 	leaves: {
 		count: 36,
 		reducedCount: 4, // prefers-reduced-motion / low-end fallback
-		emitterX: -1.9, // canopy centre (world)
+		emitterX: -2.2, // canopy centre (world) — keep aligned with treeX/treeAnchor
 		emitterY: 1.25,
-		emitterWidth: 1.5,
+		emitterWidth: 1.6,
 		emitterHeight: 0.7,
 		floorY: -2.3, // below the frame bottom → leaves exit off-screen
 		fallSpeed: 0.22, // world units/s, base
@@ -275,6 +282,8 @@ export const LOBBY = {
 		minScale: 0.05,
 		maxScale: 0.1,
 		backRatio: 0.25, // fraction rendered on the far plane (smaller/paler, behind the mist)
+		birthStagger: 6, // seconds over which the field populates after release — leaves detach one by one
+		growSeconds: 0.9, // per-leaf scale-in at each (re)birth, so a detach never pops
 	},
 	mist: {
 		bands: 3,
@@ -293,7 +302,7 @@ export const INTRO = {
 	layerStagger: 0.28,
 	layerFade: 0.9, // per-layer fade/rise duration
 	leavesDelay: 1.8, // leaves become visible (storyboard beat 3)
-	menuDelay: 2.5, // first DOM element (calligraphy) starts painting
+	menuDelay: 2.5, // first DOM element (the logo) starts painting
 	menuStagger: 0.35, // per-menu-item stagger after menuDelay
 	total: 4.5, // full entry choreography (3D paint-on + DOM menu) — the natural finish beat
 	// Exit veil: brush strokes cover one after another, then "dry" out in order.
