@@ -4,7 +4,8 @@ import { LOBBY } from "../layout";
 export interface LobbyControls {
 	/** Inset of the tree's mass centre from the visible LEFT edge (negative = bleeds off). */
 	treeEdge: number;
-	treeY: number;
+	/** Inset of the tree's painted base from the visible BOTTOM edge (negative = bleeds below). */
+	treeBottom: number;
 	treeScale: number;
 	leafCount: number;
 	windStrength: number;
@@ -20,8 +21,8 @@ export const useLobbyControls = (): LobbyControls =>
 		"Lobby",
 		{
 			treeEdge: { value: LOBBY.treeEdge, min: -1.5, max: 3, step: 0.05 },
-			treeY: { value: LOBBY.treeY, min: -1.5, max: 1.5, step: 0.05 },
-			treeScale: { value: LOBBY.treeScale, min: 1, max: 2.5, step: 0.05 },
+			treeBottom: { value: LOBBY.treeBottom, min: -1.5, max: 1.5, step: 0.05 },
+			treeScale: { value: LOBBY.treeScale, min: 1, max: 3.2, step: 0.05 },
 			leafCount: { value: LOBBY.leaves.count, min: 0, max: 80, step: 1 },
 			windStrength: { value: LOBBY.leaves.windStrength, min: 0, max: 1.5, step: 0.05 },
 			drift: { value: LOBBY.leaves.drift, min: 0, max: 1, step: 0.02 },

@@ -44,21 +44,22 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	// Panorama sizing — mirrors Stage (visible width, native aspect), but on the LOBBY's deeper
 	// horizon: more painting, less bare paper below the menu.
 	const horizonY = frame.top - (frame.top - frame.bottom) * LOBBY.horizonFraction;
-	const visibleWidth = frameViewport(frame, size.width / size.height).width;
+	const vp = frameViewport(frame, size.width / size.height);
+	const visibleWidth = vp.width;
 	const width = visibleWidth * STAGE.widthOverscan * STAGE.scale;
 	const height = width / STAGE.imageAspect;
 	const centerY = (frame.top + horizonY) / 2 + STAGE.lift;
 
-	// The tree art is a full-frame panel with the tree far bottom-left INSIDE the frame: anchor its
-	// measured centre of mass (LOBBY.treeAnchor) to a point `treeEdge` inside the visible LEFT
-	// edge, so the tree hugs the border identically at any aspect — a raw panel offset would drift
-	// with the panel width and slide the tree off-screen.
+	// The tree art is a full-frame panel with the tree far bottom-left INSIDE the frame: anchor
+	// its measured footprint (LOBBY.treeAnchor) to TWO view edges — mass centre `treeEdge` inside
+	// the LEFT edge, painted base `treeBottom` above the BOTTOM edge — so the tree hugs the corner
+	// identically at any aspect (a raw panel offset would drift with the panel width).
 	// worldX(f) = centerX + (f − 0.5)·W, worldY(f) = centerY + (0.5 − f)·H.
 	const treeWorldX = -visibleWidth / 2 + c.treeEdge;
 	const treeWidth = width * c.treeScale;
 	const treeHeight = treeWidth / STAGE.imageAspect;
 	const treeCenterX = treeWorldX - (LOBBY.treeAnchor.x - 0.5) * treeWidth;
-	const treeCenterY = c.treeY - (0.5 - LOBBY.treeAnchor.y) * treeHeight;
+	const treeCenterY = vp.bottom + c.treeBottom + (LOBBY.treeAnchor.bottom - 0.5) * treeHeight;
 
 	// --- Entry cinematic: collect layer materials, then build one master timeline. ---
 	const materials = useRef(new Map<string, THREE.MeshBasicMaterial>());

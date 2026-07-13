@@ -250,22 +250,23 @@ export const STAGE_LAYERS: StageLayer[] = [
 // from it and drift right across the scene — never spawn mid-air). Single source for the "Lobby"
 // Leva folder.
 export const LOBBY = {
-	// Tree re-staging. The tree hugs the LEFT VIEW EDGE: `treeEdge` is how far the tree's centre
-	// of mass sits INSIDE from the visible left edge (world units; smaller/negative = bleeds off
-	// the edge), so the composition holds at any viewport aspect. `treeY` is the mass centre's
-	// world height. The art is a full-frame panel with the tree far bottom-left INSIDE the frame,
-	// so LobbyScene back-computes the panel centre from `treeAnchor`.
-	treeEdge: 0.45,
-	treeY: 0.3,
-	treeScale: 1.8, // multiplier on the shared panel size — the lobby tree is the protagonist
+	// Tree re-staging. The tree is anchored to TWO view edges so the composition holds at any
+	// aspect: `treeEdge` = inset of its centre of mass from the visible LEFT edge (negative =
+	// bleeds off), `treeBottom` = inset of its painted BASE from the visible BOTTOM edge (0 =
+	// touching, negative = bleeds below — grounds it firmly). The art is a full-frame panel with
+	// the tree far bottom-left INSIDE the frame, so LobbyScene back-computes the panel centre
+	// from `treeAnchor`.
+	treeEdge: 0.15,
+	treeBottom: -0.1,
+	treeScale: 2.4, // sized so that, base at the bottom edge, the canopy still reaches the top
 	// The lobby pushes its horizon DOWN vs the duel's HORIZON_FRACTION (0.4): more painting, less
 	// bare paper below. The tree also draws ABOVE the floor here (true foreground), so its base
 	// stands on the ground instead of dissolving into the horizon wash.
 	horizonFraction: 0.5,
-	// Alpha-weighted centre of the tree inside 4-tree.png, as fractions of the frame (measured at
-	// alpha > 160 — the soft ground wash below that threshold is ignored). Remeasure if the art
-	// is regenerated: scripts note in CLAUDE.md.
-	treeAnchor: { x: 0.17, y: 0.79 },
+	// Tree footprint inside 4-tree.png, as fractions of the frame (alpha > 160 — the soft ground
+	// wash below that threshold is ignored): x/y = alpha-weighted centre of mass, bottom = lowest
+	// painted row. Remeasure if the art is regenerated: scripts note in CLAUDE.md.
+	treeAnchor: { x: 0.17, y: 0.79, bottom: 0.995 },
 	// Canopy centre relative to the tree's mass centre (world x) — the leaf emitter follows the
 	// tree through this offset, so moving/reanchoring the tree never orphans the leaves.
 	treeCanopyOffsetX: -0.2,
@@ -275,9 +276,9 @@ export const LOBBY = {
 		count: 44,
 		reducedCount: 4, // prefers-reduced-motion / low-end fallback
 		emitterX: -2.6, // canopy centre (world) — LobbyScene OVERRIDES this to follow the tree; this default serves the pure-math tests
-		emitterY: 1.35,
-		emitterWidth: 1.9,
-		emitterHeight: 0.8,
+		emitterY: 1.3,
+		emitterWidth: 2.2,
+		emitterHeight: 0.9,
 		floorY: -2.3, // below the frame bottom → leaves exit off-screen
 		fallSpeed: 0.22, // world units/s, base
 		fallJitter: 0.5, // ±50% per-leaf speed variance
