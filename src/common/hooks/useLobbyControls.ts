@@ -2,7 +2,8 @@ import { useControls } from "leva";
 import { LOBBY } from "../layout";
 
 export interface LobbyControls {
-	treeX: number;
+	/** Inset of the tree's mass centre from the visible LEFT edge (negative = bleeds off). */
+	treeEdge: number;
 	treeY: number;
 	treeScale: number;
 	leafCount: number;
@@ -18,7 +19,7 @@ export const useLobbyControls = (): LobbyControls =>
 	useControls(
 		"Lobby",
 		{
-			treeX: { value: LOBBY.treeX, min: -4, max: 0, step: 0.05 },
+			treeEdge: { value: LOBBY.treeEdge, min: -1.5, max: 3, step: 0.05 },
 			treeY: { value: LOBBY.treeY, min: -1.5, max: 1.5, step: 0.05 },
 			treeScale: { value: LOBBY.treeScale, min: 1, max: 2.5, step: 0.05 },
 			leafCount: { value: LOBBY.leaves.count, min: 0, max: 80, step: 1 },

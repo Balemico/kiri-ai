@@ -250,26 +250,30 @@ export const STAGE_LAYERS: StageLayer[] = [
 // from it and drift right across the scene — never spawn mid-air). Single source for the "Lobby"
 // Leva folder.
 export const LOBBY = {
-	// Tree re-staging. `treeX/treeY` are the WORLD coordinates of the tree's centre of mass: the
-	// art is a full-frame panel with the tree far bottom-left INSIDE the frame, so LobbyScene
-	// back-computes the panel centre from `treeAnchor` — anchoring the mass keeps the tree put at
-	// any viewport aspect (a raw panel offset drifts with the panel width and slides off-screen).
-	treeX: -2.3,
-	treeY: 0.35,
-	treeScale: 1.45, // multiplier on the shared panel size
+	// Tree re-staging. The tree hugs the LEFT VIEW EDGE: `treeEdge` is how far the tree's centre
+	// of mass sits INSIDE from the visible left edge (world units; smaller/negative = bleeds off
+	// the edge), so the composition holds at any viewport aspect. `treeY` is the mass centre's
+	// world height. The art is a full-frame panel with the tree far bottom-left INSIDE the frame,
+	// so LobbyScene back-computes the panel centre from `treeAnchor`.
+	treeEdge: 0.45,
+	treeY: 0.3,
+	treeScale: 1.8, // multiplier on the shared panel size — the lobby tree is the protagonist
 	// Alpha-weighted centre of the tree inside 4-tree.png, as fractions of the frame (measured at
 	// alpha > 160 — the soft ground wash below that threshold is ignored). Remeasure if the art
 	// is regenerated: scripts note in CLAUDE.md.
 	treeAnchor: { x: 0.17, y: 0.79 },
+	// Canopy centre relative to the tree's mass centre (world x) — the leaf emitter follows the
+	// tree through this offset, so moving/reanchoring the tree never orphans the leaves.
+	treeCanopyOffsetX: -0.2,
 	// Leaf particle field. Every leaf is born inside the canopy-aligned emitter box and dies
 	// below the visible bottom, then re-enters from the canopy (deterministic per-index cycle).
 	leaves: {
 		count: 36,
 		reducedCount: 4, // prefers-reduced-motion / low-end fallback
-		emitterX: -2.2, // canopy centre (world) — keep aligned with treeX/treeAnchor
-		emitterY: 1.25,
-		emitterWidth: 1.6,
-		emitterHeight: 0.7,
+		emitterX: -2.6, // canopy centre (world) — LobbyScene OVERRIDES this to follow the tree; this default serves the pure-math tests
+		emitterY: 1.35,
+		emitterWidth: 1.9,
+		emitterHeight: 0.8,
 		floorY: -2.3, // below the frame bottom → leaves exit off-screen
 		fallSpeed: 0.22, // world units/s, base
 		fallJitter: 0.5, // ±50% per-leaf speed variance

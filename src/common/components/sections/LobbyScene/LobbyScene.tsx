@@ -49,12 +49,14 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	const centerY = (frame.top + horizonY) / 2 + STAGE.lift;
 
 	// The tree art is a full-frame panel with the tree far bottom-left INSIDE the frame: anchor its
-	// measured centre of mass (LOBBY.treeAnchor) to the tuned WORLD position (treeX/treeY), so the
-	// tree stays put at any aspect — a raw panel offset would drift with the panel width and slide
-	// the tree off-screen. worldX(f) = centerX + (f − 0.5)·W, worldY(f) = centerY + (0.5 − f)·H.
+	// measured centre of mass (LOBBY.treeAnchor) to a point `treeEdge` inside the visible LEFT
+	// edge, so the tree hugs the border identically at any aspect — a raw panel offset would drift
+	// with the panel width and slide the tree off-screen.
+	// worldX(f) = centerX + (f − 0.5)·W, worldY(f) = centerY + (0.5 − f)·H.
+	const treeWorldX = -visibleWidth / 2 + c.treeEdge;
 	const treeWidth = width * c.treeScale;
 	const treeHeight = treeWidth / STAGE.imageAspect;
-	const treeCenterX = c.treeX - (LOBBY.treeAnchor.x - 0.5) * treeWidth;
+	const treeCenterX = treeWorldX - (LOBBY.treeAnchor.x - 0.5) * treeWidth;
 	const treeCenterY = c.treeY - (0.5 - LOBBY.treeAnchor.y) * treeHeight;
 
 	// --- Entry cinematic: collect layer materials, then build one master timeline. ---
@@ -106,9 +108,18 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	);
 
 	// Memoized so FallingLeaves' internal per-cfg split cache survives unrelated re-renders.
+	// The emitter FOLLOWS the tree (canopy offset from its mass centre) — moving or reanchoring
+	// the tree never orphans the leaves.
 	const leafCfg = useMemo(
-		() => ({ ...LOBBY.leaves, count: reducedLeaves ? LOBBY.leaves.reducedCount : c.leafCount, windStrength: c.windStrength, drift: c.drift, fallSpeed: c.fallSpeed }),
-		[c.leafCount, c.windStrength, c.drift, c.fallSpeed, reducedLeaves],
+		() => ({
+			...LOBBY.leaves,
+			emitterX: treeWorldX + LOBBY.treeCanopyOffsetX,
+			count: reducedLeaves ? LOBBY.leaves.reducedCount : c.leafCount,
+			windStrength: c.windStrength,
+			drift: c.drift,
+			fallSpeed: c.fallSpeed,
+		}),
+		[c.leafCount, c.windStrength, c.drift, c.fallSpeed, reducedLeaves, treeWorldX],
 	);
 
 	return (
