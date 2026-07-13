@@ -54,7 +54,8 @@ const VeilStroke = ({ def, index, release }: VeilStrokeProps) => {
 	const blend = useTransform(progress, (v) => inkFrameBlend(v, INTRO.paintFrames).blend);
 	// Frame f01 is not empty — keep the stroke invisible until its delayed tween actually starts.
 	const started = useTransform(progress, (v) => (v > 0 ? 1 : 0));
-	const x = useTransform(progress, (v) => `${(1 - v) * -INTRO.veilDrag}vw`);
+	// Scaled by def.flip: mirrored strokes (scaleX: -1) draw right→left, so the drag must too.
+	const x = useTransform(progress, (v) => `${(1 - v) * -INTRO.veilDrag * def.flip}vw`);
 	const dry = `url(/images/intro/${def.veil}-dry.png)`;
 
 	return (
