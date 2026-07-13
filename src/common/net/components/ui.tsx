@@ -98,7 +98,7 @@ export const LobbyColumn = ({ children }: { children: ReactNode }) => {
 				display: "flex",
 				flexDirection: "column",
 				justifyContent: "center",
-				gap: 16,
+				gap: 26,
 				pointerEvents: "auto",
 			}}
 		>

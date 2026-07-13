@@ -50,7 +50,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 			style={{
 				position: "relative",
 				width: "100%",
-				height: 58,
+				height: 70,
 				padding: 0,
 				background: "none",
 				border: "none",
@@ -85,7 +85,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				style={{
 					position: "relative",
 					color: "#f2ead9",
-					fontSize: 15,
+					fontSize: 16,
 					fontWeight: 700,
 					letterSpacing: 3,
 					whiteSpace: "nowrap",
@@ -101,11 +101,13 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 					}}
 					style={{
 						position: "absolute",
-						right: -6,
+						// ON the stroke's tapering tail, not past the button box — the mask ends before the
+						// box edge, so a negative offset reads as an orphaned floating square.
+						right: 26,
 						top: "50%",
-						width: 16,
-						height: 16,
-						marginTop: -8,
+						width: 18,
+						height: 18,
+						marginTop: -9,
 						background: "#b73225",
 						borderRadius: 4,
 						boxShadow: "0 2px 6px rgba(0, 0, 0, 0.3)",

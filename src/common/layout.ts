@@ -268,7 +268,7 @@ export const LOBBY = {
 	// Leaf particle field. Every leaf is born inside the canopy-aligned emitter box and dies
 	// below the visible bottom, then re-enters from the canopy (deterministic per-index cycle).
 	leaves: {
-		count: 36,
+		count: 44,
 		reducedCount: 4, // prefers-reduced-motion / low-end fallback
 		emitterX: -2.6, // canopy centre (world) — LobbyScene OVERRIDES this to follow the tree; this default serves the pure-math tests
 		emitterY: 1.35,

@@ -114,7 +114,7 @@ export const Lobby = () => {
 					}}
 					initial="hidden"
 					animate={beat > 0 ? "painted" : "hidden"}
-					style={{ width: "82%", alignSelf: "center", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
+					style={{ width: "100%", alignSelf: "center", marginBottom: 10, filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
 				/>
 
 				<AnimatePresence mode="wait">
