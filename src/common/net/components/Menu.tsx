@@ -12,7 +12,7 @@ export const Menu = ({ onMultiplayer, beat }: { onMultiplayer: () => void; beat:
 	const { startLocal } = useSession();
 	return (
 		<>
-			<InkStrokeButton onClick={startLocal} variant={0} seal visible={beat > 1}>
+			<InkStrokeButton onClick={startLocal} variant={0} visible={beat > 1}>
 				PASSA E GIOCA
 			</InkStrokeButton>
 			<InkStrokeButton onClick={onMultiplayer} variant={1} visible={beat > 2}>
