@@ -16,27 +16,41 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def brush_stroke(w, h, seed, taper=0.75):
-    """A ragged horizontal brush band: stacked noisy ellipses + speckle erosion at the edges."""
+    """A dry, rough horizontal stroke: hard-noised body + flying-white streaks + bristle
+    speckle at the contour + stray splatter. Alpha carries ink density (greys = dilution)."""
     rng = random.Random(seed)
     img = Image.new("L", (w, h), 0)
     d = ImageDraw.Draw(img)
     cy = h // 2
-    for x in range(0, w, 4):
+    # Body: jittered ellipses with hard radius noise — ragged contour, uneven ink load.
+    for x in range(0, w, 3):
         t = x / w
         end = min(t, 1 - t) / (1 - taper) if taper < 1 else 1.0
-        swell = 0.55 + 0.45 * math.sin(t * math.pi) + rng.uniform(-0.18, 0.18)
-        r = max(2, int(h * 0.34 * swell * min(1.0, end * 3.2)))
-        wob = int(math.sin(t * 9 + seed) * h * 0.05) + rng.randint(-2, 2)
-        d.ellipse([x - r, cy - r + wob, x + r, cy + r + wob], fill=255)
-    img = img.filter(ImageFilter.GaussianBlur(1.2))
-    # Dry-brush erosion: punch small holes near the contour.
+        swell = 0.5 + 0.42 * math.sin(t * math.pi) + rng.uniform(-0.3, 0.3)
+        r = max(1, int(h * 0.36 * swell * min(1.0, end * 3.2)))
+        wob = int(math.sin(t * 7 + seed) * h * 0.06) + rng.randint(-4, 4)
+        d.ellipse([x - r, cy - r + wob, x + r, cy + r + wob], fill=rng.randint(200, 255))
+    # Flying white: long thin gaps where dry bristles left no ink.
+    for _ in range(14):
+        y0 = cy + rng.randint(-h // 3, h // 3)
+        x0 = rng.randint(0, w // 2)
+        x1 = x0 + rng.randint(w // 6, w // 2)
+        d.line([(x0, y0), (x1, y0 + rng.randint(-6, 6))], fill=0, width=rng.randint(1, max(2, h // 40)))
+    img = img.filter(ImageFilter.GaussianBlur(0.6))
+    # Bristle speckle: erode the contour into grain.
     px = img.load()
-    for _ in range(w * h // 55):
+    for _ in range(w * h // 30):
         x, y = rng.randrange(w), rng.randrange(h)
         if 24 < px[x, y] < 235:
             d.ellipse([x - 2, y - 1, x + 2, y + 1], fill=0)
+    # Stray splatter dots just outside the body (semi-transparent = diluted flicks).
+    for _ in range(w // 18):
+        x, y = rng.randrange(w), rng.randrange(h)
+        if px[x, y] == 0 and rng.random() < 0.5:
+            r = rng.randint(1, 3)
+            d.ellipse([x - r, y - r, x + r, y + r], fill=rng.randint(140, 230))
     rgba = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-    rgba.putalpha(img.point(lambda v: 0 if v < 28 else v))
+    rgba.putalpha(img.point(lambda v: 0 if v < 24 else v))
     return rgba
 
 
