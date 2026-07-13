@@ -318,6 +318,10 @@ export const INTRO = {
 	veilCover: 0.55, // one stroke's sweep duration
 	veilStrokeStagger: 0.14,
 	veilDry: 0.7, // one stroke's dry/fade-out duration
+	// Ink paint-on (frame-sequence masks from scripts/ink_masks.py).
+	paintFrames: 12, // frames per stroke/veil — must match FRAME_COUNT in ink_masks.py
+	strokePaint: 0.55, // one button stroke's draw duration
+	veilDrag: 10, // vw of residual wrist-drag while a veil stroke is being drawn
 	// Fly-back reveal: bird view above the board pulling back to the FitCamera pose.
 	flightDur: 2.5,
 	flightStartHeight: 2.4, // start y above the final camera y

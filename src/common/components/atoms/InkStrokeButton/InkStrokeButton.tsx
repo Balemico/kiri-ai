@@ -1,14 +1,21 @@
+import { useEffect } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { motion } from "motion/react";
+import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { INTRO } from "../../../layout";
+import { inkFrameBlend, inkFrameSrc, preloadInkFrames } from "../../../inkFrames";
 
-const STROKES = ["/images/intro/stroke-1.png", "/images/intro/stroke-2.png", "/images/intro/stroke-3.png"];
+const VARIANTS = ["stroke-1", "stroke-2", "stroke-3"] as const;
 
+// Tones are SOLID ink; "ghost" dims via the wrapper's opacity instead of an rgba fill — the
+// paint-on stacks two mask layers, and a translucent fill would double-darken their overlap.
 const TONES = {
-	ink: "#17120e",
-	red: "#b73225",
-	blue: "#2f6f86",
-	ghost: "rgba(23, 18, 14, 0.34)",
+	ink: { color: "#17120e", opacity: 1 },
+	red: { color: "#b73225", opacity: 1 },
+	blue: { color: "#2f6f86", opacity: 1 },
+	ghost: { color: "#17120e", opacity: 0.34 },
 } as const;
+
+for (const name of VARIANTS) preloadInkFrames(name, INTRO.paintFrames);
 
 export interface InkStrokeButtonProps {
 	children: ReactNode;
@@ -19,25 +26,46 @@ export interface InkStrokeButtonProps {
 	variant?: 0 | 1 | 2;
 	/** Vermilion hanko dot at the stroke's end — the primary action's mark. */
 	seal?: boolean;
-	/** False = still hidden (intro choreography); flipping to true paints the stroke on NOW. */
+	/** False = still hidden (intro choreography); flipping to true draws the stroke NOW. */
 	visible?: boolean;
 	style?: CSSProperties;
 }
 
+const MASK_LAYER: CSSProperties = {
+	position: "absolute",
+	inset: 0,
+	WebkitMaskSize: "100% 100%",
+	maskSize: "100% 100%",
+};
+
 /**
- * A floating sumi brush stroke that IS the button: the PNG is a mask over a colour fill, so
- * every tone shares the real brush silhouette. Paints on left→right (clip-path), and on hover
- * the ink "bleeds" — the stroke stretches a touch and the label's tracking opens.
+ * A floating sumi brush stroke that IS the button — and it is DRAWN, not revealed: a Motion
+ * value 0→1 scrubs through 12 progressive mask frames (ragged, semi-transparent brush-tip
+ * frontier baked in by scripts/ink_masks.py). Two stacked mask layers crossfade between
+ * adjacent frames, and since frames are monotonic the fade only ever adds the fresh delta —
+ * the stroke lays down continuously, flying white included.
  *
- * The paint-on is STATE-driven (`visible`), never delay-scheduled: the caller flips `visible`
- * when the choreography reaches this button's beat, switching the variant label
- * hidden → painted — a target-CHANGING label switch, which Motion animates immediately. A skip
- * that flips every beat at once therefore fast-forwards reliably (whereas a changed
- * `transition.delay` never restarts a pending Motion animation, and a same-target relabel is
- * ignored via `protectedKeys`). The small label/seal delays below are intra-element offsets only.
+ * The paint-on stays STATE-driven (`visible`), never delay-scheduled: flipping `visible`
+ * (re)starts the progress tween immediately, so an intro skip that flips every beat at once
+ * fast-forwards reliably (a changed `transition.delay` would never restart a pending Motion
+ * animation). Label/seal keep the variant choreography keyed off the same `visible`.
  */
 export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, seal = false, visible = true, style }: InkStrokeButtonProps) => {
-	const mask = `url(${STROKES[variant]})`;
+	const progress = useMotionValue(0);
+	useEffect(() => {
+		if (!visible) {
+			progress.set(0);
+			return;
+		}
+		const ctrl = animate(progress, 1, { duration: INTRO.strokePaint, ease: [0.22, 1, 0.36, 1] });
+		return () => ctrl.stop();
+	}, [visible, progress]);
+
+	const name = VARIANTS[variant];
+	const maskA = useTransform(progress, (v) => `url(${inkFrameSrc(name, inkFrameBlend(v, INTRO.paintFrames).a)})`);
+	const maskB = useTransform(progress, (v) => `url(${inkFrameSrc(name, inkFrameBlend(v, INTRO.paintFrames).b)})`);
+	const blend = useTransform(progress, (v) => inkFrameBlend(v, INTRO.paintFrames).blend);
+
 	return (
 		<motion.button
 			type="button"
@@ -59,23 +87,19 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				opacity: disabled ? 0.4 : 1,
 			}}
 		>
+			{/* Stroke group: opacity gates the un-drawn state (frame f01 is never empty) and
+			    carries the ghost tone; the drop-shadow shades the composed group once. */}
 			<motion.span
 				variants={{
-					hidden: { clipPath: "inset(0 100% 0 0)" },
-					painted: { clipPath: "inset(0 0% 0 0)", transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
-					bleed: { clipPath: "inset(0 0% 0 0)", scaleX: 1.04, scaleY: 1.08, transition: { duration: 0.25 } },
+					hidden: { opacity: 0 },
+					painted: { opacity: TONES[tone].opacity, transition: { duration: 0.1 } },
+					bleed: { opacity: TONES[tone].opacity, scaleX: 1.04, scaleY: 1.08, transition: { duration: 0.25 } },
 				}}
-				style={{
-					position: "absolute",
-					inset: 0,
-					background: TONES[tone],
-					WebkitMaskImage: mask,
-					maskImage: mask,
-					WebkitMaskSize: "100% 100%",
-					maskSize: "100% 100%",
-					filter: "drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35))",
-				}}
-			/>
+				style={{ position: "absolute", inset: 0, filter: "drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35))" }}
+			>
+				<motion.span style={{ ...MASK_LAYER, background: TONES[tone].color, WebkitMaskImage: maskA, maskImage: maskA }} />
+				<motion.span style={{ ...MASK_LAYER, background: TONES[tone].color, opacity: blend, WebkitMaskImage: maskB, maskImage: maskB }} />
+			</motion.span>
 			<motion.span
 				variants={{
 					hidden: { opacity: 0 },
