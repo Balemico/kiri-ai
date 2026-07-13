@@ -258,6 +258,10 @@ export const LOBBY = {
 	treeEdge: 0.45,
 	treeY: 0.3,
 	treeScale: 1.8, // multiplier on the shared panel size — the lobby tree is the protagonist
+	// The lobby pushes its horizon DOWN vs the duel's HORIZON_FRACTION (0.4): more painting, less
+	// bare paper below. The tree also draws ABOVE the floor here (true foreground), so its base
+	// stands on the ground instead of dissolving into the horizon wash.
+	horizonFraction: 0.5,
 	// Alpha-weighted centre of the tree inside 4-tree.png, as fractions of the frame (measured at
 	// alpha > 160 — the soft ground wash below that threshold is ignored). Remeasure if the art
 	// is regenerated: scripts note in CLAUDE.md.

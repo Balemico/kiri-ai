@@ -7,7 +7,7 @@ import { FitCamera, Floor, FallingLeaves, Mist, ParallaxLayer } from "../../atom
 import { useFloorControls } from "../../../hooks/useFloorControls";
 import { useLobbyControls } from "../../../hooks/useLobbyControls";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
-import { DEFAULT_SCENE_FRAME, HORIZON_FRACTION, INTRO, LOBBY, PAPER, STAGE, STAGE_LAYERS, frameViewport } from "../../../layout";
+import { DEFAULT_SCENE_FRAME, INTRO, LOBBY, PAPER, STAGE, STAGE_LAYERS, frameViewport } from "../../../layout";
 
 const TREE_URL = "/images/backgroud/4-tree.png";
 
@@ -41,8 +41,9 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	const frame = DEFAULT_SCENE_FRAME;
 	const floor = useFloorControls("landscape");
 
-	// Panorama sizing — mirrors Stage (visible width, native aspect, horizon strip).
-	const horizonY = frame.top - (frame.top - frame.bottom) * HORIZON_FRACTION;
+	// Panorama sizing — mirrors Stage (visible width, native aspect), but on the LOBBY's deeper
+	// horizon: more painting, less bare paper below the menu.
+	const horizonY = frame.top - (frame.top - frame.bottom) * LOBBY.horizonFraction;
 	const visibleWidth = frameViewport(frame, size.width / size.height).width;
 	const width = visibleWidth * STAGE.widthOverscan * STAGE.scale;
 	const height = width / STAGE.imageAspect;
@@ -145,13 +146,15 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 						onMaterial={onLayerMaterial(layer.url)}
 					/>
 				))}
-				{/* The maple tree, re-staged: left edge, enlarged, nearest depth — the leaves' source. */}
+				{/* The maple tree, re-staged: left edge, enlarged, TRUE foreground — drawn ABOVE the floor
+				    (unlike the in-game tree) so its base stands on the ground instead of dissolving into
+				    the horizon wash. Still behind the front leaves (5). */}
 				<ParallaxLayer
 					url={TREE_URL}
 					depth={0.62}
 					phase={0.6}
 					z={STAGE.planeZ + 0.02}
-					renderOrder={-60}
+					renderOrder={-5}
 					width={treeWidth}
 					height={treeHeight}
 					centerY={treeCenterY}
@@ -162,7 +165,7 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 					driftSpeed={STAGE.driftSpeed}
 					onMaterial={onLayerMaterial(TREE_URL)}
 				/>
-				<Floor frame={frame} controls={floor} orientation="landscape" />
+				<Floor frame={frame} controls={floor} orientation="landscape" horizonFraction={LOBBY.horizonFraction} />
 			</Suspense>
 			<Mist bands={LOBBY.mist.bands} opacity={c.mistOpacity} speed={c.mistSpeed} height={LOBBY.mist.height} y={horizonY + LOBBY.mist.y} width={visibleWidth * 1.2} />
 			{/* The field's own clock starts when the ref flips true — an empty canopy shedding leaves

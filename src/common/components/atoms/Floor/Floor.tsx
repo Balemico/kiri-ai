@@ -13,7 +13,19 @@ import { FLOOR_ALPHA } from "../../../floorTexture";
  * Sits in front of the background panels and behind the pieces. The "Floor" Leva controls are
  * lifted to the parent (`useFloorControls`) so the battleground can rake onto the same tilt.
  */
-export const Floor = ({ frame, controls, orientation = "landscape" }: { frame: SceneFrame; controls: FloorControls; orientation?: Orientation }) => {
+export const Floor = ({
+	frame,
+	controls,
+	orientation = "landscape",
+	// Where the floor's top edge meets the scenery — the duel keeps the shared default; the lobby
+	// passes its own, deeper horizon (LOBBY.horizonFraction) for a shorter bare-paper band.
+	horizonFraction = HORIZON_FRACTION,
+}: {
+	frame: SceneFrame;
+	controls: FloorControls;
+	orientation?: Orientation;
+	horizonFraction?: number;
+}) => {
 	const c = controls;
 
 	const paper = useTexture(STAGE_BASE_URL, (loaded) => {
@@ -26,7 +38,7 @@ export const Floor = ({ frame, controls, orientation = "landscape" }: { frame: S
 	// background is gone, so the floor fills the WHOLE frame (band = full height) and covers the full
 	// visible width — the tilt/perspective is preserved, the far (top) edge still fading into paper.
 	const portrait = orientation === "portrait";
-	const horizonY = frame.top - (frame.top - frame.bottom) * HORIZON_FRACTION;
+	const horizonY = frame.top - (frame.top - frame.bottom) * horizonFraction;
 	const topEdge = portrait ? frame.top : horizonY;
 	const band = topEdge - frame.bottom;
 	// Compensate the tilt foreshortening so the projected height still spans the band.
