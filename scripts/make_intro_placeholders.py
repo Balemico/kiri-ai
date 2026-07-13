@@ -9,49 +9,101 @@ import math
 import random
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 OUT = Path(__file__).resolve().parent.parent / "public" / "images" / "intro"
 OUT.mkdir(parents=True, exist_ok=True)
 
 
 def brush_stroke(w, h, seed, taper=0.75):
-    """A dry, rough horizontal stroke: hard-noised body + flying-white streaks + bristle
-    speckle at the contour + stray splatter. Alpha carries ink density (greys = dilution)."""
-    rng = random.Random(seed)
-    img = Image.new("L", (w, h), 0)
-    d = ImageDraw.Draw(img)
-    cy = h // 2
-    # Body: jittered ellipses with hard radius noise — ragged contour, uneven ink load.
-    for x in range(0, w, 3):
-        t = x / w
-        end = min(t, 1 - t) / (1 - taper) if taper < 1 else 1.0
-        swell = 0.5 + 0.42 * math.sin(t * math.pi) + rng.uniform(-0.3, 0.3)
-        r = max(1, int(h * 0.36 * swell * min(1.0, end * 3.2)))
-        wob = int(math.sin(t * 7 + seed) * h * 0.06) + rng.randint(-4, 4)
-        d.ellipse([x - r, cy - r + wob, x + r, cy + r + wob], fill=rng.randint(200, 255))
-    # Flying white: long thin gaps where dry bristles left no ink.
-    for _ in range(14):
-        y0 = cy + rng.randint(-h // 3, h // 3)
-        x0 = rng.randint(0, w // 2)
-        x1 = x0 + rng.randint(w // 6, w // 2)
-        d.line([(x0, y0), (x1, y0 + rng.randint(-6, 6))], fill=0, width=rng.randint(1, max(2, h // 40)))
-    img = img.filter(ImageFilter.GaussianBlur(0.6))
-    # Bristle speckle: erode the contour into grain.
-    px = img.load()
-    for _ in range(w * h // 30):
-        x, y = rng.randrange(w), rng.randrange(h)
-        if 24 < px[x, y] < 235:
-            d.ellipse([x - 2, y - 1, x + 2, y + 1], fill=0)
-    # Stray splatter dots just outside the body (semi-transparent = diluted flicks).
-    for _ in range(w // 18):
-        x, y = rng.randrange(w), rng.randrange(h)
-        if px[x, y] == 0 and rng.random() < 0.5:
-            r = rng.randint(1, 3)
-            d.ellipse([x - r, y - r, x + r, y + r], fill=rng.randint(140, 230))
-    rgba = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-    rgba.putalpha(img.point(lambda v: 0 if v < 24 else v))
-    return rgba
+    """Bristle-simulated dry brush stroke. Hundreds of individual bristle tracks deposit ink
+    along a pressured, wavering baseline; where tracks overlap the ink saturates to a solid
+    core, where they thin out (edges, tail) they leave real dry-brush streaks and flying
+    white. Alpha = ink density (greys = dilution)."""
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0.0, 1.0, w)
+
+    def noise1d(cells, lo, hi):
+        pts = rng.random(cells)
+        return np.interp(np.linspace(0, cells - 1, w), np.arange(cells), pts) * (hi - lo) + lo
+
+    # Pressure along the gesture: fast press-down, breathing body, ragged release at the tail.
+    attack = np.clip(t * 22, 0, 1) ** 0.6
+    release = np.clip((1 - t) / (1 - taper), 0, 1) ** 0.65 if taper < 1 else np.ones(w)
+    press = attack * release * (0.62 + 0.38 * np.sin(t * np.pi)) * noise1d(9, 0.72, 1.06)
+    # Lift the brush inside the frame: the gesture starts and ends on the paper, not at the crop.
+    press = press * np.clip((t - 0.012) * 45, 0, 1) * np.clip((0.99 - t) * 28, 0, 1)
+
+    # Baseline: the wrist wavers, it doesn't sine-wave.
+    base = h * 0.5 + noise1d(5, -h * 0.07, h * 0.07) + noise1d(11, -h * 0.025, h * 0.025)
+
+    yy = np.arange(h, dtype=np.float32)
+
+    def smooth1d(a, k):
+        k = max(3, int(k) | 1)
+        win = np.hanning(k)
+        return np.convolve(a, win / win.sum(), mode="same")
+
+    half = h * 0.34 * (0.10 + 0.90 * press)  # half-width of the wet band, converging at the lifts
+    # Ragged contour: multi-octave noise per lip, smoothed so no polygon corners survive.
+    lip_t = 1 + smooth1d(noise1d(12, -0.14, 0.26) + noise1d(40, -0.11, 0.11) + noise1d(140, -0.05, 0.05), w / 90)
+    lip_b = 1 + smooth1d(noise1d(12, -0.14, 0.26) + noise1d(40, -0.11, 0.11) + noise1d(140, -0.05, 0.05), w / 90)
+    top = base - half * lip_t
+    bot = base + half * lip_b
+    # Solid fill between the lips with a ~1px wet edge.
+    alpha = np.clip(np.minimum(yy[:, None] - top[None, :], bot[None, :] - yy[:, None]) / 1.4, 0.0, 1.0)
+    alpha = alpha.astype(np.float32) * np.clip(press * 8, 0, 1)[None, :]
+
+    # Flying white: streaks CARVED out of the solid body with crisp, jittered edges —
+    # thin sparse ones anywhere, widening dry breakup toward the tail.
+    rel = (yy[:, None] - base[None, :]) / np.maximum(half, 1e-3)[None, :]  # -1..1 inside the band
+    for _ in range(18):
+        r0 = rng.uniform(-0.9, 0.9)
+        drift = noise1d(int(rng.integers(6, 12)), -0.10, 0.10) + noise1d(int(rng.integers(30, 55)), -0.03, 0.03)
+        ramp = np.clip((t - rng.uniform(0.35, 0.85)) * rng.uniform(2.5, 6.0), 0, 1)
+        sputter = np.clip(noise1d(int(rng.integers(14, 26)), -0.5, 1.3), 0, 1)
+        strength = ramp * sputter * rng.uniform(0.85, 1.0)
+        width = rng.uniform(0.015, 0.06) + 0.20 * np.clip((t - 0.55) / 0.45, 0, 1) * rng.uniform(0.3, 1.0)
+        jit = noise1d(int(rng.integers(40, 90)), -0.12, 0.12)
+        d = np.abs(rel - (r0 + drift)[None, :]) / np.maximum(width, 1e-3)[None, :]
+        cut = np.clip((1 + jit[None, :] - d) / 0.3, 0, 1)  # steep edge = white, not grey
+        alpha -= cut * strength[None, :]
+    # Snap the murk: push half-carved greys toward ink or paper (real ink pools or breaks).
+    alpha = np.clip((alpha - 0.06) / 0.94, 0, 1) ** 1.15
+    # Dry fringe: the outer band frays into horizontally-elongated bristle filaments.
+    fil = np.asarray(
+        Image.fromarray((rng.random((h // 2, max(2, w // 28))) * 255).astype(np.uint8), "L").resize((w, h), Image.BILINEAR),
+        dtype=np.float32,
+    ) / 255.0
+    fray = np.clip((np.abs(rel) - 0.72) / 0.28, 0, 1) * np.clip(t * 1.6 - 0.2, 0, 1)[None, :]
+    alpha -= np.clip((fil - (1 - fray * 0.75)) / 0.12, 0, 1)
+    # Ink pooling: the core stays essentially solid, breathing a little.
+    grain = np.asarray(
+        Image.fromarray((rng.random((5, 18)) * 255).astype(np.uint8), "L").resize((w, h), Image.BILINEAR),
+        dtype=np.float32,
+    ) / 255.0
+    alpha = np.clip(alpha, 0.0, 1.0) * (0.93 + 0.07 * grain)
+
+    # A handful of splatter flecks, hugging the gesture (mostly off the tail).
+    for _ in range(7):
+        fx = int(np.clip(rng.uniform(0.3, 1.02) * w, 0, w - 1))
+        fy = int(np.clip(base[min(fx, w - 1)] + rng.normal(0, h * 0.30), 2, h - 3))
+        rx, ry = rng.uniform(1.5, 7.0), rng.uniform(0.8, 2.4)
+        x0, x1 = int(max(0, fx - 3 * rx)), int(min(w, fx + 3 * rx))
+        if x1 <= x0:
+            continue
+        gx = np.exp(-((np.arange(x0, x1) - fx) ** 2) / (2 * rx * rx))
+        gy = np.exp(-((yy - fy) ** 2) / (2 * ry * ry))
+        fleck = np.clip((gy[:, None] * gx[None, :] - 0.35) / 0.65, 0, 1) * rng.uniform(0.7, 1.0)
+        alpha[:, x0:x1] = np.maximum(alpha[:, x0:x1], fleck)
+
+    alpha = np.clip(alpha, 0.0, 1.0)
+    alpha[alpha < 0.05] = 0.0
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    rgba[..., :3] = 255
+    rgba[..., 3] = (alpha * 255).astype(np.uint8)
+    return Image.fromarray(rgba, "RGBA")
 
 
 def maple_leaf(size, seed):
