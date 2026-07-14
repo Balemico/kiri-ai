@@ -7,8 +7,8 @@ greys become real semi-transparency (flying white, dry-brush streaks survive int
 Workflow:
 1. Generate with the prompts below (any size ≥ the target; the script resizes).
 2. Save as `public/images/intro/src/<name>.png` (or .jpg) — names: `stroke-1..3`, `veil-1..3`.
-3. Run `python3 scripts/ink_masks.py` — it overwrites the canonical masks, regenerates the
-   12 paint frames per asset and the `-dry` veil variants. No code changes needed.
+3. Run `python3 scripts/ink_masks.py` — it overwrites the canonical masks and regenerates
+   the `wipe-N.png` reveal ramps and the `-dry` veil variants. No code changes needed.
 4. Check in the dev server (`yarn dev`): lobby paint-on + PASSA E GIOCA transition.
 
 ## Button strokes (`stroke-1`, `stroke-2`, `stroke-3`) — target 1024×224

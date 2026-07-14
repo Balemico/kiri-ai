@@ -8,9 +8,12 @@ Input per asset name (first match wins):
      so the whole pipeline runs before the real art lands.
 
 Output (white-on-transparent, CSS masks read alpha only):
-  public/images/intro/<name>.png            — canonical full mask, overwritten in place
-  public/images/intro/frames/<name>-fNN.png — 12 progressive paint frames (veils half-res)
-  public/images/intro/veil-N-dry.png        — granulated dry variant (veils only)
+  public/images/intro/<name>.png     — canonical full mask, overwritten in place
+  public/images/intro/wipe-N.png     — paint-on wipe ramps: solid LEFT, ragged brush-tip
+                                        frontier, transparent RIGHT. A fill layer masked by
+                                        this slides under the (static) stroke mask, so the
+                                        reveal frontier moves CONTINUOUSLY (no frame steps).
+  public/images/intro/veil-N-dry.png — granulated dry variant (veils only)
 
 Deterministic: fixed seeds; two runs produce byte-identical files.
 """
@@ -21,13 +24,14 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent / "public" / "images" / "intro"
 SRC = ROOT / "src"
-FRAMES = ROOT / "frames"
-FRAMES.mkdir(parents=True, exist_ok=True)
 
-FRAME_COUNT = 12
-EDGE = 0.07    # soft width of the advancing frontier (fraction of stroke length)
-JITTER = 0.22  # how far noise bends the frontier away from a straight vertical line
 SIZES = {"stroke": (1024, 224), "veil": (2048, 640)}  # canonical mask sizes
+WIPE_SIZE = (1024, 320)  # ramps are soft — resolution matters little
+# The wipe image is WIPE_SCALE x the reveal box (keep in sync with src/common/inkWipe.ts).
+# The box sees ramp interval [(S-1)/S, 1] at travel start (must be fully transparent) and
+# [0, 1/S] at travel end (must be fully solid) — so the whole ragged frontier must live
+# inside (1/S, (S-1)/S). S=3 gives it the middle third: one full box-width of raggedness.
+WIPE_SCALE = 3.0
 
 
 def resize_alpha(alpha, w, h):
@@ -63,46 +67,46 @@ def save_mask(alpha, path):
     Image.fromarray(rgba, "RGBA").save(path)
 
 
-def low_freq_noise(w, h, seed, cells=(5, 16)):
+def wipe_ramp(seed):
+    """Solid-to-transparent ramp whose frontier is a ragged, bristled brush tip.
+    The whole frontier (waver + feather + spikes) stays inside the middle third of the
+    ramp, so the reveal box is fully bare at travel start and fully covered at the end."""
+    w, h = WIPE_SIZE
     rng = np.random.RandomState(seed)
-    grid = (rng.rand(*cells) * 255).astype(np.uint8)
-    img = Image.fromarray(grid, "L").resize((w, h), Image.BILINEAR)
-    return np.asarray(img, dtype=np.float32) / 255.0
 
+    def noise_col(cells, lo, hi):
+        pts = rng.rand(cells)
+        return np.interp(np.linspace(0, cells - 1, h), np.arange(cells), pts) * (hi - lo) + lo
 
-def paint_frames(alpha, seed):
-    """FRAME_COUNT masks revealing alpha left->right behind a noisy soft frontier.
-    Monotonic (frame k+1 contains frame k); the last frame is the full stroke."""
-    h, w = alpha.shape
-    xs = np.tile(np.linspace(0.0, 1.0, w, dtype=np.float32), (h, 1))
-    field = xs + (low_freq_noise(w, h, seed) - 0.5) * JITTER
-    t_full = field.max() + EDGE  # threshold at which everything is revealed
-    return [alpha * np.clip((t_full * k / FRAME_COUNT - field) / EDGE, 0.0, 1.0)
-            for k in range(1, FRAME_COUNT + 1)]
+    # Frontier x-position per row: layered waver, no straight lines anywhere.
+    b = 0.47 + noise_col(6, -0.07, 0.07) + noise_col(22, -0.02, 0.02) + noise_col(90, -0.01, 0.01)
+    xs = np.linspace(0.0, 1.0, w, dtype=np.float32)[None, :]
+    # Watery soft edge…
+    alpha = np.clip((b[:, None] - xs) / 0.05, 0.0, 1.0).astype(np.float32)
+    # …with thin dry bristle spikes shooting ahead of the wet front.
+    spike = np.clip(noise_col(150, -1.0, 1.0), 0, 1) ** 2 * 0.09
+    tips = np.clip((b[:, None] + spike[:, None] - xs) / 0.008, 0.0, 1.0) * (spike[:, None] > 0.015) * 0.85
+    return np.maximum(alpha, tips)
 
 
 def dry_variant(alpha, seed):
     """Granulated skeleton: noise eats thin/translucent ink first, solid cores survive."""
     h, w = alpha.shape
-    noise = low_freq_noise(w, h, seed, cells=(24, 96))
+    rng = np.random.RandomState(seed)
+    grid = (rng.rand(24, 96) * 255).astype(np.uint8)
+    noise = np.asarray(Image.fromarray(grid, "L").resize((w, h), Image.BILINEAR), dtype=np.float32) / 255.0
     keep = np.clip((alpha - (0.35 + (noise - 0.5) * 0.55)) / 0.08, 0.0, 1.0)
     return alpha * keep * 0.9
 
 
 for i in (1, 2, 3):
-    name = f"stroke-{i}"
-    alpha = load_alpha(name)
-    save_mask(alpha, ROOT / f"{name}.png")
-    for k, fr in enumerate(paint_frames(alpha, seed=100 + i), start=1):
-        save_mask(fr, FRAMES / f"{name}-f{k:02d}.png")
+    save_mask(load_alpha(f"stroke-{i}"), ROOT / f"stroke-{i}.png")
+    save_mask(wipe_ramp(seed=400 + i), ROOT / f"wipe-{i}.png")
 
 for i in (1, 2, 3):
     name = f"veil-{i}"
     alpha = load_alpha(name)
     save_mask(alpha, ROOT / f"{name}.png")
-    half = resize_alpha(alpha, alpha.shape[1] // 2, alpha.shape[0] // 2)
-    for k, fr in enumerate(paint_frames(half, seed=200 + i), start=1):
-        save_mask(fr, FRAMES / f"{name}-f{k:02d}.png")
     save_mask(dry_variant(alpha, seed=300 + i), ROOT / f"{name}-dry.png")
 
-print(f"wrote masks, {FRAME_COUNT} frames/asset and dry variants under {ROOT}")
+print(f"wrote masks, wipe ramps and dry variants under {ROOT}")

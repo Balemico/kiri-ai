@@ -2,12 +2,12 @@ import { useEffect } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { INTRO } from "../../../layout";
-import { inkFrameBlend, inkFrameSrc, preloadInkFrames } from "../../../inkFrames";
+import { WIPE_LEFT, WIPE_WIDTH, inkWipeSrc, preloadInk, wipeTravel } from "../../../inkWipe";
 
 const VARIANTS = ["stroke-1", "stroke-2", "stroke-3"] as const;
 
-// Tones are SOLID ink; "ghost" dims via the wrapper's opacity instead of an rgba fill — the
-// paint-on stacks two mask layers, and a translucent fill would double-darken their overlap.
+// Tones are SOLID ink; "ghost" dims via the wrapper's opacity instead of an rgba fill, so the
+// fill layer can stay opaque whatever slides over it.
 const TONES = {
 	ink: { color: "#17120e", opacity: 1 },
 	red: { color: "#b73225", opacity: 1 },
@@ -15,7 +15,7 @@ const TONES = {
 	ghost: { color: "#17120e", opacity: 0.34 },
 } as const;
 
-for (const name of VARIANTS) preloadInkFrames(name, INTRO.paintFrames);
+preloadInk([...VARIANTS.map((n) => `/images/intro/${n}.png`), ...VARIANTS.map((_, i) => inkWipeSrc(i))]);
 
 export interface InkStrokeButtonProps {
 	children: ReactNode;
@@ -31,19 +31,11 @@ export interface InkStrokeButtonProps {
 	style?: CSSProperties;
 }
 
-const MASK_LAYER: CSSProperties = {
-	position: "absolute",
-	inset: 0,
-	WebkitMaskSize: "100% 100%",
-	maskSize: "100% 100%",
-};
-
 /**
- * A floating sumi brush stroke that IS the button — and it is DRAWN, not revealed: a Motion
- * value 0→1 scrubs through 12 progressive mask frames (ragged, semi-transparent brush-tip
- * frontier baked in by scripts/ink_masks.py). Two stacked mask layers crossfade between
- * adjacent frames, and since frames are monotonic the fade only ever adds the fresh delta —
- * the stroke lays down continuously, flying white included.
+ * A floating sumi brush stroke that IS the button — and it is DRAWN, not revealed: the stroke
+ * mask stays static while an ink fill, masked by a ragged wipe ramp (`inkWipe.ts`), slides
+ * underneath on a Motion value. The frontier moves continuously (compositor-only transform),
+ * so the lay-down is fluid — no frame steps, no crossfade flicker.
  *
  * The paint-on stays STATE-driven (`visible`), never delay-scheduled: flipping `visible`
  * (re)starts the progress tween immediately, so an intro skip that flips every beat at once
@@ -61,10 +53,8 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 		return () => ctrl.stop();
 	}, [visible, progress]);
 
+	const x = useTransform(progress, wipeTravel);
 	const name = VARIANTS[variant];
-	const maskA = useTransform(progress, (v) => `url(${inkFrameSrc(name, inkFrameBlend(v, INTRO.paintFrames).a)})`);
-	const maskB = useTransform(progress, (v) => `url(${inkFrameSrc(name, inkFrameBlend(v, INTRO.paintFrames).b)})`);
-	const blend = useTransform(progress, (v) => inkFrameBlend(v, INTRO.paintFrames).blend);
 
 	return (
 		<motion.button
@@ -87,8 +77,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				opacity: disabled ? 0.4 : 1,
 			}}
 		>
-			{/* Stroke group: opacity gates the un-drawn state (frame f01 is never empty) and
-			    carries the ghost tone; the drop-shadow shades the composed group once. */}
+			{/* Stroke group: carries the ghost tone and the drop-shadow of the composed stroke. */}
 			<motion.span
 				variants={{
 					hidden: { opacity: 0 },
@@ -97,8 +86,34 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				}}
 				style={{ position: "absolute", inset: 0, filter: "drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35))" }}
 			>
-				<motion.span style={{ ...MASK_LAYER, background: TONES[tone].color, WebkitMaskImage: maskA, maskImage: maskA }} />
-				<motion.span style={{ ...MASK_LAYER, background: TONES[tone].color, opacity: blend, WebkitMaskImage: maskB, maskImage: maskB }} />
+				{/* Static stroke silhouette; the sliding wipe fill paints it in. */}
+				<span
+					style={{
+						position: "absolute",
+						inset: 0,
+						overflow: "hidden",
+						WebkitMaskImage: `url(/images/intro/${name}.png)`,
+						maskImage: `url(/images/intro/${name}.png)`,
+						WebkitMaskSize: "100% 100%",
+						maskSize: "100% 100%",
+					}}
+				>
+					<motion.span
+						style={{
+							position: "absolute",
+							top: 0,
+							bottom: 0,
+							left: WIPE_LEFT,
+							width: WIPE_WIDTH,
+							background: TONES[tone].color,
+							WebkitMaskImage: `url(${inkWipeSrc(variant)})`,
+							maskImage: `url(${inkWipeSrc(variant)})`,
+							WebkitMaskSize: "100% 100%",
+							maskSize: "100% 100%",
+							x,
+						}}
+					/>
+				</span>
 			</motion.span>
 			<motion.span
 				variants={{
