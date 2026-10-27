@@ -86,16 +86,16 @@ interface BrushSpec {
 	flankDrops: number;
 	/** Multiplier on the pale wash (giant overlapping slashes need less, or they fog together). */
 	washScale: number;
-	/** Straight stroke (menu, like the kanji 一): constant width with parallel flanks, a blunt
-	 *  pressed head and a tip that splits into bristles of uneven length — versus the tapering
-	 *  slash (veil): pressed head, long dry taper. */
+	/** Straight stroke (menu, like the kanji 一): constant width with parallel flanks, BOTH ends
+	 *  splitting into bristles of uneven length, alike — versus the tapering slash (veil):
+	 *  pressed head, long dry taper. */
 	straight: boolean;
 	/** Bow/tremor/swell amplitude multiplier (lower = a more controlled, refined hand). */
 	wildness: number;
 }
 
 /** Flung droplets on an anisotropic cell grid in stroke space (cells stretched along the gesture). */
-const droplets = (x: N, y: N, s: N, n: N, b: BrushSpec, cellAlong: number, cellAcross: number, rMin: number, rMax: number, density: number, z: number): N => {
+const droplets = (x: N, y: N, s: N, zs: N, n: N, b: BrushSpec, cellAlong: number, cellAcross: number, rMin: number, rMax: number, density: number, z: number): N => {
 	const cl = b.dropScale.mul(cellAlong);
 	const cw = b.dropScale.mul(cellAcross);
 	const g = vec2(x.div(cl), y.div(cw));
@@ -106,8 +106,9 @@ const droplets = (x: N, y: N, s: N, n: N, b: BrushSpec, cellAlong: number, cellA
 	const r2 = mx_cell_noise_float(vec3(cell, b.seed.add(z + 2.71)));
 	const r3 = mx_cell_noise_float(vec3(cell, b.seed.add(z + 4.13)));
 	// Where drops fly: thrown past the slowing tip, and flicked off the flanks along the body.
-	const tipZone = smoothstep(0.45, 0.85, s).mul(smoothstep(1.55, 1.0, s)).mul(smoothstep(3.0, 0.9, abs(n)));
-	const flankZone = smoothstep(0.08, 0.3, s).mul(smoothstep(1.1, 0.7, s)).mul(smoothstep(0.9, 0, abs(abs(n).sub(1.6))));
+	// `zs` = position along the stroke for the zones (a straight stroke folds both ends onto 1).
+	const tipZone = smoothstep(0.45, 0.85, zs).mul(smoothstep(1.55, 1.0, zs)).mul(smoothstep(3.0, 0.9, abs(n)));
+	const flankZone = smoothstep(0.08, 0.3, zs).mul(smoothstep(1.1, 0.7, zs)).mul(smoothstep(0.9, 0, abs(abs(n).sub(1.6))));
 	const zone = tipZone.mul(b.tipDrops).add(flankZone.mul(b.flankDrops)).mul(INK_LOOK.splatter).mul(density);
 	const exists = step(float(1).sub(zone), r0);
 	const centre = vec2(r1, r2).mul(0.56).add(0.22);
@@ -151,8 +152,9 @@ const brush = (b: BrushSpec) => {
 	const tooth = mx_noise_float(vec3(b.P.mul(0.42), b.seed.add(2.9))).mul(0.5).add(0.5);
 	const tex = mix(bristle, tooth, L.tooth);
 	// Ink load: full at the head, running dry toward the tip and at the splayed flanks.
-	// A straight stroke stays loaded almost to the end, running dry only as the brush lifts.
-	const runDry = b.straight ? smoothstep(0.8, 1.02, s).mul(L.tailDry) : smoothstep(0.38, 1.0, s).mul(L.tailDry);
+	// A straight stroke stays loaded through the body and runs dry at both ends alike.
+	const ends01 = abs(s.sub(0.5)).mul(2); // 0 middle → 1 at either end
+	const runDry = b.straight ? smoothstep(0.6, 1.04, ends01).mul(L.tailDry) : smoothstep(0.38, 1.0, s).mul(L.tailDry);
 	const load = float(1)
 		.sub(runDry)
 		.sub(smoothstep(0.45, 1.0, an).mul(L.edgeDry))
@@ -161,11 +163,12 @@ const brush = (b: BrushSpec) => {
 	const filled = smoothstep(thr.sub(0.05), thr.add(0.05), tex);
 	// Ragged flank: bristle ends stick out unevenly.
 	const flank = bristle.sub(0.5).mul(b.straight ? 0.1 : 0.22).add(0.98);
-	// Straight ends, in px: a blunt head laid slightly oblique with softened corners; a tip where
-	// the lifting brush leaves bristles of uneven length (streaks of different reach).
+	// Straight ends, in px, mirror images: at each end the bristles reach unevenly (streaks of
+	// different length) along a slightly oblique cut. The head uses its own bristle draw so the
+	// two ends match in character without being copies.
 	const hw = b.width.mul(0.5);
-	const corner = hw.mul(0.42).mul(float(1).sub(max(float(1).sub(an.mul(an)), 0).sqrt()));
-	const dHead = x.add(b.length.mul(0.5)).sub(n.mul(hw.mul(0.16))).sub(corner);
+	const bristleHead = mx_noise_float(vec3(n.mul(bristleN), s.mul(1.4), b.seed.add(31.3))).mul(0.62).add(bB.mul(0.38)).mul(0.5).add(0.5);
+	const dHead = x.add(b.length.mul(0.5)).sub(n.mul(hw.mul(0.12))).add(bristleHead.sub(0.5).mul(hw.mul(1.8)));
 	const dTip = b.length.mul(0.5).sub(x).add(n.mul(hw.mul(0.12))).add(bristle.sub(0.5).mul(hw.mul(1.8)));
 	const straightEnds = smoothstep(0, 1.5, dHead).mul(smoothstep(0, 1.5, dTip));
 	const body = smoothstep(flank, flank.sub(float(1.6).div(half)), an).mul(b.straight ? straightEnds : step(0, s));
@@ -179,15 +182,16 @@ const brush = (b: BrushSpec) => {
 	// creeping slowly — the one part that stays alive after the stroke is laid.
 	const t = time.mul(L.drift);
 	const washEdge = mx_fractal_noise_float(vec3(x.mul(0.01), y.mul(0.01), t.add(b.seed)), 3, 2.0, 0.5).mul(0.35).add(1.4);
-	const washShape = smoothstep(washEdge, washEdge.sub(0.55), an).mul(b.straight ? smoothstep(-0.02, 0.06, s).mul(smoothstep(1.02, 0.85, s)) : smoothstep(-0.02, 0.08, s).mul(smoothstep(0.95, 0.45, s)));
+	const washShape = smoothstep(washEdge, washEdge.sub(0.55), an).mul(b.straight ? smoothstep(1.02, 0.7, ends01) : smoothstep(-0.02, 0.08, s).mul(smoothstep(0.95, 0.45, s)));
 	const washDrawn = smoothstep(b.front, b.front.sub(0.15), s);
 	const washBody = mx_noise_float(vec3(b.P.mul(0.012), t.mul(0.6).add(b.seed.add(5.5)))).mul(0.35).add(0.65);
 	const wash = washShape.mul(washDrawn).mul(washBody).mul(L.wash).mul(b.washScale).mul(clamp(float(1).sub(b.dry.mul(2)), 0, 1));
 
 	const dropsFade = clamp(float(1).sub(b.dry.mul(2.2)), 0, 1);
+	const zs = b.straight ? ends01.mul(0.5).add(0.5) : s;
 	const drops = max(
-		droplets(x, y, s, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
-		droplets(x, y, s, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
+		droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
+		droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
 	).mul(dropsFade);
 	return { ink, wash, drops };
 };
@@ -227,8 +231,8 @@ export interface StrokeUniforms {
 
 /**
  * One straight brush stroke behind a menu button (like the kanji 一), centred under the label:
- * parallel flanks, a blunt pressed head, a tip splitting into uneven bristles as the brush lifts,
- * fine bristles and a whisper of spray. A barely-there per-seed tilt and bow keep siblings apart.
+ * parallel flanks, both ends splitting alike into bristles of uneven reach, fine bristles and a
+ * whisper of spray off either end. A barely-there per-seed tilt and bow keep siblings apart.
  */
 export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: StrokeUniforms } => {
 	const u = {
