@@ -8,7 +8,7 @@ import { InkStrokeButton } from "../../components/atoms";
 import { INTRO } from "../../layout";
 import { Menu } from "./Menu";
 import { MultiplayerLobby } from "./MultiplayerLobby";
-import { HankoStamp, LobbyColumn } from "./ui";
+import { BackStroke, HankoStamp, LobbyColumn } from "./ui";
 
 // The cinematic plays once per app load — coming back from a game (or the multiplayer flow)
 // re-enters a lobby that is already "awake".
@@ -45,7 +45,9 @@ const ScreenFade = ({ children }: { children: ReactNode }) => (
 		animate={{ opacity: 1, y: 0 }}
 		exit={{ opacity: 0, y: -10 }}
 		transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-		style={{ display: "flex", flexDirection: "column", gap: 16 }}
+		// Tight rows (each stroke already carries vertical air in its 70px box); back strokes add
+		// their own top margin (BackStroke) to sit apart.
+		style={{ display: "flex", flexDirection: "column", gap: 2 }}
 	>
 		{children}
 	</motion.div>
@@ -141,9 +143,7 @@ export const Lobby = () => {
 								Non appena si unisce, la partita inizia.
 							</p>
 							<NetDiagLine />
-							<InkStrokeButton tone="ghost" variant={2} onClick={backToMenu}>
-								ANNULLA
-							</InkStrokeButton>
+							<BackStroke onClick={backToMenu}>ANNULLA</BackStroke>
 						</ScreenFade>
 					)}
 

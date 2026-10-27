@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { LOBBY } from "../../layout";
+import { InkStrokeButton } from "../../components/atoms";
 
 /** Single-line text field styled for the dark paper card. */
 export const TextField = ({
@@ -106,3 +107,10 @@ export const LobbyColumn = ({ children }: { children: ReactNode }) => {
 		</div>
 	);
 };
+
+/** Secondary "go back" stroke (ghost tone), set apart from the main rows above it. */
+export const BackStroke = ({ onClick, children }: { onClick: () => void; children: ReactNode }) => (
+	<InkStrokeButton tone="ghost" variant={2} onClick={onClick} style={{ marginTop: 22 }}>
+		{children}
+	</InkStrokeButton>
+);

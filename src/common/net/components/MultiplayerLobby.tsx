@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Team } from "../../game";
 import { useSession } from "../useSession";
 import { InkSegmentedStroke, InkStrokeButton, type InkSegmentOption } from "../../components/atoms";
-import { TextField } from "./ui";
+import { BackStroke, TextField } from "./ui";
 
 type View = "choose" | "create" | "join";
 
@@ -14,7 +14,7 @@ const TEAM_OPTIONS: [InkSegmentOption, InkSegmentOption] = [
 ];
 
 const Heading = ({ title, subtitle }: { title: string; subtitle: string }) => (
-	<div style={{ textAlign: "center", color: "#17120e" }}>
+	<div style={{ textAlign: "center", color: "#17120e", marginBottom: 10 }}>
 		<h1 style={{ margin: 0, fontSize: 28, letterSpacing: 4, fontFamily: "var(--font-display)" }}>{title}</h1>
 		<p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.65 }}>{subtitle}</p>
 	</div>
@@ -39,9 +39,7 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 				<InkStrokeButton tone="blue" variant={1} onClick={() => setView("join")}>
 					UNISCITI
 				</InkStrokeButton>
-				<InkStrokeButton tone="ghost" variant={2} onClick={onBack}>
-					← INDIETRO
-				</InkStrokeButton>
+				<BackStroke onClick={onBack}>← INDIETRO</BackStroke>
 			</>
 		);
 	}
@@ -56,9 +54,7 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 				<InkStrokeButton disabled={!trimmed} seal onClick={() => createRoom(trimmed, color)}>
 					CREA E ATTENDI
 				</InkStrokeButton>
-				<InkStrokeButton tone="ghost" variant={2} onClick={() => setView("choose")}>
-					← INDIETRO
-				</InkStrokeButton>
+				<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
 			</>
 		);
 	}
@@ -73,9 +69,7 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 			<InkStrokeButton disabled={!trimmed} seal onClick={() => joinRoom(trimmed)}>
 				UNISCITI
 			</InkStrokeButton>
-			<InkStrokeButton tone="ghost" variant={2} onClick={() => setView("choose")}>
-				← INDIETRO
-			</InkStrokeButton>
+			<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
 		</>
 	);
 };
