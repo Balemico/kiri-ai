@@ -60,20 +60,28 @@ export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor
 	const reach = 1 + Math.tan(maxTilt) * aspect;
 	const width = (widthFactor * reach) / count;
 	const baseTilt = -0.22 + (rand() - 0.5) * 0.12;
-	// Laid TOP → BOTTOM, one after another: each slash spans ~widthFactor stacking steps, so the
-	// inked band grows down the screen by a step per slash and the screen turns fully opaque only
-	// as the LAST one lands — the brush strokes themselves cover it (no flood, no sudden black).
+	// Laying mirrors the drying: a seeded SHUFFLE (own generator — never perturbs the geometry), at
+	// an irregular cadence (random gaps: some blows close together, some after a beat), each slash
+	// from a random side. Coverage is geometric, so whatever the order the screen is fully opaque
+	// only once the LAST slash lands — the brush strokes themselves cover it (no flood).
+	const pourRand = rng(seed + 53);
+	const pourOrder = Array.from({ length: count }, (_, i) => i).sort(() => pourRand() - 0.5);
+	const gaps = Array.from({ length: count }, (_, k) => (k === 0 ? 0 : 0.35 + pourRand() * 1.3));
+	const cumulative = gaps.map((_, k) => gaps.slice(0, k + 1).reduce((a, g) => a + g, 0));
+	const lastStart = 0.62;
+	const startOf = (slot: number) => (cumulative[count - 1] > 0 ? (cumulative[slot] / cumulative[count - 1]) * lastStart : 0);
+	const fromLeft = Array.from({ length: count }, () => pourRand() < 0.5);
 	// Drying order: a seeded shuffle from its OWN generator, so it never perturbs the geometry.
 	const dryRand = rng(seed + 101);
 	const dryOrder = Array.from({ length: count }, (_, i) => i).sort(() => dryRand() - 0.5);
 	const dryDur = 0.45;
 	return Array.from({ length: count }, (_, i) => {
 		const drySlot = dryOrder.indexOf(i);
+		const pourSlot = pourOrder.indexOf(i);
 		// Near-parallel: one shared tilt, a whisper of variation — slashes with independent tilts
 		// diverge across the screen and open wedge-shaped gaps between neighbours.
 		const tilt = baseTilt + (rand() - 0.5) * 0.04;
-		const leftToRight = i % 2 === 0;
-		const angle = leftToRight ? tilt : Math.PI + tilt;
+		const angle = fromLeft[i] ? tilt : Math.PI + tilt;
 		return {
 			cx: (rand() - 0.5) * 0.1,
 			// Jitter and bow scale with the stroke (not the screen), so thin slashes keep their overlap.
@@ -82,7 +90,7 @@ export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor
 			length: (aspect + lengthExtra) / Math.cos(tilt) + width,
 			width,
 			bend: (rand() - 0.5) * 0.3 * width,
-			start: (i * 0.62) / count + rand() * 0.02,
+			start: startOf(pourSlot),
 			dur: 0.36,
 			dryStart: count > 1 ? (drySlot / (count - 1)) * (1 - dryDur) : 0,
 			dryDur,

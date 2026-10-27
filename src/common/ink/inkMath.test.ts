@@ -39,14 +39,20 @@ describe("veilStrokes", () => {
 		}
 	});
 
-	it("alternate direction and start staggered from the first beat", () => {
+	it("are laid in a random order and cadence, from random sides, all within the pour", () => {
 		const strokes = veilStrokes(12, 1.6, 4);
-		expect(Math.cos(strokes[0].angle)).toBeGreaterThan(0);
-		expect(Math.cos(strokes[1].angle)).toBeLessThan(0);
-		expect(strokes[0].start).toBeLessThan(0.05);
-		// Laid top → bottom: each slash starts after the one above it.
-		strokes.slice(1).forEach((st, i) => expect(st.start).toBeGreaterThan(strokes[i].start));
-		expect(strokes[1].cy).toBeLessThan(strokes[0].cy);
+		const starts = strokes.map((st) => st.start);
+		expect(Math.min(...starts)).toBe(0);
+		expect(new Set(starts).size).toBe(12);
+		expect(strokes.every((st) => st.start + st.dur <= 1)).toBe(true);
+		// Not top → bottom: the laying order is shuffled…
+		const byStart = [...strokes.keys()].sort((a, b) => strokes[a].start - strokes[b].start);
+		expect(byStart).not.toEqual([...strokes.keys()]);
+		// …at an uneven rhythm, and from both sides.
+		const sorted = [...starts].sort((a, b) => a - b);
+		const intervals = sorted.slice(1).map((v, i) => v - sorted[i]);
+		expect(Math.max(...intervals) / Math.min(...intervals)).toBeGreaterThan(1.5);
+		expect(new Set(strokes.map((st) => Math.cos(st.angle) > 0)).size).toBe(2);
 	});
 
 	it("dry at different times, all within the drying phase", () => {
