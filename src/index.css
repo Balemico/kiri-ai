@@ -101,9 +101,10 @@ button {
 button:hover {
 	border-color: #646cff;
 }
+/* No focus ring on tap/click: buttons are ink strokes, a browser outline around them breaks the look. */
 button:focus,
 button:focus-visible {
-	outline: 4px auto -webkit-focus-ring-color;
+	outline: none;
 }
 
 @media (prefers-color-scheme: light) {
