@@ -57,6 +57,8 @@ export const INK_LOOK = {
 	wash: num(INK.wash),
 	splatter: num(INK.splatter),
 	drift: num(INK.drift),
+	tones: num(INK.tones),
+	sanboku: num(INK.sanboku),
 	strokeHeight: num(INK.strokeHeight),
 	inkColor: uniform(new Color(INK.inkColor)),
 };
@@ -182,7 +184,18 @@ const brush = (b: BrushSpec) => {
 	const lead = b.front.add(bristle.sub(0.5).mul(b.straight ? 0.14 : 0.05));
 	const drawn = b.straight ? smoothstep(lead, lead.sub(0.16), ends01) : smoothstep(lead, lead.sub(0.012), s);
 	// Loaded bristles deposit slightly unevenly — sumi is never flat black.
-	const ink = body.mul(filled).mul(drawn).mul(bristle.mul(0.3).add(0.78));
+	// Nōtan — tonal contrast INSIDE the black, as ink concentration (diluted sumi = more paper
+	// showing through, i.e. lower coverage, not a different colour):
+	//  - some bristle clumps carry diluted ink → grey streaks running along the gesture;
+	//  - uneven deposit → slow, large grey/black mottling;
+	//  - sanboku ("three inks"): dense ink at the brush tip, diluted at its belly → one flank
+	//    stays black while the other softens to grey.
+	const toneStreak = smoothstep(0.52, 0.8, mx_noise_float(vec3(n.mul(bristleN.mul(0.55)), s.mul(0.9), b.seed.add(41.7))).mul(0.5).add(0.5));
+	const mottle = smoothstep(0.35, 0.85, mx_fractal_noise_float(vec3(b.P.mul(0.006), b.seed.add(53.1)), 2, 2.0, 0.5).mul(0.5).add(0.5));
+	const belly = smoothstep(-0.35, 1.0, n);
+	const dilution = L.tones.mul(toneStreak.mul(0.6).add(mottle.mul(0.35))).add(L.sanboku.mul(belly).mul(0.6));
+	const concentration = clamp(float(1).sub(dilution), 0.22, 1);
+	const ink = body.mul(filled).mul(drawn).mul(bristle.mul(0.3).add(0.78)).mul(concentration);
 
 	// Pale wash (bokashi): diluted ink bleeding past the flanks near the head and body, its edge
 	// creeping slowly — the one part that stays alive after the stroke is laid.

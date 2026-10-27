@@ -18,6 +18,8 @@ export const useInkControls = (): void => {
 			tooth: { value: INK.tooth, min: 0, max: 1, step: 0.05, label: "paper tooth" },
 			wash: { value: INK.wash, min: 0, max: 1, step: 0.02, label: "pale wash" },
 			splatter: { value: INK.splatter, min: 0, max: 3, step: 0.05 },
+			tones: { value: INK.tones, min: 0, max: 1.2, step: 0.05, label: "ink tones" },
+			sanboku: { value: INK.sanboku, min: 0, max: 1.2, step: 0.05, label: "sanboku" },
 			drift: { value: INK.drift, min: 0, max: 0.5, step: 0.01, label: "wash breathing" },
 			strokeHeight: { value: INK.strokeHeight, min: 0.3, max: 1.1, step: 0.01, label: "button stroke height" },
 			inkColor: { value: INK.inkColor, label: "ink" },
@@ -32,6 +34,8 @@ export const useInkControls = (): void => {
 		INK_LOOK.wash.value = c.wash;
 		INK_LOOK.splatter.value = c.splatter;
 		INK_LOOK.drift.value = c.drift;
+		INK_LOOK.tones.value = c.tones;
+		INK_LOOK.sanboku.value = c.sanboku;
 		INK_LOOK.strokeHeight.value = c.strokeHeight;
 		INK_LOOK.inkColor.value.set(c.inkColor);
 	}, [c]);

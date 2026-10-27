@@ -113,6 +113,8 @@ export const INK = {
 	tooth: 0.15, // paper tooth breaking the dry-brush (vs pure bristle streaks)
 	wash: 0.24, // pale diluted-ink wash bleeding beside the stroke
 	splatter: 0.55, // flung-droplet density multiplier
+	tones: 0.5, // nōtan: grey streaks + mottling of diluted ink inside the black (0 = flat black)
+	sanboku: 0.35, // "three inks": one flank dense black, the other diluted to grey (brush-tip vs belly)
 	drift: 0.05, // speed the wet wash edge keeps creeping/breathing (noise evolution / s)
 	inkColor: "#0c0a09",
 	// Menu strokes
