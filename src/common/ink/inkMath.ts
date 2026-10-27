@@ -20,6 +20,12 @@ export const phaseProgress = (elapsed: number, duration: number): number => (dur
 /** Ease-out cubic — ink lands fast and slows as the paper drinks it. */
 export const easeOutCubic = (t: number): number => 1 - (1 - clamp01(t)) ** 3;
 
+/** Ease-in-out cubic — a reveal that starts and settles softly. */
+export const easeInOutCubic = (t: number): number => {
+	const x = clamp01(t);
+	return x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2;
+};
+
 export interface VeilStroke {
 	/** Centre of the stroke, in screen-height units: x ∈ [−aspect/2, aspect/2], y ∈ [−½, ½] (y up). */
 	cx: number;

@@ -116,7 +116,7 @@ export const INK = {
 	drift: 0.05, // speed the wet wash edge keeps creeping/breathing (noise evolution / s)
 	inkColor: "#0c0a09",
 	// Menu strokes
-	strokePour: 0.55, // s for the brush to slash a button's stroke left → right
+	strokePour: 0.95, // s for a button's stroke to open from the middle and soak to full black
 	strokeMargin: 60, // px of room around a button for the frayed ends (incl. their hover reach), wash and spray
 	// Veil (lobby → duel)
 	veilStrokes: 6, // giant slashes that cover the screen (combed: even ones first, then the odd)

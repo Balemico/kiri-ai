@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { PlaneGeometry, type Mesh } from "three";
 import { InkCanvas } from "../../atoms/InkCanvas";
 import { createStrokeMaterial, inkUniforms, type StrokeUniforms } from "../../../ink/inkNodes";
-import { easeOutCubic, phaseProgress } from "../../../ink/inkMath";
+import { easeInOutCubic, phaseProgress } from "../../../ink/inkMath";
 import { effectiveOpacity, inkStrokes, inkSupported, type InkStrokeEntry, type InkTone } from "../../../ink/inkRegistry";
 import { useInkControls } from "../../../hooks/useInkControls";
 import { INK } from "../../../layout";
@@ -52,8 +52,8 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		if (!e.visible) startedAt.current = null;
 		else if (startedAt.current === null) startedAt.current = clock.elapsedTime;
 		const age = startedAt.current === null ? 0 : clock.elapsedTime - startedAt.current;
-		// A slash: fast, decelerating as the bristles drag out.
-		u.pour.value = easeOutCubic(phaseProgress(age, INK.strokePour));
+		// Soft in, soft out: the stroke opens from the middle as the ink soaks in.
+		u.pour.value = easeInOutCubic(phaseProgress(age, INK.strokePour));
 		// Hover reaches the ends out and thickens a touch — eased exponentially (frame-rate
 		// independent), so it glides in and out instead of popping.
 		hover.current += ((e.hovered && !e.disabled ? 1 : 0) - hover.current) * (1 - Math.exp(-dt * 7));

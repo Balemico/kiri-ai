@@ -118,7 +118,9 @@ const droplets = (x: N, y: N, s: N, zs: N, n: N, b: BrushSpec, cellAlong: number
 	const dd = length(f.sub(centre).mul(vec2(cl, cw)).div(vec2(elong, 1)));
 	const drop = smoothstep(radius, radius.mul(0.55), dd).mul(exists);
 	// A drop exists only once the brush has passed and flung it.
-	return drop.mul(step(s, b.front.sub(0.08)));
+	// Straight strokes open from the middle, so a drop appears when its END reaches it.
+	const along = b.straight ? zs.sub(0.5).mul(2) : s;
+	return drop.mul(step(along, b.front.sub(0.08)));
 };
 
 /** One brush stroke → { ink, wash, drops } coverages (0..1). */
@@ -173,8 +175,11 @@ const brush = (b: BrushSpec) => {
 	const straightEnds = smoothstep(0, 1.5, dHead).mul(smoothstep(0, 1.5, dTip));
 	const body = smoothstep(flank, flank.sub(float(1.6).div(half)), an).mul(b.straight ? straightEnds : step(0, s));
 	// The brush front: bristles lead and lag a little, so the frontier itself is streaky.
-	const lead = b.front.add(bristle.sub(0.5).mul(0.05));
-	const drawn = smoothstep(lead, lead.sub(0.012), s);
+	// Slash: the brush front travels head → tip, bristles leading and lagging a little.
+	// Straight: the stroke OPENS from the middle toward both ends at once, on a soft frontier
+	// (a wide feather, streaked by the bristles) — no hard sweep line.
+	const lead = b.front.add(bristle.sub(0.5).mul(b.straight ? 0.14 : 0.05));
+	const drawn = b.straight ? smoothstep(lead, lead.sub(0.16), ends01) : smoothstep(lead, lead.sub(0.012), s);
 	// Loaded bristles deposit slightly unevenly — sumi is never flat black.
 	const ink = body.mul(filled).mul(drawn).mul(bristle.mul(0.3).add(0.78));
 
@@ -183,7 +188,7 @@ const brush = (b: BrushSpec) => {
 	const t = time.mul(L.drift);
 	const washEdge = mx_fractal_noise_float(vec3(x.mul(0.01), y.mul(0.01), t.add(b.seed)), 3, 2.0, 0.5).mul(0.35).add(1.4);
 	const washShape = smoothstep(washEdge, washEdge.sub(0.55), an).mul(b.straight ? smoothstep(1.02, 0.7, ends01) : smoothstep(-0.02, 0.08, s).mul(smoothstep(0.95, 0.45, s)));
-	const washDrawn = smoothstep(b.front, b.front.sub(0.15), s);
+	const washDrawn = b.straight ? smoothstep(b.front, b.front.sub(0.35), ends01) : smoothstep(b.front, b.front.sub(0.15), s);
 	const washBody = mx_noise_float(vec3(b.P.mul(0.012), t.mul(0.6).add(b.seed.add(5.5)))).mul(0.35).add(0.65);
 	const wash = washShape.mul(washDrawn).mul(washBody).mul(L.wash).mul(b.washScale).mul(clamp(float(1).sub(b.dry.mul(2)), 0, 1));
 
@@ -265,8 +270,11 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		width,
 		bend,
 		seed: u.seed,
-		front: u.pour.mul(1.25),
-		dry: float(0),
+		// Opens from the middle to slightly past both ends…
+		front: u.pour.mul(1.15),
+		// …while the load builds: bristle streaks first, soaking to full black (the wash and the
+		// spray bloom in last, since `dry` holds them back too).
+		dry: float(1).sub(u.pour).mul(0.55),
 		bristleScale: 1.7,
 		dropScale: float(0.6),
 		tipDrops: 0.3,
@@ -276,7 +284,9 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		wildness: 0.35,
 	});
 	// Hover deepens the wash WHERE IT ALREADY IS (multiply) — adding to it would tint the whole plane.
-	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)), drops);
+	// A coloured wash reads as a pastel glow, not diluted ink: tinted strokes keep only a trace.
+	const washTone = float(1).sub(u.tintAmount.mul(0.8));
+	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)).mul(washTone), drops);
 	const material = baseMaterial();
 	material.colorNode = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
 	material.opacityNode = alpha.mul(u.opacity);

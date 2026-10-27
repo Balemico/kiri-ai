@@ -70,12 +70,12 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 					style={{ position: "absolute", inset: "10px 4px", borderRadius: "40% 12% 30% 10% / 50% 20% 50% 20%", background: FALLBACK[tone] }}
 				/>
 			)}
-			{/* The label lands once the brush has passed over most of the stroke. */}
+			{/* The label settles in (letters drawing together out of a soft blur) as the ink soaks. */}
 			<motion.span
 				variants={{
-					hidden: { opacity: 0 },
-					painted: { opacity: 1, letterSpacing: "3px", transition: { delay: INK.strokePour * 0.55, duration: 0.4 } },
-					bleed: { opacity: 1, letterSpacing: "4.5px", transition: { duration: 0.25 } },
+					hidden: { opacity: 0, letterSpacing: "6px", filter: "blur(3px)" },
+					painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+					bleed: { opacity: 1, letterSpacing: "4.5px", filter: "blur(0px)", transition: { duration: 0.25 } },
 				}}
 				style={{ position: "relative", color: "#f2ead9", fontSize: 16, fontWeight: 700, letterSpacing: 3, whiteSpace: "nowrap" }}
 			>

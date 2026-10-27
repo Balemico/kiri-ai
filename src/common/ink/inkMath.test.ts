@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { easeOutCubic, insideStroke, phaseProgress, rng, veilStrokes } from "./inkMath";
+import { easeInOutCubic, easeOutCubic, insideStroke, phaseProgress, rng, veilStrokes } from "./inkMath";
 
 describe("rng", () => {
 	it("is deterministic per seed", () => {
@@ -18,6 +18,10 @@ describe("timing", () => {
 		expect(easeOutCubic(0)).toBe(0);
 		expect(easeOutCubic(1)).toBe(1);
 		expect(easeOutCubic(0.5)).toBeGreaterThan(0.5);
+		expect(easeInOutCubic(0)).toBe(0);
+		expect(easeInOutCubic(0.5)).toBe(0.5);
+		expect(easeInOutCubic(1)).toBe(1);
+		expect(easeInOutCubic(0.1)).toBeLessThan(0.1);
 	});
 });
 
