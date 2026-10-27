@@ -54,8 +54,9 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		const age = startedAt.current === null ? 0 : clock.elapsedTime - startedAt.current;
 		// A slash: fast, decelerating as the bristles drag out.
 		u.pour.value = easeOutCubic(phaseProgress(age, INK.strokePour));
-		// Hover spreads the ink a little further, eased (no pop).
-		hover.current += ((e.hovered && !e.disabled ? 1 : 0) - hover.current) * Math.min(1, dt * 8);
+		// Hover reaches the ends out and thickens a touch — eased exponentially (frame-rate
+		// independent), so it glides in and out instead of popping.
+		hover.current += ((e.hovered && !e.disabled ? 1 : 0) - hover.current) * (1 - Math.exp(-dt * 7));
 		u.hover.value = hover.current;
 
 		const tone = TONE[e.tone];

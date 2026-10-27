@@ -252,7 +252,8 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	// equally; a barely-there tilt and bow so siblings still differ.
 	const tilt = sin(u.seed.mul(12.9898)).mul(0.008);
 	const dir = vec2(cos(tilt), sin(tilt));
-	const len = box.x.add(u.margin.mul(0.7));
+	// Hover reaches out: the stroke lengthens equally at both ends (eased in InkLayer).
+	const len = box.x.add(u.margin.mul(0.5)).add(u.hover.mul(u.margin.mul(0.6)));
 	const centre = u.size.mul(0.5);
 	const width = box.y.mul(u.hover.mul(0.06).add(0.86));
 	const bend = box.y.mul(0.03).mul(sin(u.seed.mul(7.31)));

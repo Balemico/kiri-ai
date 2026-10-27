@@ -117,7 +117,7 @@ export const INK = {
 	inkColor: "#0c0a09",
 	// Menu strokes
 	strokePour: 0.55, // s for the brush to slash a button's stroke left → right
-	strokeMargin: 44, // px of room around a button for the tail, wash and splatter
+	strokeMargin: 60, // px of room around a button for the frayed ends (incl. their hover reach), wash and spray
 	// Veil (lobby → duel)
 	veilStrokes: 6, // giant slashes that cover the screen (combed: even ones first, then the odd)
 	veilPour: 1.5, // s until the slashes (and the final flood) cover everything
