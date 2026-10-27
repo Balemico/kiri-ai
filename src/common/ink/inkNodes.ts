@@ -251,7 +251,8 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		flankDrops: 0.12,
 		washScale: 1,
 	});
-	const alpha = union(ink, wash.add(u.hover.mul(0.08)), drops);
+	// Hover deepens the wash WHERE IT ALREADY IS (multiply) — adding to it would tint the whole plane.
+	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)), drops);
 	const material = baseMaterial();
 	material.colorNode = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
 	material.opacityNode = alpha.mul(u.opacity);
