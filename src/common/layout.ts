@@ -119,7 +119,7 @@ export const INK = {
 	inkColor: "#0c0a09",
 	// Menu strokes
 	strokeHeight: 0.66, // stroke thickness as a fraction of the button's height (flank dryness is relative, so unaffected)
-	strokePour: 0.95, // s for a button's stroke to open from the middle and soak to full black
+	strokePour: 1.05, // s for the brush to drag a button's stroke left → right and the ink to soak to full black
 	strokeMargin: 60, // px of room around a button for the frayed ends (incl. their hover reach), wash and spray
 	// Veil (lobby → duel)
 	veilStrokes: 6, // giant slashes that cover the screen (combed: even ones first, then the odd)
