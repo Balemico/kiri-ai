@@ -26,6 +26,11 @@ export const BATTLEGROUND = {
 	y: -0.7, // vertical placement (below the horizon, on the floor)
 	diamondTilt: 1.0, // rake the diamond markers onto the floor (radians) — match to the floor tilt
 	sharedOffset: 0.2, // lateral nudge each pawn gets when both share a space, so they stay readable
+	// Narrow landscape windows: the resting played cards hug the lateral viewport edges, so a full-width
+	// line would put the end pawns under them. The line shrinks so its ends stay `edgeClear` (world x)
+	// inside the viewport edge — card column + the pawn's half-width — never below `minLineScale`.
+	edgeClear: 1.45,
+	minLineScale: 0.68,
 	// Portrait: the vertical duel line, raked onto the floor, with pawns/markers to its sides.
 	baseY: 0.66, // world-Y centre of the vertical line
 	laneOffset: 0.5, // lateral (x) offset of a pawn/marker from the line — bottom team right (+), top left (−)
@@ -88,6 +93,70 @@ export const WIN_BANNER = {
 	testTeam: "red" as Team, // Leva: which team's victory to preview
 } as const;
 
+// --- In-game HUD ---
+// The DOM overlay drawn over the duel: the two player banners (life seals + stance), the round
+// marker, the pass-the-device veil (pass & play) and the ink splash on a landed hit.
+export const GAME_HUD = {
+	inset: 22, // px from the screen edges to the banners / round marker
+	bannerHeight: 116, // px a player banner occupies at scale 1 (disc / name, stance, seals, caption slot) — measured
+	scale: 1, // landscape size multiplier for banners + round marker
+	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
+	handoffDelayMs: 650, // after a confirm, let the cards flip face-down before the veil inks in
+	introHudDelay: 0.1, // duel opening: s after both samurai have stood up before the HUD animates in
+	introTurnDelay: 0.7, // s after the HUD starts before red's first turn begins (the hand rises)
+	hitLagMs: 950, // a life seal breaks this long after the reveal, once the blade has landed
+	splashSeconds: 0.9, // how long the screen-edge ink wash of a landed hit lingers
+	hitInk: "#8a1610", // the spilled ink of a landed blow — blood red (the screen-edge wash)
+	idleOpacity: 0.6, // a banner whose player is NOT acting fades to this, alongside its corner resting in black
+	// Corner vignette behind the banners (sections/HudVignette → atoms/CornerVignette): a gradual glow in
+	// each top corner, drawn in the 3D scene under the cards — it glows in the team colour while that
+	// player is acting, otherwise rests in black.
+	vignetteShade: "#0c0a09", // resting tone (sumi black)
+	vignetteShadeOpacity: 0.5, // alpha of the resting shade at the corner
+	vignetteGlowOpacity: 0.65, // alpha of the team-colour glow at the corner
+	vignetteWidth: 0.66, // extent across, as a fraction of the viewport width
+	vignetteHeight: 0.31, // extent down, as a fraction of the viewport height
+	vignetteDrift: 4, // seconds for one slow breath of the vignette
+} as const;
+
+// --- Sumi ink (TSL shader) ---
+// Action sumi-e (haboku / hatsuboku): fast dry-brush slashes whose bristles split into streaks,
+// flung splatter, and pale wash beside the solid black. Drives the lobby buttons and the
+// lobby→duel veil (src/common/ink). Look params are SHARED live uniforms ("Ink" Leva folder).
+export const INK = {
+	// Look
+	bristles: 3.5, // bristle clumps across a menu-sized stroke (the veil scales it up)
+	tailDry: 0.7, // how dry the brush runs by the end of a stroke (0 = solid to the tip)
+	edgeDry: 0.5, // how broken the stroke's flanks are (bristles splaying at the edges)
+	tooth: 0.15, // paper tooth breaking the dry-brush (vs pure bristle streaks)
+	wash: 0.24, // pale diluted-ink wash bleeding beside the stroke
+	splatter: 0.55, // flung-droplet density multiplier
+	tones: 0.2, // nōtan: grey streaks + mottling of diluted ink inside the black (0 = flat black)
+	sanboku: 0.15, // "three inks": one flank dense black, the other diluted to grey (brush-tip vs belly)
+	drift: 0.16, // speed the wet wash edge keeps creeping/breathing (noise evolution / s)
+	inkColor: "#0c0a09",
+	// Menu strokes
+	strokeHeight: 0.66, // stroke thickness as a fraction of the button's height (flank dryness is relative, so unaffected)
+	strokePour: 1.05, // s for the brush to drag a button's stroke left → right and the ink to soak to full black
+	strokeMargin: 60, // px of room around a button for the frayed ends (incl. their hover reach), wash and spray
+	// Veil (lobby → duel)
+	veilStrokes: 12, // slashes laid top → bottom that, between them, ink the WHOLE screen
+	veilPour: 1.8, // s for the slashes to be laid, one after another, until the screen is fully inked
+	veilDry: 1.6, // s for the cover to dry into bristle streaks and lift away
+	veilLayer: 0.72, // opacity of ONE veil slash — translucent, they add up until the screen is full
+} as const;
+
+// --- Seal disc ---
+// The team kanji avatar (赤 / 青) rendered as a carved, nearly 3D seal: a raised bevelled rim
+// around a recessed face, with the kanji standing in relief. Light comes from the top-left.
+export const SEAL_DISC = {
+	rim: 0.08, // rim width, as a fraction of the disc size
+	bevel: 0.25, // rim highlight/shadow strength (0 = flat colour, 1 = white/black extremes)
+	depth: 1, // how deep the face sits below the rim (inner-shadow multiplier)
+	relief: 2.4, // how far the kanji stands out of the face (highlight/shadow multiplier)
+	gloss: 0, // specular sheen on the upper-left (0 = matte)
+} as const;
+
 // The samurai pawns are flat billboard sprites (white silhouettes in public/images/characters,
 // tinted per team). One PNG per stance: heaven = sword raised high, earth = sword forward.
 // `frames` holds metrics measured from each PNG's alpha so the figure is anchored by its BODY
@@ -109,6 +178,28 @@ export const PAWN = {
 		heaven: { aspect: 1024 / 1536, bodyCol: 0.451, feetRow: 0.956, scale: 1.12 },
 		earth: { aspect: 1641 / 1536, bodyCol: 0.338, feetRow: 0.933, scale: 1.0 },
 	},
+} as const;
+
+// The samurai as PAPER CUT-OUTS: a cream paper rim around the coloured silhouette, a faint offset
+// edge for the sheet's thickness, a contact shadow at the feet — and the entrance: hinged at the
+// feet, each figure lies back flat on the floor until the duel starts, then is raised slowly and
+// gracefully — like a figure in a paper theatre lifted by hand — and eased back into place. Single source for the "Paper Cutout" Leva folder.
+export const PAPER_CUTOUT = {
+	lieAngle: -1.4, // radians the figure lies back on the floor (hinged at the feet) before the duel
+	standDur: 1.2, // seconds for the whole stand-up: the slow lift + the soft settle
+	liftShare: 0.74, // share of standDur spent lifting off the floor (the rest is the settle)
+	overshoot: 0.08, // radians the cut-out drifts PAST vertical before easing back — barely there
+	revealDelay: 0.05, // red starts standing this long after the veil has OPENED (ink/veilSignal)
+	stagger: 0.35, // blue stands this long after red
+	rimScale: 1.015, // paper rim: the silhouette scaled up behind the coloured one
+	rimColor: "#ffffff", // the cut paper's white rim
+	rimOffsetY: 0.001, // shifts the rim up (world units): thicker over the head/blades, thinner under the feet
+	edgeOffsetX: 0.007, // offset of the sheet-thickness shadow from the RIM outline (world units)
+	edgeOffsetY: 0.002, // positive = the dark sheet peeks out ABOVE the rim
+	edgeOpacity: 0.55,
+	shadowOpacity: 0.4, // contact shadow at the feet once standing
+	shadowWidth: 0.63, // × the sprite height
+	shadowHeight: 0.09, // world units
 } as const;
 
 // Yellow sword-cut wedge shown over a pawn that takes a hit (echoes the card slash). A bold
@@ -244,6 +335,97 @@ export const STAGE_LAYERS: StageLayer[] = [
 	{ url: "/images/backgroud/4-tree.png", depth: 0.62, phase: 0.6, y: 0.05 },
 ];
 
+// --- Lobby panorama (menu backdrop) ---
+// The lobby reuses the game's stage art but re-stages it: the maple tree is anchored to the LEFT
+// edge, bigger and nearer, because its canopy is the SOURCE of the falling leaves (they detach
+// from it and drift right across the scene — never spawn mid-air). Single source for the "Lobby"
+// Leva folder.
+export const LOBBY = {
+	// Tree re-staging. The tree is anchored to TWO view edges so the composition holds at any
+	// aspect: `treeEdge` = inset of its centre of mass from the visible LEFT edge (negative =
+	// bleeds off), `treeBottom` = inset of its painted BASE from the visible BOTTOM edge (0 =
+	// touching, negative = bleeds below — grounds it firmly). The art is a full-frame panel with
+	// the tree far bottom-left INSIDE the frame, so LobbyScene back-computes the panel centre
+	// from `treeAnchor`.
+	treeEdge: 0.6,
+	treeBottom: -0.1,
+	treeScale: 2.4, // sized so that, base at the bottom edge, the canopy still reaches the top
+	// The lobby pushes its horizon DOWN vs the duel's HORIZON_FRACTION (0.4): more painting, less
+	// bare paper below. The tree also draws ABOVE the floor here (true foreground), so its base
+	// stands on the ground instead of dissolving into the horizon wash.
+	horizonFraction: 0.5,
+	// Tree footprint inside 4-tree.png, as fractions of the frame (alpha > 160 — the soft ground
+	// wash below that threshold is ignored): x/y = alpha-weighted centre of mass, bottom = lowest
+	// painted row. Remeasure if the art is regenerated: scripts note in CLAUDE.md.
+	treeAnchor: { x: 0.17, y: 0.79, bottom: 0.995 },
+	// Canopy centre relative to the tree's mass centre (world x) — the leaf emitter follows the
+	// tree through this offset, so moving/reanchoring the tree never orphans the leaves.
+	treeCanopyOffsetX: -0.2,
+	// Leaf particle field. Every leaf is born inside the canopy-aligned emitter box and dies
+	// below the visible bottom, then re-enters from the canopy (deterministic per-index cycle).
+	leaves: {
+		count: 44,
+		reducedCount: 4, // prefers-reduced-motion / low-end fallback
+		emitterX: -2.6, // canopy centre (world) — LobbyScene OVERRIDES this to follow the tree; this default serves the pure-math tests
+		emitterY: 1.3,
+		emitterWidth: 2.2,
+		emitterHeight: 0.9,
+		floorY: -2.3, // below the frame bottom → leaves exit off-screen
+		fallSpeed: 0.22, // world units/s, base
+		fallJitter: 0.5, // ±50% per-leaf speed variance
+		drift: 0.3, // steady rightward wind (units/s at gust 1)
+		sway: 0.16, // lateral flutter amplitude
+		swayFreq: 0.7, // flutter Hz
+		spinSpeed: 1.1, // tumbling rad/s, base
+		windFreq: 0.11, // global gust Hz (slow)
+		windStrength: 0.6, // gust modulation of the drift (0 = constant wind)
+		minScale: 0.05,
+		maxScale: 0.1,
+		backRatio: 0.25, // fraction rendered on the far plane (smaller/paler, behind the mist)
+		birthStagger: 6, // seconds over which the field populates after release — leaves detach one by one
+		growSeconds: 0.9, // per-leaf scale-in at each (re)birth, so a detach never pops
+	},
+	mist: {
+		bands: 3,
+		height: 0.55, // world height of one band
+		opacity: 0.32,
+		speed: 0.018, // horizontal drift, world units/s
+		y: -0.05, // band-cluster centre relative to the horizon
+	},
+	columnWidthPct: 34, // landscape DOM menu column, % of viewport width
+} as const;
+
+// --- Intro choreography (entry cinematic, exit veil, fly-back reveal) ---
+// All timings in seconds. Single source for the entry/exit/flight choreography (compile-time; no Leva folder).
+export const INTRO = {
+	// Entry: stage layers paint far → near, then sun/tree/mist/leaves, then the DOM menu.
+	layerStagger: 0.28,
+	layerFade: 0.9, // per-layer fade/rise duration
+	leavesDelay: 1.8, // leaves become visible (storyboard beat 3)
+	menuDelay: 2.5, // first DOM element (the logo) starts painting
+	menuStagger: 0.35, // per-menu-item stagger after menuDelay
+	total: 4.5, // full entry choreography (3D paint-on + DOM menu) — the natural finish beat
+	// Approach reveal: as the veil dries, the (fully mounted) duel draws closer — the camera
+	// glides in from a little farther and higher to the FitCamera pose.
+	flightDur: 2.6,
+	flightStartHeight: 0.35, // start y above the final camera y (looks slightly down, levels out)
+	flightStartDist: 1.4, // start z as a MULTIPLE of the final camera distance (> 1 = farther)
+} as const;
+
+/** Camera pose (y, z) of the locked front view for a frame + aspect — FitCamera's fit rule as a pure function. */
+export interface CameraPose {
+	y: number;
+	z: number;
+}
+
+export const cameraPose = (frame: SceneFrame, aspect: number, fovDeg: number): CameraPose => {
+	const halfHeight = (frame.top - frame.bottom) / 2;
+	const centerY = (frame.top + frame.bottom) / 2;
+	const tan = Math.tan((fovDeg * Math.PI) / 360); // tan(vFov/2)
+	// Distance that fits the frame vertically vs horizontally — take the larger (no axis clipped).
+	return { y: centerY, z: Math.max(halfHeight / tan, frame.halfWidth / (tan * aspect)) };
+};
+
 // --- Card geometry (world units, at group scale 1) ---
 // The GLB card body renders ~5:7 (see cardAlpha.ts). These are the on-screen
 // footprint of a single card and are used both to frame the scene and to anchor
@@ -301,6 +483,8 @@ export const PLAYED_CARDS = {
 	// corner instead (only empty scenery up there, so it clears at any width).
 	restTopWidth: 4.8, // viewport width under which the resting pair moves from the bottom to the top corner
 	restTopMargin: 0.7, // gap from the top viewport edge down to the upper (first) resting card when lifted
+	restBelowHud: 0.36, // …or, if the HUD's banners reach lower, this far below them (card centre)
+	restTopScale: 0.8, // the lifted pair is a little smaller (and its gap tighter), to fit between the HUD and the swords
 	// Action: the revealed card rises landscape (horizontal) up to mid-page on its team's side, read
 	// during its action.
 	actionScale: 1.0,
@@ -383,11 +567,19 @@ export interface LandingZoneConfig {
 /** Half-width of the battlefield line (outermost board spaces). */
 export const BATTLEFIELD_HALF_WIDTH = spaceToX(BOARD_SPACES - 1); // 1.5
 
+/**
+ * Landscape line scale for a visible viewport width: 1 on wide windows, shrinking so the line ends
+ * stay `BATTLEGROUND.edgeClear` inside the lateral edges (clear of the played cards), floored at
+ * `minLineScale`. Multiply `spaceToX` by it for every landscape position along the line.
+ */
+export const landscapeLineScale = (viewportWidth: number): number =>
+	Math.min(1, Math.max(BATTLEGROUND.minLineScale, (viewportWidth / 2 - BATTLEGROUND.edgeClear) / BATTLEFIELD_HALF_WIDTH));
+
 /** Which lateral edge a team's corner/cards hug: red = left (−x), blue = right (+x). */
 const teamEdgeSign = (team: Team): number => (team === "red" ? -1 : 1);
 
-/** X of a team's battleline origin — the end of the line where its pawn starts. */
-const teamOriginX = (team: Team): number => spaceToX(team === "red" ? RED_START : BLUE_START);
+/** X of a team's battleline origin — the end of the line where its pawn starts (scaled with the line). */
+const teamOriginX = (team: Team, viewportWidth: number): number => spaceToX(team === "red" ? RED_START : BLUE_START) * landscapeLineScale(viewportWidth);
 
 /** The role a played card plays in the current round, which drives where it sits. */
 export type PlayedMode = "rest" | "action" | "toHand" | "setAside";
@@ -398,7 +590,21 @@ export interface PlayedViewport {
 	height: number;
 	bottom: number;
 	centerY: number;
+	/** World height reserved at the TOP for the DOM HUD (player banners) — cards lifted to the top
+	 *  corner sit below it. 0 = none. */
+	topReserve?: number;
 }
+
+/** The played-card viewport for a frame viewport, reserving the HUD's top band (`GAME_HUD`, in CSS
+ *  px) converted to world units for a canvas `canvasHeightPx` tall — the HUD is DOM, the cards 3D,
+ *  so neither knows the other's size without this. */
+export const playedViewport = (viewport: { width: number; height: number; bottom: number; centerY: number }, canvasHeightPx: number): PlayedViewport => ({
+	width: viewport.width,
+	height: viewport.height,
+	bottom: viewport.bottom,
+	centerY: viewport.centerY,
+	topReserve: canvasHeightPx > 0 ? ((GAME_HUD.inset + GAME_HUD.bannerHeight * GAME_HUD.scale) / canvasHeightPx) * viewport.height : 0,
+});
 
 /** Portrait played-card layout knobs (the column of committed + set-aside cards at the team's side). */
 export interface PlayedPortrait {
@@ -427,6 +633,8 @@ export interface PlayedCardConfig {
 	restZ: number;
 	restTopWidth: number;
 	restTopMargin: number;
+	restBelowHud: number;
+	restTopScale: number;
 	actionScale: number;
 	actionTilt: number;
 	actionEdgeMargin: number;
@@ -530,7 +738,7 @@ export const playedCardTransform = (
 		case "setAside":
 			// Laid flat near the battleline on the team's side (just outside its end of the line).
 			return {
-				position: [teamOriginX(team) + sign * cfg.setAsideInset, cfg.setAsideY, cfg.setAsideZ],
+				position: [teamOriginX(team, viewport.width) + sign * cfg.setAsideInset, cfg.setAsideY, cfg.setAsideZ],
 				rotationZ: cfg.setAsideRotZ,
 				rotationX: -cfg.setAsideTilt,
 				scale: cfg.setAsideScale,
@@ -541,16 +749,28 @@ export const playedCardTransform = (
 			// first card outermost (above the second). On a WIDE viewport the lateral edge sits clear of the
 			// central battleline/set-aside, so the pair rests in the bottom corner; as the viewport NARROWS
 			// the edge marches inward over them, so once the width drops below `restTopWidth` the pair lifts
-			// to the TOP corner instead (empty scenery up there → it clears at any width).
+			// to the TOP corner instead (empty scenery up there → it clears at any width), below the HUD's
+			// player banners (`topReserve`).
 			const isFirst = slot === "first";
 			const crowded = viewport.width < cfg.restTopWidth;
-			const y = crowded
-				? viewport.centerY + viewport.height / 2 - cfg.restTopMargin - (isFirst ? 0 : cfg.restGap)
-				: viewport.bottom + cfg.restY + (isFirst ? cfg.restGap : 0);
+			if (crowded) {
+				// Lifted to the top corner: the pair stays STACKED (first above second) just under the HUD's
+				// banners, a touch smaller and closer together so it fits between the banners and the
+				// samurai's raised swords. Where the band is too short a sword tip may brush the lower card
+				// — acceptable: the pawn draws over the (face-down) resting cards, hiding nothing.
+				const k = cfg.restTopScale;
+				const firstY = viewport.centerY + viewport.height / 2 - Math.max(cfg.restTopMargin, (viewport.topReserve ?? 0) + cfg.restBelowHud);
+				return {
+					position: [edgeX(cfg.restEdgeMargin), isFirst ? firstY : firstY - cfg.restGap * k, cfg.restZ],
+					rotationZ: -Math.PI / 2,
+					rotationX: 0,
+					scale: cfg.restScale * k,
+				};
+			}
 			return {
 				// Same z for both cards: a z difference would parallax-shift their apparent x (they sit
 				// near the frustum edge) and break the vertical alignment.
-				position: [edgeX(cfg.restEdgeMargin), y, cfg.restZ],
+				position: [edgeX(cfg.restEdgeMargin), viewport.bottom + cfg.restY + (isFirst ? cfg.restGap : 0), cfg.restZ],
 				rotationZ: -Math.PI / 2, // landscape (fixed)
 				rotationX: 0,
 				scale: cfg.restScale,

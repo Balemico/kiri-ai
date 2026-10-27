@@ -12,7 +12,7 @@ import {
 	SLOT_KANJI,
 	type Orientation,
 	type PlayedMode,
-	type SceneFrame,
+	type SceneFrame, playedViewport
 } from "../../../layout";
 import { usePlayedCardControls } from "../../../hooks/usePlayedCardControls";
 import { useLandingZoneControls } from "../../../hooks/useLandingZoneControls";
@@ -54,7 +54,7 @@ export const LandingZones = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lands
 	if (orientation !== "portrait") return null;
 
 	const viewport = frameViewport(frame, size.width / size.height);
-	const vp = { width: viewport.width, height: viewport.height, bottom: viewport.bottom, centerY: viewport.centerY };
+	const vp = playedViewport(viewport, size.height);
 	const pp = {
 		bottomTeam,
 		scaleFrac: played.playedScale,

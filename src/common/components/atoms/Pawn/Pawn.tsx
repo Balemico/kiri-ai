@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useLayoutEffect, useMemo } from "react"
 import { gsap } from "gsap";
 import * as THREE from "three";
 import type { Stance, Team } from "../../../game";
-import { PAWN, SLASH, RESOLUTION, rakeLine } from "../../../layout";
+import { PAPER_CUTOUT, PAWN, SLASH, RESOLUTION, rakeLine } from "../../../layout";
 import { useCharacterTexture, makeCharacterMaterial } from "../../../hooks/useCharacterTextures";
 import type { SlashControls } from "../../../hooks/useSlashControls";
+import type { PaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
 
 // Tints applied to the white silhouette (multiply), matched to the duel-card palette.
 const COLORS: Record<Team, string> = { red: "#cf463f", blue: "#4a8aa0" };
@@ -16,6 +17,26 @@ const DEFEATED = "#333333";
 const tintFor = (team: Team, damage: number): string => (damage >= 2 ? DEFEATED : damage >= 1 ? INJURED[team] : COLORS[team]);
 
 const STANCES: Stance[] = ["heaven", "earth"];
+
+// Soft elliptical contact shadow (shared, procedural — no asset).
+let shadowTexture: THREE.CanvasTexture | null = null;
+const contactShadow = (): THREE.CanvasTexture => {
+	if (shadowTexture) return shadowTexture;
+	const c = document.createElement("canvas");
+	c.width = 128;
+	c.height = 32;
+	const g = c.getContext("2d")!;
+	const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+	grad.addColorStop(0, "rgba(0,0,0,1)");
+	grad.addColorStop(0.45, "rgba(0,0,0,0.55)");
+	grad.addColorStop(1, "rgba(0,0,0,0)");
+	// Squash the round gradient into a flat ellipse filling the 128×32 canvas.
+	g.setTransform(1, 0, 0, 0.25, 0, 0);
+	g.fillStyle = grad;
+	g.fillRect(0, 0, 128, 128);
+	shadowTexture = new THREE.CanvasTexture(c);
+	return shadowTexture;
+};
 
 export interface PawnProps {
 	/** Position ALONG the duel line (already mapped from a board space): world-x in landscape, world-y
@@ -61,6 +82,14 @@ export interface PawnProps {
 	/** Delay (s) before the stance crossfade plays — used to hold a Kesa/Zan-Tetsu flip until AFTER the
 	 *  strike, so the attack reads in its pre-switch pose. Defaults to 0 (switch immediately). */
 	stanceDelay?: number;
+	/** Paper cut-out look + stand-up entrance (from the "Paper Cutout" Leva folder). */
+	cutout?: PaperCutoutControls;
+	/** False = the cut-out lies back flat on the floor; flipping true springs it up (once). */
+	standing?: boolean;
+	/** Seconds before this figure springs up (the second samurai follows the first). */
+	standDelay?: number;
+	/** Bumping this lays the figure back down and replays the spring-up (Leva "play stand-up"). */
+	standTick?: number;
 }
 
 /** Geometry of one stance sprite, anchored by body column + feet so it stands on the board line. */
@@ -96,13 +125,22 @@ export const Pawn = ({
 	moveDur = RESOLUTION.moveDur,
 	attackDelay = 0,
 	stanceDelay = 0,
+	cutout,
+	standing = true,
+	standDelay = 0,
+	standTick = 0,
 }: PawnProps) => {
 	const cfg: SlashControls = slash ?? SLASH;
+	const paper: PaperCutoutControls = cutout ?? PAPER_CUTOUT;
 	const rootRef = useRef<THREE.Group>(null); // movement (x)
 	const reactRef = useRef<THREE.Group>(null); // hit shake / punch + entrance (local)
 	const meshRefs = { heaven: useRef<THREE.Mesh>(null), earth: useRef<THREE.Mesh>(null) };
 	const slashRef = useRef<THREE.Mesh>(null);
 	const growRef = useRef<THREE.Group>(null); // pivot group scaled to "grow" the wedge from its tip
+	const hingeRef = useRef<THREE.Group>(null); // pivot at the feet: the cut-out lies down / stands up here
+	const shadowRef = useRef<THREE.Mesh>(null);
+	const rimRefs = { heaven: useRef<THREE.Mesh>(null), earth: useRef<THREE.Mesh>(null) };
+	const edgeRefs = { heaven: useRef<THREE.Mesh>(null), earth: useRef<THREE.Mesh>(null) };
 	const initialized = useRef(false);
 	const prevDamage = useRef(damage);
 	const prevStance = useRef<Stance | null>(null);
@@ -113,6 +151,17 @@ export const Pawn = ({
 	const matEarth = useMemo(() => makeCharacterMaterial(texEarth), [texEarth]);
 	const materials = useMemo(() => ({ heaven: matHeaven, earth: matEarth }), [matHeaven, matEarth]);
 	useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
+	// Paper layers behind the coloured silhouette: a cream rim (the cut paper's margin) and a faint
+	// dark offset copy (the sheet's thickness lifting off the background).
+	const rimMats = useMemo(() => ({ heaven: makeCharacterMaterial(texHeaven), earth: makeCharacterMaterial(texEarth) }), [texHeaven, texEarth]);
+	const edgeMats = useMemo(() => ({ heaven: makeCharacterMaterial(texHeaven), earth: makeCharacterMaterial(texEarth) }), [texHeaven, texEarth]);
+	useEffect(() => () => STANCES.forEach((st) => rimMats[st].dispose()), [rimMats]);
+	useEffect(() => () => STANCES.forEach((st) => edgeMats[st].dispose()), [edgeMats]);
+	const shadowMat = useMemo(
+		() => new THREE.MeshBasicMaterial({ map: contactShadow(), color: "#000000", transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false }),
+		[],
+	);
+	useEffect(() => () => shadowMat.dispose(), [shadowMat]);
 
 	// vertexColors lets the 3 triangle vertices carry per-vertex alpha → a smooth tip→base gradient.
 	const slashMat = useMemo(
@@ -191,6 +240,24 @@ export const Pawn = ({
 
 	// Mutate materials through the mesh refs (refs are mutable; the useMemo'd materials are not).
 	const matOf = (s: Stance) => meshRefs[s].current?.material as THREE.MeshBasicMaterial | undefined;
+	const rimOf = (s: Stance) => rimRefs[s].current?.material as THREE.MeshBasicMaterial | undefined;
+	const edgeOf = (s: Stance) => edgeRefs[s].current?.material as THREE.MeshBasicMaterial | undefined;
+	/** Every layer of a stance's cut-out with its full opacity — the stance crossfade moves them together. */
+	const layersOf = (s: Stance): [THREE.MeshBasicMaterial | undefined, number][] => [
+		[matOf(s), 1],
+		[rimOf(s), 1],
+		[edgeOf(s), paper.edgeOpacity],
+	];
+
+	// Paper colours (rim cream, edge ink) — kept in sync with the controls.
+	useLayoutEffect(() => {
+		STANCES.forEach((st) => {
+			rimOf(st)?.color.set(paper.rimColor);
+			edgeOf(st)?.color.set("#000000");
+		});
+		// rimOf/edgeOf read stable refs.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [rimMats, edgeMats, paper.rimColor]);
 
 	// Keep the tint in sync before paint (no white flash on mount or material swap).
 	useLayoutEffect(() => {
@@ -203,19 +270,22 @@ export const Pawn = ({
 	// Crossfade the two stance sprites: on a stance change, the outgoing pose fades out while the
 	// incoming one fades in with a small scale overshoot + a vertical settle. On mount it just snaps.
 	useLayoutEffect(() => {
-		const incoming = matOf(stance);
-		const outgoing = matOf(stance === "heaven" ? "earth" : "heaven");
-		if (!incoming || !outgoing) return;
+		const other: Stance = stance === "heaven" ? "earth" : "heaven";
+		if (!matOf(stance) || !matOf(other)) return;
 		if (prevStance.current === null || prevStance.current === stance) {
-			incoming.opacity = 1;
-			outgoing.opacity = 0;
+			layersOf(stance).forEach(([m, full]) => {
+				if (m) m.opacity = full;
+			});
+			layersOf(other).forEach(([m]) => {
+				if (m) m.opacity = 0;
+			});
 		} else {
 			// `stanceDelay` holds the flip until after the strike (Kesa/Zan-Tetsu). During the delay the
 			// outgoing pose stays at opacity 1 (its `to` hasn't started) while the incoming starts at 0
 			// (immediateRender), so the attack reads in the pre-switch pose; the crossfade then plays.
 			const delay = stanceDelay;
-			gsap.to(outgoing, { opacity: 0, duration: 0.28, delay, ease: "power2.out", overwrite: true });
-			gsap.fromTo(incoming, { opacity: 0 }, { opacity: 1, duration: 0.32, delay, ease: "power2.out", overwrite: true });
+			layersOf(other).forEach(([m]) => m && gsap.to(m, { opacity: 0, duration: 0.28, delay, ease: "power2.out", overwrite: true }));
+			layersOf(stance).forEach(([m, full]) => m && gsap.fromTo(m, { opacity: 0 }, { opacity: full, duration: 0.32, delay, ease: "power2.out", overwrite: true }));
 			// Directional settle (translation only): the figure lifts when rising to heaven, sinks to earth.
 			const from = stance === "heaven" ? -0.05 : 0.05;
 			if (reactRef.current)
@@ -228,7 +298,7 @@ export const Pawn = ({
 		prevStance.current = stance;
 		// matOf/meshRefs/reactRef are stable refs; intentionally not dependencies.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [stance, materials]);
+	}, [stance, materials, rimMats, edgeMats, paper.edgeOpacity]);
 
 	// Movement along the line: landscape slides along x. Portrait lays the line position onto the
 	// raked board plane (y foreshortened + z receding, via `rakeLine`) so the pawn stands in
@@ -269,18 +339,56 @@ export const Pawn = ({
 		}
 	}, [linePos, moveKey, lateral, lift, axis, tilt, moveDelay, moveDur]);
 
-	// One-time entrance: slide in horizontally from each samurai's own side (red from the left, blue
-	// from the right) and fade in (translation + opacity, no scale), just after the board line draws.
+	// Entrance — the paper cut-out stands up: hinged at the feet, it lies back flat on the floor
+	// (`lieAngle`) until `standing`, then is raised slowly, like a paper-theatre figure, while its
+	// contact shadow fades in. Plays once per mount; the Leva
+	// "play stand-up" (`standTick`) lays it back down and replays it.
+	const stood = useRef(false);
+	const shadowMatOf = () => shadowRef.current?.material as THREE.MeshBasicMaterial | undefined;
+	const layDown = () => {
+		if (hingeRef.current) hingeRef.current.rotation.x = paper.lieAngle;
+		const sm = shadowMatOf();
+		if (sm) sm.opacity = 0;
+	};
+	const standUp = (delay: number) => {
+		const h = hingeRef.current;
+		if (!h) return;
+		// Paper theatre: raised slowly by an unseen hand — a long sine-eased lift that drifts just past
+		// vertical, then one soft ease back into place (no spring, no wobble).
+		const lift = paper.standDur * paper.liftShare;
+		gsap.killTweensOf(h.rotation);
+		gsap
+			.timeline({ delay })
+			.to(h.rotation, { x: paper.overshoot, duration: lift, ease: "sine.inOut" })
+			.to(h.rotation, { x: 0, duration: paper.standDur - lift, ease: "sine.inOut" });
+		const sm = shadowMatOf();
+		if (sm) gsap.to(sm, { opacity: paper.shadowOpacity, duration: paper.standDur * paper.liftShare, delay, ease: "sine.inOut", overwrite: true });
+	};
 	useLayoutEffect(() => {
-		const g = reactRef.current;
-		if (!g) return;
-		const fromX = team === "red" ? -0.8 : 0.8;
-		gsap.from(g.position, { x: fromX, duration: 0.7, delay: 0.55, ease: "back.out(1.4)", overwrite: true });
-		const mat = matOf(stance);
-		if (mat) gsap.from(mat, { opacity: 0, duration: 0.6, delay: 0.55, ease: "power2.out", overwrite: true });
-		// Mount-only; matOf reads stable refs and `team`/`stance` are the initial values.
+		if (!standing) layDown();
+		else {
+			stood.current = true;
+			const sm = shadowMatOf();
+			if (sm) sm.opacity = paper.shadowOpacity;
+		}
+		// Mount-only: the initial pose.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+	useEffect(() => {
+		if (!standing || stood.current) return;
+		stood.current = true;
+		standUp(standDelay);
+		// standUp reads refs + the live controls.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [standing]);
+	const prevStandTick = useRef(standTick);
+	useEffect(() => {
+		if (standTick === prevStandTick.current) return;
+		prevStandTick.current = standTick;
+		layDown();
+		standUp(standDelay + 0.25);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [standTick]);
 
 	// Hit reaction (when this pawn takes a point): a horizontal shake + white flash, and a yellow
 	// sword-cut that sweeps across the figure — echoing the slash on the cards. Translation + opacity.
@@ -321,15 +429,43 @@ export const Pawn = ({
 	return (
 		<group ref={rootRef}>
 			<group ref={reactRef}>
-				<group scale={[mirror, 1, 1]}>
-					{STANCES.map((s, i) => {
-						const { worldW, worldH, offsetX, centerY } = frameLayout(s, height, baseY, yLift);
-						return (
-							<mesh key={s} ref={meshRefs[s]} position={[offsetX, centerY, baseZ + z - i * 0.002]} material={materials[s]} renderOrder={PAWN.renderOrder}>
-								<planeGeometry args={[worldW, worldH]} />
-							</mesh>
-						);
-					})}
+				{/* Contact shadow at the feet — fades in as the cut-out stands up. */}
+				<mesh ref={shadowRef} position={[0, baseY + yLift, baseZ + z - 0.01]} material={shadowMat} renderOrder={PAWN.renderOrder - 3}>
+					<planeGeometry args={[height * paper.shadowWidth, paper.shadowHeight]} />
+				</mesh>
+				{/* Hinge at the feet: the whole cut-out rotates about the floor line (lie down / stand up). */}
+				<group ref={hingeRef} position={[0, baseY + yLift, baseZ + z]}>
+					<group scale={[mirror, 1, 1]}>
+						{STANCES.map((s, i) => {
+							const { worldW, worldH, offsetX, centerY } = frameLayout(s, height, baseY, yLift);
+							const y = centerY - (baseY + yLift); // relative to the hinge (feet)
+							const zi = -i * 0.002;
+							return (
+								<group key={s}>
+									{/* Sheet thickness: a faint dark copy of the WHOLE sheet (rim included), furthest back,
+									    offset toward the figure's OUTER side (its back — away from the opponent / the line), so
+									    the two cut-outs mirror each other: red's thickness on the left, blue's on the right.
+									    Inside the mirrored group, a constant −x local offset is exactly that in both layouts. */}
+									<mesh
+										ref={edgeRefs[s]}
+										position={[offsetX - paper.edgeOffsetX,y + paper.rimOffsetY + paper.edgeOffsetY, zi - 0.006]}
+										scale={[paper.rimScale, paper.rimScale, 1]}
+										material={edgeMats[s]}
+										renderOrder={PAWN.renderOrder - 2}
+									>
+										<planeGeometry args={[worldW, worldH]} />
+									</mesh>
+									{/* Paper rim: the silhouette scaled up in cream — the cut-out's margin. */}
+									<mesh ref={rimRefs[s]} position={[offsetX, y + paper.rimOffsetY, zi - 0.003]} scale={[paper.rimScale, paper.rimScale, 1]} material={rimMats[s]} renderOrder={PAWN.renderOrder - 1}>
+										<planeGeometry args={[worldW, worldH]} />
+									</mesh>
+									<mesh ref={meshRefs[s]} position={[offsetX, y, zi]} material={materials[s]} renderOrder={PAWN.renderOrder}>
+										<planeGeometry args={[worldW, worldH]} />
+									</mesh>
+								</group>
+							);
+						})}
+					</group>
 				</group>
 			</group>
 			{/* Sword-cut overlay — centred on the figure; the mesh sweeps about this group's origin via

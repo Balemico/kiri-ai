@@ -22,12 +22,14 @@ import {
 	type FanConfig,
 	type CardEntry,
 	type PlayedMode,
-	type Orientation,
+	type Orientation, playedViewport
 } from "../../../layout";
 import { useFanControls } from "../../../hooks/useFanControls";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { usePlayedCardControls } from "../../../hooks/usePlayedCardControls";
 import { useBottomTeam, CONFIRM_COVER_MS, CONFIRM_HAND_IN_MS } from "../../../hooks/useBottomTeam";
+import { useHandoffPending } from "../../../hooks/useHandoffPending";
+import { useDuelIntroReached } from "../../../state/duelIntro";
 import { useLagged } from "../../../hooks/useLagged";
 import { useGame, currentHandViews, placedViews, setAsideViews, type CardView } from "../../../state";
 import { useSession } from "../../../net";
@@ -141,10 +143,16 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	const coverSettled = !portrait || coverLag === bottomTarget;
 	const fanShown = !portrait || handLag === bottomTarget;
 
+	// Pass & play: on a hand-over the outgoing hand slides down, the HandoffVeil inks in, and the incoming
+	// hand rises only once the veil is tapped away — never shown to the wrong player.
+	const handoffPending = useHandoffPending();
+	// Duel opening: no hand until the samurai have stood up and the HUD is in — then red's rises.
+	const turnOpen = useDuelIntroReached("turn");
+
 	// The fan only shows while the viewer is still placing (not yet confirmed) — and, in portrait, once
 	// the turn-change choreography has brought it back up.
 	const isPlacing = state.phase === "place" && !state.confirmed[viewerTeam];
-	const handViews = isPlacing && fanShown ? currentHandViews(state, viewerTeam) : [];
+	const handViews = isPlacing && fanShown && turnOpen && !handoffPending ? currentHandViews(state, viewerTeam) : [];
 	const hoveredIndex = handViews.findIndex((v) => v.key === hoveredKey);
 
 	// Tight, overlapping fan anchored to the bottom edge of the viewport. When it would
@@ -223,7 +231,7 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	// Played-card context — computed here (before the fan render) because the drop-zone geometry below
 	// needs it. The turn player (bottom team) sits on the LEFT, opponent right; lagged so played cards
 	// cover in place on CONFIRM before the column swaps sides with the view.
-	const playedVp = { width: viewport.width, height: viewport.height, bottom: viewport.bottom, centerY: viewport.centerY };
+	const playedVp = playedViewport(viewport, size.height);
 	const bottomTeam = useBottomTeam(viewerTeam);
 	const playedPortrait = portrait
 		? { bottomTeam, scaleFrac: played.playedScale, gap: played.playedGap, edge: played.playedEdge, setAsideScale: played.playedSetAside, setAsideOffset: played.playedSetAsideOffset, centerY: viewport.centerY + played.playedCenter }

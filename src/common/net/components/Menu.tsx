@@ -1,29 +1,38 @@
 import { motion } from "motion/react";
 import { useSession } from "../useSession";
-import { Panel, InkButton } from "./ui";
+import { InkStrokeButton, Stagger } from "../../components/atoms";
 
-/** Root screen: brand logo hero, then choose pass & play (default) or go to the multiplayer lobby. */
-export const Menu = ({ onMultiplayer }: { onMultiplayer: () => void }) => {
+/**
+ * Root screen: the two mode strokes floating on the panorama (the logo lives in Lobby's column).
+ * `beat` is Lobby's choreography counter — each element paints on when its beat is reached (the
+ * logo takes beat 1; the buttons take 2 and 3; the caption rides the last beat). A skip jumps
+ * all beats.
+ */
+export const Menu = ({ onMultiplayer, beat }: { onMultiplayer: () => void; beat: number }) => {
 	const { startLocal } = useSession();
 	return (
-		<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 26, width: "min(680px, 100%)" }}>
-			<motion.img
-				src="/images/logo/kiri-ai-logo.png"
-				alt="Kiri-ai: The Duel"
-				initial={{ opacity: 0, y: -16, filter: "blur(6px)" }}
-				animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-				transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-				style={{ width: "100%", height: "auto", display: "block", filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.45))" }}
-			/>
-			<Panel>
-				<InkButton onClick={startLocal}>PASSA E GIOCA</InkButton>
-				<InkButton tone="blue" onClick={onMultiplayer}>
-					MULTIPLAYER
-				</InkButton>
-				<p style={{ margin: "4px 0 0", fontSize: 12, opacity: 0.55, textAlign: "center", lineHeight: 1.5 }}>
-					Passa e gioca sullo stesso dispositivo, oppure sfida un avversario online.
-				</p>
-			</Panel>
-		</div>
+		<Stagger>
+			<InkStrokeButton onClick={startLocal} variant={0} visible={beat > 1}>
+				PASSA E GIOCA
+			</InkStrokeButton>
+			<InkStrokeButton onClick={onMultiplayer} variant={1} visible={beat > 2}>
+				MULTIPLAYER
+			</InkStrokeButton>
+			{/* Opacity lives in the variants (Motion owns it) — the caption is part of the choreography,
+			    fading in just after the last stroke instead of sitting on the page from frame one. */}
+			<motion.p
+				variants={{
+					hidden: { opacity: 0 },
+					painted: { opacity: 0.55, transition: { delay: 0.25, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+				}}
+				initial="hidden"
+				animate={beat > 2 ? "painted" : "hidden"}
+				// Sits as far below the last stroke's ink as the logo sits above the first (≈48px of
+				// clear paper): 34px + the stroke's own ~12px of air in its 70px box + the 2px row gap.
+				style={{ margin: "34px 0 0", fontSize: 12, textAlign: "center", lineHeight: 1.5, color: "#17120e" }}
+			>
+				Passa e gioca sullo stesso dispositivo, oppure sfida un avversario online.
+			</motion.p>
+		</Stagger>
 	);
 };

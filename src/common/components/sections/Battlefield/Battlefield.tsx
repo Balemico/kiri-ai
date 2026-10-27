@@ -6,16 +6,31 @@ import { BoardLine, Pawn, ClashEffect } from "../../atoms";
 import { useGame } from "../../../state";
 import { useSession } from "../../../net";
 import { spaceToX, type Stance, type Team } from "../../../game";
-import { frameViewport, lineCoord, portraitLateralSign, portraitLineLength, rakeLine, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
+import { frameViewport, landscapeLineScale, lineCoord, BATTLEFIELD_HALF_WIDTH, portraitLateralSign, portraitLineLength, rakeLine, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
 import { useBattlegroundControls } from "../../../hooks/useBattlegroundControls";
 import { useBottomTeam } from "../../../hooks/useBottomTeam";
 import { usePawnControls } from "../../../hooks/usePawnControls";
 import { useSlashControls } from "../../../hooks/useSlashControls";
 import { useClashControls } from "../../../hooks/useClashControls";
-import { useResolutionControls } from "../../../hooks/useResolutionControls";
+import { attackBeat, moveDelays, useResolutionControls } from "../../../hooks/useResolutionControls";
+import { useGameHudControls } from "../../../hooks/useGameHudControls";
+import { usePaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
+import { useDuelIntroDriver } from "../../../hooks/useDuelIntroDriver";
+import { useDuelIntroReached } from "../../../state/duelIntro";
 
 /** The battlefield line with both samurai pawns, positioned by the "Battleground" controls. */
-export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_FRAME, floorTilt = 0 }: { orientation?: Orientation; frame?: SceneFrame; floorTilt?: number }) => {
+export const Battlefield = ({
+	orientation = "landscape",
+	frame = DEFAULT_SCENE_FRAME,
+	floorTilt = 0,
+	standUp = true,
+}: {
+	orientation?: Orientation;
+	frame?: SceneFrame;
+	floorTilt?: number;
+	/** False = the paper samurai lie flat on the floor; flipping true springs them up (game start). */
+	standUp?: boolean;
+}) => {
 	const { state } = useGame();
 	const { viewerTeam } = useSession();
 	const bg = useBattlegroundControls(orientation);
@@ -29,9 +44,18 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	const playClash = useCallback(() => setClashTick((t) => t + 1), []);
 	const clash = useClashControls(playClash);
 	const res = useResolutionControls();
+	const hud = useGameHudControls();
+	// Paper cut-out look + stand-up entrance; the Leva "play stand-up" bumps standTick to replay it.
+	const [standTick, setStandTick] = useState(0);
+	const replayStand = useCallback(() => setStandTick((t) => t + 1), []);
+	const cutout = usePaperCutoutControls(replayStand);
+	// Duel opening: the HUD, then the first turn, follow once the second samurai is fully up.
+	useDuelIntroDriver(standUp, cutout.revealDelay + cutout.stagger + cutout.standDur, hud.introHudDelay, hud.introTurnDelay);
+	const turnOpen = useDuelIntroReached("turn");
 	// The active (pulsing) marker shows only while placing — highlighting the viewer's own pawn (the
 	// colour this device plays). Once both are ready, through the reveal and round end, no marker pulses.
-	const isPlacing = state.phase === "place";
+	// Not before the first turn has begun (duel opening).
+	const isPlacing = state.phase === "place" && turnOpen;
 	const activeTeam = isPlacing ? viewerTeam : null;
 
 	// Portrait: the line turns vertical. The turn player sits at the BOTTOM (its character + marker to
@@ -49,12 +73,14 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	// Visible world height of the active frame — the basis for both the portrait line length and the
 	// marker size, so the markers read at a consistent on-screen size in both orientations and scale
 	// with the window (rather than a fixed world size 2.45× bigger in portrait).
-	const viewportHeight = frameViewport(frame, size.width / size.height).height;
-	const lineLength = portrait ? portraitLineLength(viewportHeight, bg.handReserve, bg.margin, floorTilt) : 0;
+	const { height: viewportHeight, width: viewportWidth } = frameViewport(frame, size.width / size.height);
+	// Landscape: the line narrows on narrow windows so its end pawns clear the edge-hugging played cards.
+	const lineScale = portrait ? 1 : landscapeLineScale(viewportWidth);
+	const lineLength = portrait ? portraitLineLength(viewportHeight, bg.handReserve, bg.margin, floorTilt) : BATTLEFIELD_HALF_WIDTH * 2 * lineScale;
 	const markerScale = (viewportHeight / MARKER_REF_HEIGHT) * bg.thickness;
 	// Each pawn's coordinate ALONG the line (world-x landscape, world-y portrait).
-	const redLine = portrait ? lineCoord(state.red.space, bottomTeam, lineLength) : spaceToX(state.red.space);
-	const blueLine = portrait ? lineCoord(state.blue.space, bottomTeam, lineLength) : spaceToX(state.blue.space);
+	const redLine = portrait ? lineCoord(state.red.space, bottomTeam, lineLength) : spaceToX(state.red.space) * lineScale;
+	const blueLine = portrait ? lineCoord(state.blue.space, bottomTeam, lineLength) : spaceToX(state.blue.space) * lineScale;
 	// Viewport-INDEPENDENT logical coordinate (line at unit length): unchanged by a resize, so the pawns
 	// snap (not tween) to a rescaled line and stay locked to it (see Pawn `moveKey`).
 	const redMoveKey = portrait ? lineCoord(state.red.space, bottomTeam) : spaceToX(state.red.space);
@@ -75,12 +101,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	// `attackGap` after movement settles. Equal priority (or a single mover) → no stagger.
 	const resolution = state.lastResolution;
 	const isReveal = state.phase === "reveal-first" || state.phase === "reveal-second";
-	const order = isReveal ? resolution?.movement.order ?? "simultaneous" : "simultaneous";
-	const redDelay = order === "blue-first" ? res.moveStagger : 0;
-	const blueDelay = order === "red-first" ? res.moveStagger : 0;
-	const anyMoved = isReveal && !!(resolution?.red.moved || resolution?.blue.moved);
-	const movementSpan = anyMoved ? Math.max(redDelay, blueDelay) + res.moveDur : 0;
-	const attackDelay = isReveal ? movementSpan + res.attackGap : 0;
+	const delays = isReveal && resolution ? moveDelays(resolution, res) : { red: 0, blue: 0 };
+	const redDelay = delays.red;
+	const blueDelay = delays.blue;
+	const attackDelay = isReveal && resolution ? attackBeat(resolution, res) : 0;
 
 	// On a parry the X crosses at the midpoint between the pawns, struck at the attack beat. The Leva
 	// "Play clash" button previews it (clashTick) regardless of phase, played immediately.
@@ -98,15 +122,15 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 		: [(redLine + blueLine) / 2, bg.y + pawn.height * 0.45, pawn.z + 0.1];
 
 	// Per-pawn combat callout, shown at the attack beat: a successful Counterattack reads
-	// "Counterattack!" (orange); attacking from a stance the card doesn't allow reads "Feint!" (black).
+	// "Contrattacco!" (orange); attacking from a stance the card doesn't allow reads "Finta!" (black).
 	// (An in-stance attack that only misses on range is not flagged.) Stays through game-over (a winning
 	// counter skips straight past the reveal phase).
 	const resolved = isReveal || state.phase === "game-over";
 	const calloutFor = (team: Team): { text: string; color: string } | null => {
 		if (!resolved || !resolution) return null;
 		const o = resolution[team];
-		if (o.countered) return { text: "Counterattack!", color: "#e6812c" };
-		if (o.wrongStance) return { text: "Feint!", color: "#111111" };
+		if (o.countered) return { text: "Contrattacco!", color: "#e6812c" };
+		if (o.wrongStance) return { text: "Finta!", color: "#111111" };
 		return null;
 	};
 	// A pawn's callout floats above its head: landscape at a fixed height over the line, portrait above
@@ -125,7 +149,7 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 
 	return (
 		<group position={[bg.x, 0, 0]}>
-			<BoardLine y={pawnBaseY} length={portrait ? lineLength : undefined} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} />
+			<BoardLine y={pawnBaseY} length={lineLength} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} />
 			{(["red", "blue"] as Team[]).map((team) => {
 				const callout = calloutFor(team);
 				if (!callout) return null;
@@ -162,6 +186,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 				moveDur={res.moveDur}
 				attackDelay={attackDelay}
 				stanceDelay={stanceDelay("red")}
+				cutout={cutout}
+				standing={standUp}
+				standDelay={cutout.revealDelay}
+				standTick={standTick}
 			/>
 			<Pawn
 				linePos={blueLinePos}
@@ -184,6 +212,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 				moveDur={res.moveDur}
 				attackDelay={attackDelay}
 				stanceDelay={stanceDelay("blue")}
+				cutout={cutout}
+				standing={standUp}
+				standDelay={cutout.revealDelay + cutout.stagger}
+				standTick={standTick}
 			/>
 			{showClash && (
 				<ClashEffect
@@ -211,7 +243,7 @@ interface PawnCalloutProps {
 	delay: number;
 }
 
-/** A combat title (Feint! / Counterattack!) that pops in above a pawn at the moment of the strike. */
+/** A combat title (Finta! / Contrattacco!) that pops in above a pawn at the moment of the strike. */
 const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
 	<Html position={[x, y, z]} style={{ pointerEvents: "none" }}>
 		{/* Static wrapper bottom-centres the title over the pawn's head; motion owns the pop-in transform. */}
@@ -237,3 +269,4 @@ const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
 		</div>
 	</Html>
 );
+

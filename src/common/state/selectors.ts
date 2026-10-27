@@ -19,6 +19,10 @@ export interface CardView {
 /** A team may still edit its selection: it's the place phase and that team hasn't confirmed yet. */
 export const isPlacing = (state: GameState, team: Team): boolean => state.phase === "place" && !state.confirmed[team];
 
+/** Who is acting, from the viewer's seat (HUD highlight). Pass & play: one player at a time; online: both at once. */
+export const isActing = (state: GameState, team: Team, local: boolean, viewerTeam: Team): boolean =>
+	isPlacing(state, team) && (!local || team === viewerTeam);
+
 /** Whether the given team's card in `slot` is visible to `viewerTeam` this phase. */
 const slotFaceUp = (state: GameState, viewerTeam: Team, team: Team, slot: Slot): boolean => {
 	switch (state.phase) {

@@ -25,7 +25,8 @@ export const WaitingOverlay = () => {
 					transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
 					style={{
 						position: "fixed",
-						top: "clamp(14px, 3vh, 32px)",
+						// Below the HUD's round ensō (top centre), not on top of it.
+						top: "clamp(118px, 18vh, 168px)",
 						left: "50%",
 						transform: "translateX(-50%)",
 						zIndex: 1800,

@@ -17,6 +17,9 @@ export const BOARD_SPACES = 5; // indices 0..4
 export const RED_START = 0;
 export const BLUE_START = 4;
 
+/** Hits that defeat a player (life shown = MAX_HITS − damage). */
+export const MAX_HITS = 2;
+
 const X_STEP = 0.75;
 const X_ORIGIN = -1.5;
 
@@ -260,14 +263,14 @@ export const resolveAction = (state: GameState, slot: Slot): ResolveResult => {
 	}
 
 	// 3) Apply damage.
-	if (redDamaged) red.damage = Math.min(2, red.damage + 1) as PlayerState["damage"];
-	if (blueDamaged) blue.damage = Math.min(2, blue.damage + 1) as PlayerState["damage"];
+	if (redDamaged) red.damage = Math.min(MAX_HITS, red.damage + 1) as PlayerState["damage"];
+	if (blueDamaged) blue.damage = Math.min(MAX_HITS, blue.damage + 1) as PlayerState["damage"];
 
 	// A clash deals no damage, so a true double-KO is not reachable here; if both
 	// are somehow defeated, treat it as a draw resolved in red's favour.
 	let winner: Team | null = null;
-	if (blue.damage >= 2) winner = "red";
-	else if (red.damage >= 2) winner = "blue";
+	if (blue.damage >= MAX_HITS) winner = "red";
+	else if (red.damage >= MAX_HITS) winner = "blue";
 
 	const resolution: ActionResolution = { slot, red: redOut, blue: blueOut, movement, clash };
 	return { red, blue, resolution, winner };
