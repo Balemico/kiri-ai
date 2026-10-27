@@ -57,6 +57,7 @@ export const INK_LOOK = {
 	wash: num(INK.wash),
 	splatter: num(INK.splatter),
 	drift: num(INK.drift),
+	strokeHeight: num(INK.strokeHeight),
 	inkColor: uniform(new Color(INK.inkColor)),
 };
 
@@ -260,7 +261,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	// Hover reaches out: the stroke lengthens equally at both ends (eased in InkLayer).
 	const len = box.x.add(u.margin.mul(0.5)).add(u.hover.mul(u.margin.mul(0.6)));
 	const centre = u.size.mul(0.5);
-	const width = box.y.mul(u.hover.mul(0.06).add(0.86));
+	const width = box.y.mul(INK_LOOK.strokeHeight).mul(u.hover.mul(0.07).add(1));
 	const bend = box.y.mul(0.03).mul(sin(u.seed.mul(7.31)));
 	const { ink, wash, drops } = brush({
 		P,

@@ -107,15 +107,16 @@ export const GAME_HUD = {
 // lobby→duel veil (src/common/ink). Look params are SHARED live uniforms ("Ink" Leva folder).
 export const INK = {
 	// Look
-	bristles: 11, // bristle clumps across a menu-sized stroke (the veil scales it up)
-	tailDry: 0.85, // how dry the brush runs by the end of a stroke (0 = solid to the tip)
-	edgeDry: 0.5, // how broken the stroke's flanks are (bristles splaying at the edges)
-	tooth: 0.3, // paper tooth breaking the dry-brush (vs pure bristle streaks)
-	wash: 0.28, // pale diluted-ink wash bleeding beside the stroke
-	splatter: 1, // flung-droplet density multiplier
+	bristles: 10.5, // bristle clumps across a menu-sized stroke (the veil scales it up)
+	tailDry: 0.7, // how dry the brush runs by the end of a stroke (0 = solid to the tip)
+	edgeDry: 0.6, // how broken the stroke's flanks are (bristles splaying at the edges)
+	tooth: 0.15, // paper tooth breaking the dry-brush (vs pure bristle streaks)
+	wash: 0.24, // pale diluted-ink wash bleeding beside the stroke
+	splatter: 0.55, // flung-droplet density multiplier
 	drift: 0.05, // speed the wet wash edge keeps creeping/breathing (noise evolution / s)
 	inkColor: "#0c0a09",
 	// Menu strokes
+	strokeHeight: 0.66, // stroke thickness as a fraction of the button's height (flank dryness is relative, so unaffected)
 	strokePour: 0.95, // s for a button's stroke to open from the middle and soak to full black
 	strokeMargin: 60, // px of room around a button for the frayed ends (incl. their hover reach), wash and spray
 	// Veil (lobby → duel)
