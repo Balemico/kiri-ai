@@ -48,38 +48,41 @@ export interface VeilStroke {
 
 /**
  * Giant brush slashes for the full-screen veil: `count` near-horizontal strokes stacked down the
- * screen, alternating direction, overlapping their neighbours (1.7 × spacing) so their bodies ink
- * almost all of it — the shader's closing flood seals the rest (dry-brush streaks and tapered
- * tips leave gaps by design), so the swap is always fully covered.
+ * screen, alternating direction, each `widthFactor` stacking steps wide so neighbours overlap
+ * generously. Their BODIES alone ink the whole screen (tested at 100% across aspects): the cover
+ * is made by the brush strokes themselves — there is no flood that turns the screen opaque on its own.
  */
-export const veilStrokes = (count: number, aspect: number, seed = 1): VeilStroke[] => {
+export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor = VEIL_WIDTH_FACTOR, lengthExtra = VEIL_LENGTH_EXTRA): VeilStroke[] => {
 	const rand = rng(seed);
 	const maxTilt = 0.3;
 	// The tilt drops each slash by up to tan(maxTilt)·aspect/2 at the screen sides: stack them over
 	// a band that much taller than the screen, so the top-right / bottom-left corners stay inked.
 	const reach = 1 + Math.tan(maxTilt) * aspect;
-	const width = (1.7 * reach) / count;
-	// Combed order (0, 2, 4…, then 1, 3, 5…): the first pass leaves paper between the slashes, so
-	// each blow reads on its own before the second pass closes the gaps.
-	const order = [...Array.from({ length: count }, (_, i) => i).filter((i) => i % 2 === 0), ...Array.from({ length: count }, (_, i) => i).filter((i) => i % 2 === 1)];
+	const width = (widthFactor * reach) / count;
+	const baseTilt = -0.22 + (rand() - 0.5) * 0.12;
+	// Laid TOP → BOTTOM, one after another: each slash spans ~widthFactor stacking steps, so the
+	// inked band grows down the screen by a step per slash and the screen turns fully opaque only
+	// as the LAST one lands — the brush strokes themselves cover it (no flood, no sudden black).
 	// Drying order: a seeded shuffle from its OWN generator, so it never perturbs the geometry.
 	const dryRand = rng(seed + 101);
 	const dryOrder = Array.from({ length: count }, (_, i) => i).sort(() => dryRand() - 0.5);
 	const dryDur = 0.45;
 	return Array.from({ length: count }, (_, i) => {
-		const slot = order.indexOf(i);
 		const drySlot = dryOrder.indexOf(i);
-		const tilt = -0.22 + (rand() - 0.5) * 0.16;
+		// Near-parallel: one shared tilt, a whisper of variation — slashes with independent tilts
+		// diverge across the screen and open wedge-shaped gaps between neighbours.
+		const tilt = baseTilt + (rand() - 0.5) * 0.04;
 		const leftToRight = i % 2 === 0;
 		const angle = leftToRight ? tilt : Math.PI + tilt;
 		return {
 			cx: (rand() - 0.5) * 0.1,
-			cy: reach / 2 - ((i + 0.5) / count) * reach + (rand() - 0.5) * 0.04,
+			// Jitter and bow scale with the stroke (not the screen), so thin slashes keep their overlap.
+			cy: reach / 2 - ((i + 0.5) / count) * reach + (rand() - 0.5) * 0.15 * (reach / count),
 			angle,
-			length: (aspect + 1.0) / Math.cos(tilt) + width,
+			length: (aspect + lengthExtra) / Math.cos(tilt) + width,
 			width,
-			bend: (rand() - 0.5) * 0.12,
-			start: (slot * 0.62) / count + rand() * 0.03,
+			bend: (rand() - 0.5) * 0.3 * width,
+			start: (i * 0.62) / count + rand() * 0.02,
 			dur: 0.36,
 			dryStart: count > 1 ? (drySlot / (count - 1)) * (1 - dryDur) : 0,
 			dryDur,
@@ -87,8 +90,18 @@ export const veilStrokes = (count: number, aspect: number, seed = 1): VeilStroke
 	});
 };
 
+/** How much a veil slash narrows toward its tip (0.35 → the tip keeps 65% of the body width): milder
+ *  than a free slash, so the tails can't leave the screen's corners uncovered. Shared with the shader. */
+export const VEIL_TIP_TAPER = 0.35;
+
+/** Slash width as a multiple of the stacking step (> 1 = neighbours overlap). */
+export const VEIL_WIDTH_FACTOR = 2.6;
+
+/** Extra length (screen heights) past the screen width, so the tapered ends land off-screen. */
+export const VEIL_LENGTH_EXTRA = 1.0;
+
 /** Half-width of a slash at `s` along it (0..1): full through the body, tapering on the tail. */
-export const strokeHalfWidth = (stroke: VeilStroke, s: number): number => (stroke.width / 2) * (s < 0.5 ? 1 : 1 - 0.7 * Math.min(1, (s - 0.5) / 0.5));
+export const strokeHalfWidth = (stroke: VeilStroke, s: number): number => (stroke.width / 2) * (s < 0.5 ? 1 : 1 - VEIL_TIP_TAPER * Math.min(1, (s - 0.5) / 0.5));
 
 /** Whether a point (screen-height units) lies inside a slash's body (ignoring bristle gaps and bow). */
 export const insideStroke = (stroke: VeilStroke, x: number, y: number, fill = 0.9): boolean => {

@@ -123,8 +123,8 @@ export const INK = {
 	strokePour: 1.05, // s for the brush to drag a button's stroke left → right and the ink to soak to full black
 	strokeMargin: 60, // px of room around a button for the frayed ends (incl. their hover reach), wash and spray
 	// Veil (lobby → duel)
-	veilStrokes: 6, // giant slashes that cover the screen (combed: even ones first, then the odd)
-	veilPour: 1.5, // s until the slashes (and the final flood) cover everything
+	veilStrokes: 12, // slashes laid top → bottom that, between them, ink the WHOLE screen
+	veilPour: 1.8, // s for the slashes to be laid, one after another, until the screen is fully inked
 	veilDry: 1.6, // s for the cover to dry into bristle streaks and lift away
 } as const;
 

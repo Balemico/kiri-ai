@@ -26,36 +26,33 @@ describe("timing", () => {
 });
 
 describe("veilStrokes", () => {
-	// The shader's flood guarantees the final cover; the slashes' bodies should still ink nearly all
-	// of the screen by themselves, so the flood only seals dry-brush gaps (never reads as a wipe).
-	it.each([0.46, 1, 1.6, 2.4])("their bodies ink at least 90 percent of the screen (aspect %f)", (aspect) => {
-		for (const seed of [1, 2, 3]) {
-			const strokes = veilStrokes(6, aspect, seed);
-			let inked = 0;
-			let total = 0;
-			for (let sx = 0; sx <= 30; sx++) {
-				for (let sy = 0; sy <= 30; sy++) {
-					total++;
-					if (strokes.some((st) => insideStroke(st, -aspect / 2 + (sx / 30) * aspect, -0.5 + sy / 30))) inked++;
+	// The cover is made by the brush strokes alone (no flood): their bodies must ink every point of
+	// the screen, at any aspect.
+	it.each([0.46, 0.75, 1, 1.3, 1.6, 2, 2.4])("their bodies ink the whole screen (aspect %f)", (aspect) => {
+		for (const seed of [1, 2, 3, 7]) {
+			const strokes = veilStrokes(12, aspect, seed);
+			for (let sx = 0; sx <= 40; sx++) {
+				for (let sy = 0; sy <= 40; sy++) {
+					expect(strokes.some((st) => insideStroke(st, -aspect / 2 + (sx / 40) * aspect, -0.5 + sy / 40))).toBe(true);
 				}
 			}
-			expect(inked / total).toBeGreaterThanOrEqual(0.9);
 		}
 	});
 
 	it("alternate direction and start staggered from the first beat", () => {
-		const strokes = veilStrokes(6, 1.6, 4);
+		const strokes = veilStrokes(12, 1.6, 4);
 		expect(Math.cos(strokes[0].angle)).toBeGreaterThan(0);
 		expect(Math.cos(strokes[1].angle)).toBeLessThan(0);
 		expect(strokes[0].start).toBeLessThan(0.05);
-		// Combed: the even slashes all land before any odd one.
-		expect(Math.max(strokes[0].start, strokes[2].start, strokes[4].start)).toBeLessThan(Math.min(strokes[1].start, strokes[3].start, strokes[5].start));
+		// Laid top → bottom: each slash starts after the one above it.
+		strokes.slice(1).forEach((st, i) => expect(st.start).toBeGreaterThan(strokes[i].start));
+		expect(strokes[1].cy).toBeLessThan(strokes[0].cy);
 	});
 
 	it("dry at different times, all within the drying phase", () => {
-		const strokes = veilStrokes(6, 1.6, 4);
+		const strokes = veilStrokes(12, 1.6, 4);
 		const starts = strokes.map((st) => st.dryStart);
-		expect(new Set(starts).size).toBe(6);
+		expect(new Set(starts).size).toBe(12);
 		expect(Math.min(...starts)).toBe(0);
 		expect(strokes.every((st) => st.dryStart + st.dryDur <= 1 + 1e-9)).toBe(true);
 		expect(strokes.every((st) => st.start + st.dur <= 1)).toBe(true);

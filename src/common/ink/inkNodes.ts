@@ -29,7 +29,7 @@ import {
 	type ShaderNodeObject,
 } from "three/tsl";
 import { INK } from "../layout";
-import type { VeilStroke } from "./inkMath";
+import { VEIL_TIP_TAPER, type VeilStroke } from "./inkMath";
 
 /**
  * Action sumi-e in TSL (WebGPU, or WebGL2 through WebGPURenderer's fallback) — the haboku /
@@ -99,6 +99,10 @@ interface BrushSpec {
 	wildness: number;
 	/** Fine spray layer on top of the drops (off for the giant veil: cheaper, and lost at that scale). */
 	fineSpray: boolean;
+	/** A COVER stroke (the veil): while laid it is fully loaded — solid, opaque, no dry-brush gaps,
+	 *  no grey tones — so the slashes themselves make the screen opaque; the dry brush and the tones
+	 *  come back as it dries (`dry`). Also tapers less (`VEIL_TIP_TAPER`) so its tail still covers. */
+	cover: boolean;
 }
 
 /** Flung droplets on an anisotropic cell grid in stroke space (cells stretched along the gesture). */
@@ -143,7 +147,7 @@ const brush = (b: BrushSpec) => {
 	// a long taper to the tip. Straight: constant width — its ends are cut below, in px.
 	const a = smoothstep(-0.015, 0.09, s);
 	const cap = b.straight ? float(1) : a.mul(float(2).sub(a)).sqrt();
-	const taper = b.straight ? float(1) : mix(float(1), float(0.3), smoothstep(0.5, 1.0, s));
+	const taper = b.straight ? float(1) : mix(float(1), float(b.cover ? 1 - VEIL_TIP_TAPER : 0.3), smoothstep(0.5, 1.0, s));
 	const swell = mx_noise_float(vec3(s.mul(4.3), b.seed.add(3.3), 0)).mul(0.1 * b.wildness).add(1);
 	const ends = b.straight ? float(1) : smoothstep(1.04, 0.97, s);
 	const half = max(b.width.mul(0.5).mul(cap).mul(taper).mul(swell).mul(ends), 0.001);
@@ -165,10 +169,13 @@ const brush = (b: BrushSpec) => {
 	// Straight strokes SOAK in behind the brush: right behind the front only the bristle streaks
 	// are down; the black fills in as the paper drinks the ink, a little further back.
 	const soak = b.straight ? float(1).sub(smoothstep(0, 0.32, b.front.sub(s))).mul(0.7) : float(0);
+	// Cover strokes: the dry brush (and, below, the grey tones and uneven deposit) only shows as they
+	// dry — while being laid they are solid ink.
+	const dryBrush = b.cover ? b.dry.mul(0.9).add(0.1) : float(1);
 	const load = float(1)
-		.sub(runDry)
+		.sub(runDry.mul(dryBrush))
 		.sub(soak)
-		.sub(smoothstep(0.45, 1.0, an).mul(L.edgeDry))
+		.sub(smoothstep(0.45, 1.0, an).mul(L.edgeDry).mul(dryBrush))
 		.sub(b.dry.mul(1.25));
 	const thr = float(1).sub(load);
 	const filled = smoothstep(thr.sub(0.05), thr.add(0.05), tex);
@@ -200,8 +207,9 @@ const brush = (b: BrushSpec) => {
 	const mottle = smoothstep(0.35, 0.85, mx_fractal_noise_float(vec3(b.P.mul(0.006), b.seed.add(53.1)), 2, 2.0, 0.5).mul(0.5).add(0.5));
 	const belly = smoothstep(-0.35, 1.0, n);
 	const dilution = L.tones.mul(toneStreak.mul(0.6).add(mottle.mul(0.35))).add(L.sanboku.mul(belly).mul(0.6));
-	const concentration = clamp(float(1).sub(dilution), 0.22, 1);
-	const ink = body.mul(filled).mul(drawn).mul(bristle.mul(0.3).add(0.78)).mul(concentration);
+	const concentration = clamp(float(1).sub(dilution.mul(dryBrush)), 0.22, 1);
+	const deposit = b.cover ? mix(float(1), bristle.mul(0.3).add(0.78), b.dry) : bristle.mul(0.3).add(0.78);
+	const ink = body.mul(filled).mul(drawn).mul(deposit).mul(concentration);
 
 	// Pale wash (bokashi): diluted ink bleeding past the flanks near the head and body, its edge
 	// creeping slowly — the one part that stays alive after the stroke is laid.
@@ -311,6 +319,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		straight: true,
 		wildness: 0.35,
 		fineSpray: true,
+		cover: false,
 	});
 	// Hover deepens the wash WHERE IT ALREADY IS (multiply) — adding to it would tint the whole plane.
 	// A coloured wash reads as a pastel glow, not diluted ink: tinted strokes keep only a trace.
@@ -343,7 +352,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 export interface VeilUniforms {
 	/** Canvas size in px. */
 	resolution: U<Vector2>;
-	/** 0 → 1: the slashes land one after another, then the flood seals the gaps. */
+	/** 0 → 1: the slashes land one after another until, between them, they ink the whole screen. */
 	pour: U<number>;
 	/** 0 → 1: the cover dries into bristle streaks and lifts away. */
 	dry: U<number>;
@@ -351,8 +360,8 @@ export interface VeilUniforms {
 
 /**
  * The lobby→duel veil: giant alternating slashes cut across the screen in sequence, overlapping
- * one over another (each with its own bristles, spray and wash), then a flood of ink seals the
- * dry-brush gaps → full cover. On release the flood drains first, then the slashes dry at
+ * one over another (each with its own bristles, spray and wash), laid fully loaded, until their
+ * bodies have inked every point of the screen → full cover. On release the slashes dry at
  * DIFFERENT times (shuffled `dryStart`), each breaking into bristle streaks that thin and vanish —
  * the duel shows through piecewise.
  * Geometry comes from `veilStrokes` (screen-height units), baked at build time.
@@ -369,16 +378,14 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 	const half = u.resolution.mul(0.5);
 	// Giant strokes: more bristles across, bigger flung drops (scaled to the screen).
 	const dropScale = H.div(700);
-	// Flood: ink soaks the gaps once every slash has landed; it drains first when drying. Kept
-	// just short of opaque (0.9) so, while the duel mounts underneath, the cover still reads as
-	// living ink — the slashes' texture and tones stay visible over it — not a dead black frame.
-	const flood = smoothstep(0.86, 1, u.pour).mul(smoothstep(0.22, 0, u.dry)).mul(0.9);
+	// No flood: the slashes alone make the screen opaque — `veilStrokes` guarantees their bodies
+	// cover every point (tested), and cover strokes are laid fully loaded (`cover`).
 
 	// PERFORMANCE: a pixel lies within at most two or three slashes, so each slash's full brush
 	// (≈17 noise lookups) runs only behind a cheap test — near its body/spray zone, already
 	// started, not yet fully dried. Without it every pixel paid for all six slashes.
 	const alpha = Fn(() => {
-		const clear = float(1).sub(flood).toVar(); // Π(1 − coverage): how much paper still shows
+		const clear = float(1).toVar(); // Π(1 − coverage): how much paper still shows
 		strokes.forEach((st, i) => {
 			const grow = clamp(u.pour.sub(st.start).div(st.dur), 0, 1);
 			const dryI = clamp(u.dry.sub(st.dryStart).div(st.dryDur), 0, 1);
@@ -389,12 +396,12 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 			const d = P.sub(centre);
 			const along = dot(d, dir).div(len).add(0.5);
 			const across = abs(dot(d, vec2(-Math.sin(st.angle), Math.cos(st.angle))));
-			// Body + bow + wash + flung spray all live within this box (s past the tip for the spray,
-			// ~1.7 widths across for the flank drops).
+			// Body + bow + wash live within this box (the veil throws no flank spray, so it stays tight —
+			// with many overlapping slashes a wide box would make every pixel pay for most of them).
 			const near = along
 				.greaterThan(-0.2)
 				.and(along.lessThan(1.6))
-				.and(across.lessThan(wid.mul(1.7).add(H.mul(Math.abs(st.bend)))))
+				.and(across.lessThan(wid.mul(0.8).add(H.mul(Math.abs(st.bend)))))
 				.and(grow.greaterThan(0))
 				.and(dryI.lessThan(1));
 			If(near, () => {
@@ -413,11 +420,12 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 					bristleScale: 2.4,
 					dropScale,
 					tipDrops: 0.4,
-					flankDrops: 0.15,
+					flankDrops: 0,
 					washScale: 0.35,
 					straight: false,
 					wildness: 1,
 					fineSpray: false,
+					cover: true,
 				});
 				clear.mulAssign(float(1).sub(clamp(ink, 0, 1)).mul(float(1).sub(clamp(wash, 0, 1))).mul(float(1).sub(clamp(drops, 0, 1))));
 			});
