@@ -161,6 +161,29 @@ export const PAWN = {
 	},
 } as const;
 
+// The samurai as PAPER CUT-OUTS: a cream paper rim around the coloured silhouette, a faint offset
+// edge for the sheet's thickness, a contact shadow at the feet — and the entrance: hinged at the
+// feet, each figure lies back flat on the floor until the duel starts, then springs up with a
+// paper-like recoil. Single source for the "Paper Cutout" Leva folder.
+export const PAPER_CUTOUT = {
+	lieAngle: -1.45, // radians the figure lies back on the floor (hinged at the feet) before the duel
+	standDur: 1.6, // seconds for the whole stand-up: the lift + the recoil
+	liftShare: 0.42, // share of standDur spent lifting off the floor (the rest is the recoil)
+	overshoot: 0.16, // radians the cut-out swings PAST vertical (forward) before recoiling
+	amplitude: 1.15, // elastic overshoot (> 1 = springier recoil)
+	period: 0.38, // elastic period (lower = quicker, tighter wobble)
+	revealDelay: 0.05, // red starts standing this long after the veil has OPENED (ink/veilSignal)
+	stagger: 0.18, // blue stands this long after red
+	rimScale: 1.035, // paper rim: the silhouette scaled up behind the coloured one
+	rimColor: "#f4eee0", // the cut paper's cream
+	edgeOffsetX: 0.012, // offset of the sheet-thickness shadow (world units)
+	edgeOffsetY: -0.014,
+	edgeOpacity: 0.28,
+	shadowOpacity: 0.24, // contact shadow at the feet once standing
+	shadowWidth: 0.62, // × the sprite height
+	shadowHeight: 0.09, // world units
+} as const;
+
 // Yellow sword-cut wedge shown over a pawn that takes a hit (echoes the card slash). A bold
 // triangle (tip + base, sized as a fraction of pawn height) that sweeps along its length and
 // fades. Single source for the "Slash" Leva folder.

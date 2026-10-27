@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useRef, useState, useSyncExternalStore } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
 import { FitCamera, Lights, Floor, IntroFlight } from "../../atoms";
@@ -21,6 +21,7 @@ import { useCombatAudio } from "../../../hooks/useCombatAudio";
 import { useAutoReveal } from "../../../hooks/useAutoReveal";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
+import { veilSignal } from "../../../ink/veilSignal";
 
 // The scene counts as ready once it renders this many consecutive smooth frames (< ~24 fps
 // budget each) — or after a safety cap, so a slow device still gets revealed.
@@ -80,6 +81,8 @@ const SceneContents = ({
 	// only — turn passing and orientation flips must NEVER re-run the entrance.
 	const [flying, setFlying] = useState(entrance === "fly");
 	const [ready, setReady] = useState(false);
+	// On-screen entrances wait for the veil to have actually OPENED (see ink/veilSignal).
+	const veilOpen = useSyncExternalStore(veilSignal.subscribe, veilSignal.isOpen);
 	const showBoard = showInterface;
 	const showHand = showInterface;
 	return (
@@ -108,7 +111,8 @@ const SceneContents = ({
 			{showBoard && (
 				<>
 					<Suspense fallback={null}>
-						<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} />
+						{/* The paper samurai lie flat until the duel is revealed, then spring up. */}
+						<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} standUp={entrance === "none" || (ready && veilOpen)} />
 					</Suspense>
 					{/* Portrait placeholders marking where each team's played / set-aside cards land. */}
 					<LandingZones frame={frame} orientation={orientation} />

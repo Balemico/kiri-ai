@@ -14,10 +14,22 @@ import { useSlashControls } from "../../../hooks/useSlashControls";
 import { useClashControls } from "../../../hooks/useClashControls";
 import { attackBeat, moveDelays, useResolutionControls } from "../../../hooks/useResolutionControls";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
+import { usePaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
 import { SEAL } from "../../../hudPalette";
 
 /** The battlefield line with both samurai pawns, positioned by the "Battleground" controls. */
-export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_FRAME, floorTilt = 0 }: { orientation?: Orientation; frame?: SceneFrame; floorTilt?: number }) => {
+export const Battlefield = ({
+	orientation = "landscape",
+	frame = DEFAULT_SCENE_FRAME,
+	floorTilt = 0,
+	standUp = true,
+}: {
+	orientation?: Orientation;
+	frame?: SceneFrame;
+	floorTilt?: number;
+	/** False = the paper samurai lie flat on the floor; flipping true springs them up (game start). */
+	standUp?: boolean;
+}) => {
 	const { state } = useGame();
 	const { viewerTeam } = useSession();
 	const bg = useBattlegroundControls(orientation);
@@ -32,6 +44,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	const clash = useClashControls(playClash);
 	const res = useResolutionControls();
 	const hud = useGameHudControls();
+	// Paper cut-out look + stand-up entrance; the Leva "play stand-up" bumps standTick to replay it.
+	const [standTick, setStandTick] = useState(0);
+	const replayStand = useCallback(() => setStandTick((t) => t + 1), []);
+	const cutout = usePaperCutoutControls(replayStand);
 	// The active (pulsing) marker shows only while placing — highlighting the viewer's own pawn (the
 	// colour this device plays). Once both are ready, through the reveal and round end, no marker pulses.
 	const isPlacing = state.phase === "place";
@@ -179,6 +195,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 				moveDur={res.moveDur}
 				attackDelay={attackDelay}
 				stanceDelay={stanceDelay("red")}
+				cutout={cutout}
+				standing={standUp}
+				standDelay={cutout.revealDelay}
+				standTick={standTick}
 			/>
 			<Pawn
 				linePos={blueLinePos}
@@ -201,6 +221,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 				moveDur={res.moveDur}
 				attackDelay={attackDelay}
 				stanceDelay={stanceDelay("blue")}
+				cutout={cutout}
+				standing={standUp}
+				standDelay={cutout.revealDelay + cutout.stagger}
+				standTick={standTick}
 			/>
 			{showClash && (
 				<ClashEffect

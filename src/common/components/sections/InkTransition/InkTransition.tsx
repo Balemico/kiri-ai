@@ -9,10 +9,13 @@ import { phaseProgress, veilStrokes } from "../../../ink/inkMath";
 import { inkSupported } from "../../../ink/inkRegistry";
 import { useInkControls } from "../../../hooks/useInkControls";
 import { INK } from "../../../layout";
+import { VEIL_OPEN_AT, veilSignal } from "../../../ink/veilSignal";
 
 const PLANE = new PlaneGeometry(1, 1);
 // A beat with the screen fully inked before the swap, so the cover reads as settled.
 const HOLD = 0.12;
+// Longest step the veil's clock advances in one frame (s): a stalled frame can't skip the ink ahead.
+const MAX_STEP = 1 / 30;
 
 interface VeilProps {
 	covering: boolean;
@@ -58,18 +61,20 @@ const Veil = ({ covering, release, onCovered, onDone }: VeilProps) => {
 	useEffect(() => {
 		cb.current = { covering, release, onCovered, onDone };
 	}, [covering, release, onCovered, onDone]);
-	const run = useRef({ active: false, start: -1, covered: false, releasedAt: -1, done: false });
+	// Session clock: ACCUMULATED frame time, each frame capped — after a hitch (the duel mounting
+	// underneath) the ink resumes where it was instead of jumping ahead, so the drying is always seen.
+	const idle = { active: false, t: 0, covered: false, releasedAt: -1, done: false };
+	const run = useRef(idle);
 	// Re-arm when a session ends. In an effect, not the frame loop: an idle canvas renders no frames.
 	useEffect(() => {
-		if (!covering) run.current = { active: false, start: -1, covered: false, releasedAt: -1, done: false };
+		if (!covering) run.current = { active: false, t: 0, covered: false, releasedAt: -1, done: false };
 	}, [covering]);
 
-	useFrame(({ clock: c }) => {
+	useFrame((_, dt) => {
 		const m = mesh.current;
 		if (!m) return;
 		const u = inkUniforms<VeilUniforms>(m.material);
 		const k = run.current;
-		const now = c.elapsedTime;
 		u.resolution.value.set(size.width, size.height);
 		if (!cb.current.covering) {
 			// Idle between sessions (the one frame a parked canvas renders): nothing on screen.
@@ -78,17 +83,20 @@ const Veil = ({ covering, release, onCovered, onDone }: VeilProps) => {
 			return;
 		}
 		if (!k.active) {
-			Object.assign(k, { active: true, start: now });
+			Object.assign(k, { active: true, t: 0 });
 			u.dry.value = 0;
-		}
-		u.pour.value = phaseProgress(now - k.start, INK.veilPour);
-		if (!k.covered && now - k.start >= INK.veilPour + HOLD) {
+			veilSignal.set(false);
+		} else k.t += Math.min(dt, MAX_STEP);
+		const now = k.t;
+		u.pour.value = phaseProgress(now, INK.veilPour);
+		if (!k.covered && now >= INK.veilPour + HOLD) {
 			k.covered = true;
 			cb.current.onCovered();
 		}
 		if (cb.current.release && k.covered && !k.done) {
 			if (k.releasedAt < 0) k.releasedAt = now;
 			u.dry.value = phaseProgress(now - k.releasedAt, INK.veilDry);
+			if (u.dry.value >= VEIL_OPEN_AT) veilSignal.set(true);
 			if (u.dry.value >= 1) {
 				k.done = true;
 				cb.current.onDone();
@@ -106,7 +114,12 @@ const FallbackVeil = ({ covering, release, onCovered, onDone }: VeilProps) =>
 			initial={{ opacity: 0 }}
 			animate={{ opacity: release ? 0 : 1 }}
 			transition={{ duration: release ? INK.veilDry * 0.6 : INK.veilPour * 0.6 }}
-			onAnimationComplete={() => (release ? onDone() : onCovered())}
+			onAnimationComplete={() => {
+				if (release) {
+					veilSignal.set(true);
+					onDone();
+				} else onCovered();
+			}}
 			style={{ position: "absolute", inset: 0, background: INK.inkColor }}
 		/>
 	) : null;
@@ -146,15 +159,20 @@ export const InkTransition = ({ covering, release, onCovered }: InkTransitionPro
 			coveredOnce.current = false;
 			return;
 		}
-		const t = window.setTimeout(onCoveredOnce, (INK.veilPour + 0.8) * 1000);
+		const t = window.setTimeout(onCoveredOnce, (INK.veilPour + 2) * 1000);
 		return () => window.clearTimeout(t);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- armed once per session
 	}, [running]);
 	useEffect(() => {
 		if (!running || !release) return;
-		const t = window.setTimeout(() => setDone(true), (INK.veilDry + 1.2) * 1000);
+		const t = window.setTimeout(() => setDone(true), (INK.veilDry + 3) * 1000);
 		return () => window.clearTimeout(t);
 	}, [running, release]);
+	// Whenever a session ends (normally, by the safety net, or with no canvas at all) the duel
+	// is visible: the open signal must never be left false.
+	useEffect(() => {
+		if (!running && covering) veilSignal.set(true);
+	}, [running, covering]);
 
 	const props: VeilProps = { covering: running, release, onCovered: onCoveredOnce, onDone: () => setDone(true) };
 	return (
