@@ -27,9 +27,9 @@ describe("cameraPose", () => {
 });
 
 describe("intro constants", () => {
-	it("reveal beats fit inside the flight", () => {
-		expect(INTRO.boardRevealAt).toBeLessThan(INTRO.flightDur);
-		expect(INTRO.handRevealAt).toBeLessThan(INTRO.flightDur);
+	it("the approach starts farther than the final pose", () => {
+		expect(INTRO.flightStartDist).toBeGreaterThan(1);
+		expect(INTRO.flightDur).toBeGreaterThan(0);
 	});
 	it("leaf emitter sits above the kill line", () => {
 		expect(LOBBY.leaves.emitterY).toBeGreaterThan(LOBBY.leaves.floorY);

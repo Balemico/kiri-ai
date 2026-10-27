@@ -95,6 +95,8 @@ interface BrushSpec {
 	straight: boolean;
 	/** Bow/tremor/swell amplitude multiplier (lower = a more controlled, refined hand). */
 	wildness: number;
+	/** Fine spray layer on top of the drops (off for the giant veil: cheaper, and lost at that scale). */
+	fineSpray: boolean;
 }
 
 /** Flung droplets on an anisotropic cell grid in stroke space (cells stretched along the gesture). */
@@ -211,10 +213,8 @@ const brush = (b: BrushSpec) => {
 
 	const dropsFade = clamp(float(1).sub(b.dry.mul(2.2)), 0, 1);
 	const zs = b.straight ? ends01.mul(0.5).add(0.5) : s;
-	const drops = max(
-		droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
-		droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
-	).mul(dropsFade);
+	const coarse = droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0);
+	const drops = (b.fineSpray ? max(coarse, droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20)) : coarse).mul(dropsFade);
 	return { ink, wash, drops, s, n, bristle };
 };
 
@@ -308,6 +308,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		washScale: 0.55,
 		straight: true,
 		wildness: 0.35,
+		fineSpray: true,
 	});
 	// Hover deepens the wash WHERE IT ALREADY IS (multiply) — adding to it would tint the whole plane.
 	// A coloured wash reads as a pastel glow, not diluted ink: tinted strokes keep only a trace.
@@ -347,10 +348,11 @@ export interface VeilUniforms {
 }
 
 /**
- * The lobby→duel veil: giant alternating slashes cut across the screen in sequence (each with its
- * own bristles, spray and wash), then a flood of ink seals the dry-brush gaps → full cover. On
- * release the flood drains first, then every slash dries from its flanks and tip inward into
- * streaks, which thin out and vanish — the duel shows through the bristle lines.
+ * The lobby→duel veil: giant alternating slashes cut across the screen in sequence, overlapping
+ * one over another (each with its own bristles, spray and wash), then a flood of ink seals the
+ * dry-brush gaps → full cover. On release the flood drains first, then the slashes dry at
+ * DIFFERENT times (shuffled `dryStart`), each breaking into bristle streaks that thin and vanish —
+ * the duel shows through piecewise.
  * Geometry comes from `veilStrokes` (screen-height units), baked at build time.
  */
 export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasicNodeMaterial; u: VeilUniforms } => {
@@ -378,8 +380,8 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 			bend: H.mul(st.bend),
 			seed: float(11 + i * 7.7),
 			front,
-			// The tips dry first: later strokes (on top) linger a touch longer.
-			dry: clamp(u.dry.mul(1.15).sub(i * 0.025), 0, 1),
+			// Each slash dries on its own schedule (shuffled), so the scene shows through piecewise.
+			dry: clamp(u.dry.sub(st.dryStart).div(st.dryDur), 0, 1),
 			bristleScale: 2.4,
 			dropScale,
 			tipDrops: 0.4,
@@ -387,11 +389,14 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 			washScale: 0.35,
 			straight: false,
 			wildness: 1,
+			fineSpray: false,
 		});
 		coverages.push(ink, wash, drops);
 	});
-	// Flood: ink soaks the gaps once every slash has landed; it drains first when drying.
-	const flood = smoothstep(0.86, 1, u.pour).mul(smoothstep(0.3, 0, u.dry));
+	// Flood: ink soaks the gaps once every slash has landed; it drains first when drying. Kept
+	// just short of opaque (0.9) so, while the duel mounts underneath, the cover still reads as
+	// living ink — the slashes' texture and tones stay visible over it — not a dead black frame.
+	const flood = smoothstep(0.86, 1, u.pour).mul(smoothstep(0.22, 0, u.dry)).mul(0.9);
 	const alpha = union(...coverages, flood);
 	const material = baseMaterial();
 	material.colorNode = INK_LOOK.inkColor;

@@ -364,12 +364,11 @@ export const INTRO = {
 	menuDelay: 2.5, // first DOM element (the logo) starts painting
 	menuStagger: 0.35, // per-menu-item stagger after menuDelay
 	total: 4.5, // full entry choreography (3D paint-on + DOM menu) — the natural finish beat
-	// Fly-back reveal: bird view above the board pulling back to the FitCamera pose.
-	flightDur: 2.5,
-	flightStartHeight: 2.4, // start y above the final camera y
-	flightStartDist: 0.35, // start z as a FRACTION of the final camera distance
-	boardRevealAt: 0.5, // seconds into the flight: board line + pawns mount
-	handRevealAt: 1.5, // seconds into the flight: hand fan cascades in
+	// Approach reveal: as the veil dries, the (fully mounted) duel draws closer — the camera
+	// glides in from a little farther and higher to the FitCamera pose.
+	flightDur: 2.6,
+	flightStartHeight: 0.35, // start y above the final camera y (looks slightly down, levels out)
+	flightStartDist: 1.4, // start z as a MULTIPLE of the final camera distance (> 1 = farther)
 } as const;
 
 /** Camera pose (y, z) of the locked front view for a frame + aspect — FitCamera's fit rule as a pure function. */

@@ -19,4 +19,3 @@ export * from "./InkSegmentedStroke";
 export * from "./Stagger";
 export * from "./InkCanvas";
 export * from "./IntroFlight";
-export * from "./RevealGroup";

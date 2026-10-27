@@ -40,6 +40,10 @@ export interface VeilStroke {
 	/** Fraction of the pour when this slash starts, and how much of the pour it takes. */
 	start: number;
 	dur: number;
+	/** Fraction of the drying when this slash starts drying, and how much of it it takes —
+	 *  shuffled, so the slashes dry at different times and the scene shows through piecewise. */
+	dryStart: number;
+	dryDur: number;
 }
 
 /**
@@ -58,8 +62,13 @@ export const veilStrokes = (count: number, aspect: number, seed = 1): VeilStroke
 	// Combed order (0, 2, 4…, then 1, 3, 5…): the first pass leaves paper between the slashes, so
 	// each blow reads on its own before the second pass closes the gaps.
 	const order = [...Array.from({ length: count }, (_, i) => i).filter((i) => i % 2 === 0), ...Array.from({ length: count }, (_, i) => i).filter((i) => i % 2 === 1)];
+	// Drying order: a seeded shuffle from its OWN generator, so it never perturbs the geometry.
+	const dryRand = rng(seed + 101);
+	const dryOrder = Array.from({ length: count }, (_, i) => i).sort(() => dryRand() - 0.5);
+	const dryDur = 0.45;
 	return Array.from({ length: count }, (_, i) => {
 		const slot = order.indexOf(i);
+		const drySlot = dryOrder.indexOf(i);
 		const tilt = -0.22 + (rand() - 0.5) * 0.16;
 		const leftToRight = i % 2 === 0;
 		const angle = leftToRight ? tilt : Math.PI + tilt;
@@ -72,6 +81,8 @@ export const veilStrokes = (count: number, aspect: number, seed = 1): VeilStroke
 			bend: (rand() - 0.5) * 0.12,
 			start: (slot * 0.62) / count + rand() * 0.03,
 			dur: 0.36,
+			dryStart: count > 1 ? (drySlot / (count - 1)) * (1 - dryDur) : 0,
+			dryDur,
 		};
 	});
 };

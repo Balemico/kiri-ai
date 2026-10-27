@@ -28,7 +28,7 @@ describe("timing", () => {
 describe("veilStrokes", () => {
 	// The shader's flood guarantees the final cover; the slashes' bodies should still ink nearly all
 	// of the screen by themselves, so the flood only seals dry-brush gaps (never reads as a wipe).
-	it.each([0.46, 1, 1.6, 2.4])("their bodies ink ≥ 90%% of the screen (aspect %f)", (aspect) => {
+	it.each([0.46, 1, 1.6, 2.4])("their bodies ink at least 90 percent of the screen (aspect %f)", (aspect) => {
 		for (const seed of [1, 2, 3]) {
 			const strokes = veilStrokes(6, aspect, seed);
 			let inked = 0;
@@ -50,6 +50,14 @@ describe("veilStrokes", () => {
 		expect(strokes[0].start).toBeLessThan(0.05);
 		// Combed: the even slashes all land before any odd one.
 		expect(Math.max(strokes[0].start, strokes[2].start, strokes[4].start)).toBeLessThan(Math.min(strokes[1].start, strokes[3].start, strokes[5].start));
+	});
+
+	it("dry at different times, all within the drying phase", () => {
+		const strokes = veilStrokes(6, 1.6, 4);
+		const starts = strokes.map((st) => st.dryStart);
+		expect(new Set(starts).size).toBe(6);
+		expect(Math.min(...starts)).toBe(0);
+		expect(strokes.every((st) => st.dryStart + st.dryDur <= 1 + 1e-9)).toBe(true);
 		expect(strokes.every((st) => st.start + st.dur <= 1)).toBe(true);
 	});
 });

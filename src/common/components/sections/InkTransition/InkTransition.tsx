@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { motion } from "motion/react";
 import { PlaneGeometry, type Mesh } from "three";
+import type { WebGPURenderer } from "three/webgpu";
 import { InkCanvas } from "../../atoms/InkCanvas";
 import { createVeilMaterial, inkUniforms, type VeilUniforms } from "../../../ink/inkNodes";
 import { phaseProgress, veilStrokes } from "../../../ink/inkMath";
@@ -14,50 +15,81 @@ const PLANE = new PlaneGeometry(1, 1);
 const HOLD = 0.12;
 
 interface VeilProps {
+	covering: boolean;
 	release: boolean;
 	onCovered: () => void;
 	onDone: () => void;
 }
 
 /**
- * The full-screen veil. Giant brush slashes cut across in sequence, a flood seals the gaps →
- * `onCovered` (the canvases swap underneath). On `release` the flood drains and the slashes dry
- * into bristle streaks that thin out and vanish → `onDone` (the canvas unmounts).
+ * The full-screen veil, PERSISTENT: mounted (idle, transparent) from the first lobby frame, so
+ * its heavy pipeline is compiled ahead of time (`compileAsync`) instead of freezing the first
+ * frame after the click. Each session runs on the same material:
+ *   covering → slashes cut across one over another, a flood seals the gaps → `onCovered`
+ *   release  → the flood drains, the slashes dry at different times → `onDone`
+ * Session state lives in a ref, re-armed (in an effect) whenever a session ends.
  */
-const Veil = ({ release, onCovered, onDone }: VeilProps) => {
+const Veil = ({ covering, release, onCovered, onDone }: VeilProps) => {
 	useInkControls();
 	const size = useThree((s) => s.size);
+	const gl = useThree((s) => s.gl);
+	const scene = useThree((s) => s.scene);
+	const camera = useThree((s) => s.camera);
+	const invalidate = useThree((s) => s.invalidate);
 	const aspect = size.width / Math.max(1, size.height);
-	// Stroke geometry is baked into the shader: rebuilt only if the aspect changes mid-veil.
+	// Stroke geometry is baked into the shader: rebuilt only if the aspect changes.
 	const material = useMemo(() => createVeilMaterial(veilStrokes(INK.veilStrokes, aspect, 7)).material, [aspect]);
 	useEffect(() => () => material.dispose(), [material]);
-	const mesh = useRef<Mesh>(null);
-
-	// Latest props for the frame loop (effects — render-time ref writes are lint-forbidden).
-	const cb = useRef({ release, onCovered, onDone });
+	// Compile the pipeline off the critical path while the canvas idles in the lobby.
 	useEffect(() => {
-		cb.current = { release, onCovered, onDone };
-	}, [release, onCovered, onDone]);
-	const clock = useRef({ start: -1, covered: false, releasedAt: -1, done: false });
+		const r = gl as unknown as WebGPURenderer;
+		let alive = true;
+		void r.compileAsync?.(scene, camera).then(() => {
+			if (alive) invalidate();
+		});
+		return () => {
+			alive = false;
+		};
+	}, [gl, scene, camera, material, invalidate]);
+
+	const mesh = useRef<Mesh>(null);
+	// Latest props for the frame loop (effects — render-time ref writes are lint-forbidden).
+	const cb = useRef({ covering, release, onCovered, onDone });
+	useEffect(() => {
+		cb.current = { covering, release, onCovered, onDone };
+	}, [covering, release, onCovered, onDone]);
+	const run = useRef({ active: false, start: -1, covered: false, releasedAt: -1, done: false });
+	// Re-arm when a session ends. In an effect, not the frame loop: an idle canvas renders no frames.
+	useEffect(() => {
+		if (!covering) run.current = { active: false, start: -1, covered: false, releasedAt: -1, done: false };
+	}, [covering]);
 
 	useFrame(({ clock: c }) => {
 		const m = mesh.current;
 		if (!m) return;
 		const u = inkUniforms<VeilUniforms>(m.material);
-		const k = clock.current;
+		const k = run.current;
 		const now = c.elapsedTime;
-		if (k.start < 0) k.start = now;
 		u.resolution.value.set(size.width, size.height);
+		if (!cb.current.covering) {
+			// Idle between sessions (the one frame a parked canvas renders): nothing on screen.
+			u.pour.value = 0;
+			u.dry.value = 0;
+			return;
+		}
+		if (!k.active) {
+			Object.assign(k, { active: true, start: now });
+			u.dry.value = 0;
+		}
 		u.pour.value = phaseProgress(now - k.start, INK.veilPour);
 		if (!k.covered && now - k.start >= INK.veilPour + HOLD) {
 			k.covered = true;
 			cb.current.onCovered();
 		}
-		if (cb.current.release && k.covered) {
+		if (cb.current.release && k.covered && !k.done) {
 			if (k.releasedAt < 0) k.releasedAt = now;
-			const p = phaseProgress(now - k.releasedAt, INK.veilDry);
-			u.dry.value = p * p * (3 - 2 * p); // flood drains, then the slashes dry into streaks
-			if (p >= 1 && !k.done) {
+			u.dry.value = phaseProgress(now - k.releasedAt, INK.veilDry);
+			if (u.dry.value >= 1) {
 				k.done = true;
 				cb.current.onDone();
 			}
@@ -68,15 +100,16 @@ const Veil = ({ release, onCovered, onDone }: VeilProps) => {
 };
 
 /** No WebGPU and no WebGL2: a plain ink fade keeps the swap covered. */
-const FallbackVeil = ({ release, onCovered, onDone }: VeilProps) => (
-	<motion.div
-		initial={{ opacity: 0 }}
-		animate={{ opacity: release ? 0 : 1 }}
-		transition={{ duration: release ? INK.veilDry * 0.6 : INK.veilPour * 0.6 }}
-		onAnimationComplete={() => (release ? onDone() : onCovered())}
-		style={{ position: "absolute", inset: 0, background: INK.inkColor }}
-	/>
-);
+const FallbackVeil = ({ covering, release, onCovered, onDone }: VeilProps) =>
+	covering ? (
+		<motion.div
+			initial={{ opacity: 0 }}
+			animate={{ opacity: release ? 0 : 1 }}
+			transition={{ duration: release ? INK.veilDry * 0.6 : INK.veilPour * 0.6 }}
+			onAnimationComplete={() => (release ? onDone() : onCovered())}
+			style={{ position: "absolute", inset: 0, background: INK.inkColor }}
+		/>
+	) : null;
 
 export interface InkTransitionProps {
 	/** True while the app wants the screen covered (game starting). */
@@ -87,22 +120,23 @@ export interface InkTransitionProps {
 }
 
 /**
- * The lobby→duel veil, as slashed sumi (TSL shader, `ink/inkNodes`). It blocks input while it
- * covers; once released and dried out it UNMOUNTS (no full-screen canvas idling over the duel).
- * `done` resets whenever `covering` drops, re-arming the veil for the next session.
+ * The lobby→duel veil, as slashed sumi (TSL shader, `ink/inkNodes`). Always mounted; its canvas
+ * only renders frames while a session runs (`frameloop` "always"), parked on "demand" otherwise,
+ * so it costs nothing over the duel. It blocks input while covering. `done` resets whenever
+ * `covering` drops, re-arming the veil for the next session.
  */
 export const InkTransition = ({ covering, release, onCovered }: InkTransitionProps) => {
 	const [done, setDone] = useState(false);
 	// Re-arm for the next session — adjusted during render ("state from props"), not in an effect.
 	if (!covering && done) setDone(false);
-	if (!covering || done) return null;
+	const running = covering && !done;
 
-	const props: VeilProps = { release, onCovered, onDone: () => setDone(true) };
+	const props: VeilProps = { covering: running, release, onCovered, onDone: () => setDone(true) };
 	return (
-		<div style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: release ? "none" : "auto" }}>
+		<div style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: running && !release ? "auto" : "none" }}>
 			{inkSupported() ? (
-				// Capped DPR: a full-screen fbm shader at 3× would cost a phone dearly for no visible gain.
-				<InkCanvas maxDpr={1.5}>
+				// DPR 1: a full-screen multi-stroke shader; the veil's soft ink loses nothing at 1×.
+				<InkCanvas maxDpr={1} frameloop={running ? "always" : "demand"}>
 					<Veil {...props} />
 				</InkCanvas>
 			) : (

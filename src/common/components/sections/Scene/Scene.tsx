@@ -1,7 +1,7 @@
 import { Suspense, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
-import { FitCamera, Lights, Floor, IntroFlight, RevealGroup } from "../../atoms";
+import { FitCamera, Lights, Floor, IntroFlight } from "../../atoms";
 import { Battlefield } from "../Battlefield";
 import { Stage } from "../Stage";
 import { Hand } from "../Hand";
@@ -22,13 +22,27 @@ import { useAutoReveal } from "../../../hooks/useAutoReveal";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
 
-/** Fires `onReady` on the first rendered frame — the veil holds until the scene truly exists. */
-const ReadySignal = ({ onReady }: { onReady?: () => void }) => {
-	const fired = useRef(false);
-	useFrame(() => {
-		if (!fired.current) {
-			fired.current = true;
-			onReady?.();
+// The scene counts as ready once it renders this many consecutive smooth frames (< ~24 fps
+// budget each) — or after a safety cap, so a slow device still gets revealed.
+const STABLE_FRAMES = 6;
+const SMOOTH_FRAME = 1 / 24;
+const READY_CAP = 2.5;
+
+/**
+ * Fires `onReady` once the scene is not just mounted but SETTLED: mounting the duel compiles
+ * shaders and decodes textures, so its first frames hitch. Waiting for a run of smooth frames
+ * keeps those hitches under the ink veil — the reveal then plays fluidly.
+ */
+const ReadySignal = ({ onReady }: { onReady: () => void }) => {
+	const state = useRef({ fired: false, smooth: 0, since: -1 });
+	useFrame(({ clock }, dt) => {
+		const k = state.current;
+		if (k.fired) return;
+		if (k.since < 0) k.since = clock.elapsedTime;
+		k.smooth = dt < SMOOTH_FRAME ? k.smooth + 1 : 0;
+		if (k.smooth >= STABLE_FRAMES || clock.elapsedTime - k.since > READY_CAP) {
+			k.fired = true;
+			onReady();
 		}
 	});
 	return null;
@@ -61,14 +75,13 @@ const SceneContents = ({
 	const frame = isPortrait ? PORTRAIT_SCENE_FRAME : landscapeFrame;
 	// Floor controls are shared so the battleground can rake its pieces onto the SAME tilt the floor uses.
 	const floor = useFloorControls(orientation);
-	// Fly-back reveal staging: 0 = scenery only, 1 = + board, 2 = + hand (= everything). Portrait
-	// skips the flight (the bird view is designed around the landscape composition). State
-	// initialisers only — turn passing and orientation flips must NEVER re-run the staging.
-	const fly = entrance === "fly" && !isPortrait;
-	const [stage, setStage] = useState(fly ? 0 : 2);
-	const [flying, setFlying] = useState(fly);
-	const showBoard = showInterface && stage >= 1;
-	const showHand = showInterface && stage >= 2;
+	// Approach reveal: everything is mounted at once (under the veil); the camera holds a farther
+	// pose until the scene is ready (= the veil starts drying), then glides in. State initialiser
+	// only — turn passing and orientation flips must NEVER re-run the entrance.
+	const [flying, setFlying] = useState(entrance === "fly");
+	const [ready, setReady] = useState(false);
+	const showBoard = showInterface;
+	const showHand = showInterface;
 	return (
 		<>
 			{/* Paper fill behind everything — kept here (not only in Stage) so portrait, with the
@@ -76,18 +89,16 @@ const SceneContents = ({
 			<color attach="background" args={[PAPER]} />
 			<Lights />
 			{/* Single locked front view — no orbit; auto-fits the whole frame at any width. Yields the
-			    camera to IntroFlight for the duration of the fly-back reveal. */}
+			    camera to IntroFlight for the duration of the approach. */}
 			<FitCamera frame={frame} enabled={!flying} />
-			{flying && (
-				<IntroFlight
-					frame={frame}
-					onBoard={() => setStage((s) => Math.max(s, 1))}
-					onHand={() => setStage((s) => Math.max(s, 2))}
-					onDone={() => setFlying(false)}
-				/>
-			)}
-			{/* Fires once the canvas has produced its first frame — releases the ink veil. */}
-			<ReadySignal onReady={onReady} />
+			{flying && <IntroFlight frame={frame} start={ready} onDone={() => setFlying(false)} />}
+			{/* Fires once the scene renders smoothly — releases the ink veil and starts the approach. */}
+			<ReadySignal
+				onReady={() => {
+					setReady(true);
+					onReady?.();
+				}}
+			/>
 			{/* Background scenery (top-third parallax strip) — landscape only; dropped in portrait. */}
 			{!isPortrait && <Stage frame={frame} />}
 			{/* The tilted paper ground — lower half in landscape, full screen in portrait. */}
@@ -97,9 +108,7 @@ const SceneContents = ({
 			{showBoard && (
 				<>
 					<Suspense fallback={null}>
-						<RevealGroup drop={fly ? 0.4 : 0}>
-							<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} />
-						</RevealGroup>
+						<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} />
 					</Suspense>
 					{/* Portrait placeholders marking where each team's played / set-aside cards land. */}
 					<LandingZones frame={frame} orientation={orientation} />
@@ -119,9 +128,9 @@ const SceneContents = ({
 };
 
 export interface SceneProps {
-	/** "fly" = bird-view fly-back reveal on mount (Task: IntroFlight); "none" = instant (default). */
+	/** "fly" = approach reveal (the camera glides in as the veil dries — IntroFlight); "none" = instant. */
 	entrance?: "fly" | "none";
-	/** Fired once the canvas has produced its first frame — releases the ink veil. */
+	/** Fired once the scene renders smoothly (a run of steady frames) — releases the ink veil. */
 	onReady?: () => void;
 }
 
