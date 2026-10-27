@@ -22,6 +22,7 @@ import { useAutoReveal } from "../../../hooks/useAutoReveal";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
 import { veilSignal } from "../../../ink/veilSignal";
+import { prioritizedEvents } from "../../../eventPriority";
 
 // The scene counts as ready once it renders this many consecutive smooth frames (< ~24 fps
 // budget each) — or after a safety cap, so a slow device still gets revealed.
@@ -170,7 +171,8 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 			<WinBanner />
 			{/* Cap the device pixel ratio: high-DPR phones would render 3–4× the pixels, draining GPU/battery
 			    for no visible gain. dpr={[1, 2]} keeps it crisp while bounding the fill cost. */}
-			<Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6], fov: 30 }}>
+			{/* prioritizedEvents: the hand fan always wins the pointer over cards lying on the table. */}
+			<Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6], fov: 30 }} events={prioritizedEvents}>
 				<SceneContents showInterface={showInterface} entrance={entrance} onReady={onReady} />
 			</Canvas>
 		</>

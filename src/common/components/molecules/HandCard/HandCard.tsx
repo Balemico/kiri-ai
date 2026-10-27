@@ -169,7 +169,9 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 
 	return (
 		<>
-			<group ref={ref}>
+			{/* `eventPriority` (read by the scene's prioritizedEvents): the hand fan's bias outranks the
+			    played / set-aside cards, so the hand always wins the pointer where their zones overlap. */}
+			<group ref={ref} userData={{ eventPriority: renderBias }}>
 				{/* The card meshes handle clicks (and movement-card side dimming) only — hover/lift is
 				    driven solely by the stationary plane below, so the lift never moves the hover target. */}
 				<group ref={pulseRef}>
@@ -184,7 +186,7 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 			    there is no hover: the zone carries no handlers so a tap can't pre-lift the card before its
 			    own tap-to-arm runs in Hand. */}
 			{hitAnchor && hit && !coarse && (
-				<group position={hitAnchor.position} rotation={[hitAnchor.rotationX ?? 0, 0, hitAnchor.rotationZ]} scale={hitAnchor.scale}>
+				<group position={hitAnchor.position} rotation={[hitAnchor.rotationX ?? 0, 0, hitAnchor.rotationZ]} scale={hitAnchor.scale} userData={{ eventPriority: renderBias }}>
 					<mesh
 						position={[0, hit.y, -0.1]}
 						material={HOVER_HIT_MATERIAL}
