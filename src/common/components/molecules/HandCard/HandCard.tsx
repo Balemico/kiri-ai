@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import * as THREE from "three";
-import type { ThreeEvent } from "@react-three/fiber";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Card } from "../Card";
 import { TOUCH_HINT, type CardTransform, type CardEntry } from "../../../layout";
 import type { CardView } from "../../../state";
@@ -107,25 +107,40 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 	// with a per-card order from its stacking z so the fan still overlaps in the right order.
 	// `renderBias` then lets a card layer independent of its z (e.g. set-aside sits behind the
 	// committed cards even though its z is larger).
+	//
+	// Re-asserted EVERY FRAME (only touching what drifted): a card's materials can be replaced after
+	// mount (texture (re)load, hot reload), and a fresh material comes back depth-tested + opaque —
+	// it then renders in the OPAQUE pass, before every transparent card, so e.g. a lifted hand card
+	// ended up UNDER the set-aside card on the floor. Cheap: a handful of meshes per card.
+	const order = 100 + Math.round(z * 100) + renderBias;
+	const layering = useRef(order);
 	useLayoutEffect(() => {
+		layering.current = order;
+	}, [order]);
+	const applyLayering = () => {
 		const g = ref.current;
 		if (!g) return;
-		const order = 100 + Math.round(z * 100) + renderBias;
+		const base = layering.current;
 		g.traverse((o) => {
 			const mesh = o as THREE.Mesh;
 			if (!mesh.isMesh) return;
 			// `orderBump` (userData) keeps a card's own overlays (e.g. a movement card's dim) drawn right
 			// after its face — never decided by an unstable distance sort against the face.
-			mesh.renderOrder = order + ((mesh.userData.orderBump as number | undefined) ?? 0);
+			const want = base + ((mesh.userData.orderBump as number | undefined) ?? 0);
+			if (mesh.renderOrder !== want) mesh.renderOrder = want;
 			const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 			for (const m of mats) {
 				if (!m || !(m instanceof THREE.Material)) continue;
-				m.depthTest = false;
-				m.transparent = true;
-				m.needsUpdate = true;
+				if (m.depthTest || !m.transparent) {
+					m.depthTest = false;
+					m.transparent = true;
+					m.needsUpdate = true;
+				}
 			}
 		});
-	}, [z, view.key, renderBias]);
+	};
+	useLayoutEffect(applyLayering, [order, view.key]);
+	useFrame(applyLayering);
 
 	// Touch: a lifted (armed) card breathes to advertise the confirming second tap. The pulse rides on a
 	// nested group so it multiplies the card's own transform without fighting the position/scale tweens.
