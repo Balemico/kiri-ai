@@ -133,11 +133,13 @@ export const Lobby = () => {
 
 					{status === "waiting" && (
 						<ScreenFade key="waiting">
-							<Stagger>
+							<Stagger gap={12}>
 								<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 15, letterSpacing: 2 }}>
 									In attesa… condividi la parola chiave
 								</p>
-								<HankoStamp>{roomKeyword}</HankoStamp>
+								<div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
+									<HankoStamp>{roomKeyword}</HankoStamp>
+								</div>
 								<p style={{ margin: 0, fontSize: 13, opacity: 0.65, textAlign: "center", color: "#17120e" }}>
 									Non appena si unisce, la partita inizia.
 								</p>
@@ -153,7 +155,7 @@ export const Lobby = () => {
 								<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 17, letterSpacing: 2 }}>
 									Avversario uscito — la partita è stata interrotta
 								</p>
-								<InkStrokeButton onClick={backToMenu} seal>
+								<InkStrokeButton onClick={backToMenu}>
 									TORNA AL MENU
 								</InkStrokeButton>
 							</Stagger>

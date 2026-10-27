@@ -3,6 +3,7 @@ import { useActingTeams } from "../../../hooks/useActingTeams";
 import { useDuelIntroReached } from "../../../state/duelIntro";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
 import { TEAM_INK } from "../../../hudPalette";
+import { useSession } from "../../../net";
 import type { Team } from "../../../game";
 
 interface Corner {
@@ -21,6 +22,9 @@ export const HudVignette = () => {
 	// Held through a pass & play hand-over: the highlight moves only once the veil is tapped away.
 	const actingTeams = useActingTeams();
 	const acting = (team: Team) => actingTeams[team];
+	// Online both players own a corner for the whole duel: an idle corner keeps its team colour, just
+	// fainter (like its dimmed banner), instead of resting in black.
+	const online = useSession().mode === "online";
 
 	// Duel opening: the vignette is part of the HUD — it fades in with it, not before.
 	const hudIn = useDuelIntroReached("hud");
@@ -37,8 +41,8 @@ export const HudVignette = () => {
 				<CornerVignette
 					key={corner}
 					corner={corner}
-					shade={hud.vignetteShade}
-					shadeOpacity={hud.vignetteShadeOpacity}
+					shade={online ? TEAM_INK[team] : hud.vignetteShade}
+					shadeOpacity={online ? hud.vignetteIdleGlowOpacity : hud.vignetteShadeOpacity}
 					glow={TEAM_INK[team]}
 					lit={lit}
 					glowOpacity={hud.vignetteGlowOpacity}

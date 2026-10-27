@@ -53,12 +53,12 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 			)}
 
 			{view === "create" && (
-				<Stagger key="create">
+				<Stagger key="create" gap={12}>
 					<Heading title="Crea partita" subtitle="Scegli una parola chiave e il tuo colore" />
 					<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave (es. duello)" onEnter={() => trimmed && createRoom(trimmed, color)} />
 					{/* One stroke, two halves: the chosen colour lights its half, the other goes grey. */}
 					<InkSegmentedStroke options={TEAM_OPTIONS} value={TEAMS.indexOf(color) as 0 | 1} onChange={(i) => setColor(TEAMS[i])} variant={1} />
-					<InkStrokeButton disabled={!trimmed} seal onClick={() => createRoom(trimmed, color)}>
+					<InkStrokeButton disabled={!trimmed} onClick={() => createRoom(trimmed, color)}>
 						CREA E ATTENDI
 					</InkStrokeButton>
 					<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
@@ -66,13 +66,13 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 			)}
 
 			{view === "join" && (
-				<Stagger key="join">
+				<Stagger key="join" gap={12}>
 					<Heading title="Unisciti" subtitle="Inserisci la parola chiave della partita" />
 					<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave" onEnter={() => trimmed && joinRoom(trimmed)} />
 					<p style={{ margin: 0, fontSize: 12, opacity: 0.6, textAlign: "center", color: "#17120e" }}>
 						Ti verrà assegnato il colore opposto a chi ha creato la partita.
 					</p>
-					<InkStrokeButton disabled={!trimmed} seal onClick={() => joinRoom(trimmed)}>
+					<InkStrokeButton disabled={!trimmed} onClick={() => joinRoom(trimmed)}>
 						UNISCITI
 					</InkStrokeButton>
 					<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>

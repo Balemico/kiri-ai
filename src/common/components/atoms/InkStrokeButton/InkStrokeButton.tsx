@@ -12,8 +12,6 @@ export interface InkStrokeButtonProps {
 	tone?: InkTone;
 	/** Which brush (also seeds the stroke's shape) — siblings never look cloned. */
 	variant?: 0 | 1 | 2;
-	/** Vermilion hanko dot at the stroke's end — the primary action's mark. */
-	seal?: boolean;
 	/** False = still hidden (intro choreography); flipping to true lays the stroke NOW. */
 	visible?: boolean;
 	style?: CSSProperties;
@@ -22,11 +20,11 @@ export interface InkStrokeButtonProps {
 /**
  * A menu button whose body is a living sumi stroke. The ink itself is drawn by the lobby's
  * `InkLayer` (TSL shader on its own canvas, under the menu column): this button only REGISTERS
- * its element + state, and keeps the label and seal in the DOM on top. `visible` stays the
+ * its element + state, and keeps the label in the DOM on top. `visible` stays the
  * state-driven trigger of the choreography (an intro skip flips every beat at once and each
  * stroke starts pouring that frame).
  */
-export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, seal = false, visible = true, style }: InkStrokeButtonProps) => {
+export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, visible = true, style }: InkStrokeButtonProps) => {
 	const ref = useRef<HTMLButtonElement>(null);
 	const [id] = useState(newInkStrokeId);
 	const [hovered, setHovered] = useState(false);
@@ -83,25 +81,6 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 			>
 				{children}
 			</motion.span>
-			{seal && (
-				<motion.span
-					variants={{
-						hidden: { opacity: 0, scale: 0.4, rotate: -6 },
-						painted: { opacity: 1, scale: 1, rotate: -6, transition: { delay: delay + INK.strokePour, duration: 0.3 } },
-					}}
-					style={{
-						position: "absolute",
-						right: 26,
-						top: "50%",
-						width: 18,
-						height: 18,
-						marginTop: -9,
-						background: "#b73225",
-						borderRadius: 4,
-						boxShadow: "0 2px 6px rgba(0, 0, 0, 0.3)",
-					}}
-				/>
-			)}
 		</motion.button>
 	);
 };

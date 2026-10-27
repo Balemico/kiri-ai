@@ -114,6 +114,7 @@ export const GAME_HUD = {
 	vignetteShade: "#0c0a09", // resting tone (sumi black)
 	vignetteShadeOpacity: 0.5, // alpha of the resting shade at the corner
 	vignetteGlowOpacity: 0.65, // alpha of the team-colour glow at the corner
+	vignetteIdleGlowOpacity: 0.25, // ONLINE: an idle corner keeps its team colour at this fainter alpha instead of resting in black
 	vignetteWidth: 0.66, // extent across, as a fraction of the viewport width
 	vignetteHeight: 0.31, // extent down, as a fraction of the viewport height
 	vignetteDrift: 4, // seconds for one slow breath of the vignette

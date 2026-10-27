@@ -9,6 +9,8 @@ export interface StaggerProps {
 	step?: number;
 	/** Seconds before the first row starts (lets the previous screen finish leaving). */
 	base?: number;
+	/** Pixels between rows (tight by default — strokes carry their own air). */
+	gap?: number;
 }
 
 /**
@@ -17,13 +19,13 @@ export interface StaggerProps {
  * row's timing is handed to the ink (`InkDelayContext`): a button's stroke is laid as its row
  * arrives and lifts away as its row leaves.
  */
-export const Stagger = ({ children, step = 0.08, base = 0.05 }: StaggerProps) => (
+export const Stagger = ({ children, step = 0.08, base = 0.05, gap = 2 }: StaggerProps) => (
 	<motion.div
 		layout="position"
 		transition={{ layout: LAYOUT_TRANSITION }}
 		// Tight rows: each stroke already carries vertical air in its 70px box; back strokes add
 		// their own top margin (BackStroke) to sit apart.
-		style={{ display: "flex", flexDirection: "column", gap: 2 }}
+		style={{ display: "flex", flexDirection: "column", gap }}
 	>
 		{Children.toArray(children).map((child, i, all) => {
 			const delay = base + i * step;

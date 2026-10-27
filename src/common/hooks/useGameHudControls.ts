@@ -27,6 +27,8 @@ export interface GameHudControls {
 	vignetteShadeOpacity: number;
 	/** Alpha of the acting team's colour glow at the corner. */
 	vignetteGlowOpacity: number;
+	/** Online: alpha an idle corner keeps in its team colour (instead of resting in black). */
+	vignetteIdleGlowOpacity: number;
 	/** Vignette extent across, as a fraction of the viewport width. */
 	vignetteWidth: number;
 	/** Vignette extent down, as a fraction of the viewport height. */
@@ -53,6 +55,7 @@ export const useGameHudControls = (): GameHudControls =>
 			vignetteShade: { value: GAME_HUD.vignetteShade, label: "vignette shade" },
 			vignetteShadeOpacity: { value: GAME_HUD.vignetteShadeOpacity, min: 0, max: 1, step: 0.05, label: "shade opacity" },
 			vignetteGlowOpacity: { value: GAME_HUD.vignetteGlowOpacity, min: 0, max: 1, step: 0.05, label: "glow opacity" },
+			vignetteIdleGlowOpacity: { value: GAME_HUD.vignetteIdleGlowOpacity, min: 0, max: 1, step: 0.05, label: "online idle glow" },
 			vignetteWidth: { value: GAME_HUD.vignetteWidth, min: 0.1, max: 1, step: 0.01, label: "vignette width" },
 			vignetteHeight: { value: GAME_HUD.vignetteHeight, min: 0.1, max: 1, step: 0.01, label: "vignette height" },
 			vignetteDrift: { value: GAME_HUD.vignetteDrift, min: 2, max: 30, step: 0.5, label: "vignette breath (s)" },
