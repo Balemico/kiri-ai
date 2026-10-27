@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSession } from "../useSession";
 import { useNetDiagnostics } from "../diagnostics";
-import { LobbyScene } from "../../components/sections";
+import { InkLayer, LobbyScene } from "../../components/sections";
 import { InkStrokeButton } from "../../components/atoms";
 import { INTRO } from "../../layout";
 import { Menu } from "./Menu";
@@ -103,6 +103,8 @@ export const Lobby = () => {
 	return (
 		<div style={{ position: "fixed", inset: 0, zIndex: 3000, overflow: "hidden" }} onPointerDown={introDone ? undefined : finishIntro}>
 			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
+			{/* Sumi strokes of the menu buttons — between the panorama and the column (DOM order). */}
+			<InkLayer />
 
 			<LobbyColumn>
 				<motion.img

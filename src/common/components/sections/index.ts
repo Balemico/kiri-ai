@@ -8,6 +8,7 @@ export * from "./WinBanner";
 export * from "./Scene";
 export * from "./LobbyScene";
 export * from "./InkTransition";
+export * from "./InkLayer";
 export * from "./GameHud";
 export * from "./HandoffVeil";
 export * from "./StrikeSplash";

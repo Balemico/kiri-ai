@@ -1,113 +1,82 @@
-import { useEffect } from "react";
-import type { CSSProperties } from "react";
-import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "motion/react";
-import { INTRO } from "../../../layout";
-import { WIPE_LEFT, WIPE_WIDTH, inkWipeSrc, preloadInk, wipeTravel } from "../../../inkWipe";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { motion } from "motion/react";
+import { PlaneGeometry, type Mesh } from "three";
+import { InkCanvas } from "../../atoms/InkCanvas";
+import { createVeilMaterial, inkUniforms, type VeilUniforms } from "../../../ink/inkNodes";
+import { phaseProgress, veilStrokes } from "../../../ink/inkMath";
+import { inkSupported } from "../../../ink/inkRegistry";
+import { useInkControls } from "../../../hooks/useInkControls";
+import { INK } from "../../../layout";
 
-// Four sweeps cover the screen with overlap; a fifth solid layer seals any mask gaps.
-// `flip` mirrors the whole stroke: wipes travel left→right, so -1 draws right→left.
-const STROKES = [
-	{ top: "-6%", height: "34vh", rotate: -7, flip: 1, veil: "veil-1", wipe: 0 },
-	{ top: "20%", height: "36vh", rotate: 5, flip: -1, veil: "veil-2", wipe: 1 },
-	{ top: "46%", height: "36vh", rotate: -4, flip: 1, veil: "veil-3", wipe: 2 },
-	{ top: "72%", height: "38vh", rotate: 8, flip: -1, veil: "veil-1", wipe: 1 },
-] as const;
+const PLANE = new PlaneGeometry(1, 1);
+// A beat with the screen fully inked before the swap, so the cover reads as settled.
+const HOLD = 0.12;
 
-preloadInk([
-	...["veil-1", "veil-2", "veil-3"].flatMap((n) => [`/images/intro/${n}.png`, `/images/intro/${n}-dry.png`]),
-	...[0, 1, 2].map(inkWipeSrc),
-]);
-
-const MASK_FILL: CSSProperties = {
-	position: "absolute",
-	inset: 0,
-	background: "#17120e",
-	WebkitMaskSize: "100% 100%",
-	maskSize: "100% 100%",
-};
-
-interface VeilStrokeProps {
-	def: (typeof STROKES)[number];
-	index: number;
+interface VeilProps {
 	release: boolean;
+	onCovered: () => void;
+	onDone: () => void;
 }
 
 /**
- * One sweep: the veil mask stays static while an ink fill masked by a ragged wipe ramp slides
- * across underneath (continuous frontier — no frame steps), and a residual x-drag keeps the
- * wrist moving: drawn by a gesture, not stamped. On release the wet ink thins to its
- * granulated `-dry` skeleton (pre-baked variant, no runtime SVG filters), then the whole
- * stroke brightens and fades.
+ * The full-screen veil. Giant brush slashes cut across in sequence, a flood seals the gaps →
+ * `onCovered` (the canvases swap underneath). On `release` the flood drains and the slashes dry
+ * into bristle streaks that thin out and vanish → `onDone` (the canvas unmounts).
  */
-const VeilStroke = ({ def, index, release }: VeilStrokeProps) => {
-	const progress = useMotionValue(0);
+const Veil = ({ release, onCovered, onDone }: VeilProps) => {
+	useInkControls();
+	const size = useThree((s) => s.size);
+	const aspect = size.width / Math.max(1, size.height);
+	// Stroke geometry is baked into the shader: rebuilt only if the aspect changes mid-veil.
+	const material = useMemo(() => createVeilMaterial(veilStrokes(INK.veilStrokes, aspect, 7)).material, [aspect]);
+	useEffect(() => () => material.dispose(), [material]);
+	const mesh = useRef<Mesh>(null);
+
+	// Latest props for the frame loop (effects — render-time ref writes are lint-forbidden).
+	const cb = useRef({ release, onCovered, onDone });
 	useEffect(() => {
-		const ctrl = animate(progress, 1, {
-			duration: INTRO.veilCover,
-			delay: index * INTRO.veilStrokeStagger,
-			ease: [0.3, 0, 0.2, 1],
-		});
-		return () => ctrl.stop();
-	}, [progress, index]);
+		cb.current = { release, onCovered, onDone };
+	}, [release, onCovered, onDone]);
+	const clock = useRef({ start: -1, covered: false, releasedAt: -1, done: false });
 
-	const xWipe = useTransform(progress, wipeTravel);
-	// Scaled by def.flip: mirrored strokes (scaleX: -1) draw right→left, so the drag must too.
-	const x = useTransform(progress, (v) => `${(1 - v) * -INTRO.veilDrag * def.flip}vw`);
-	const dry = `url(/images/intro/${def.veil}-dry.png)`;
+	useFrame(({ clock: c }) => {
+		const m = mesh.current;
+		if (!m) return;
+		const u = inkUniforms<VeilUniforms>(m.material);
+		const k = clock.current;
+		const now = c.elapsedTime;
+		if (k.start < 0) k.start = now;
+		u.resolution.value.set(size.width, size.height);
+		u.pour.value = phaseProgress(now - k.start, INK.veilPour);
+		if (!k.covered && now - k.start >= INK.veilPour + HOLD) {
+			k.covered = true;
+			cb.current.onCovered();
+		}
+		if (cb.current.release && k.covered) {
+			if (k.releasedAt < 0) k.releasedAt = now;
+			const p = phaseProgress(now - k.releasedAt, INK.veilDry);
+			u.dry.value = p * p * (3 - 2 * p); // flood drains, then the slashes dry into streaks
+			if (p >= 1 && !k.done) {
+				k.done = true;
+				cb.current.onDone();
+			}
+		}
+	});
 
-	return (
-		<motion.div
-			animate={release ? { opacity: 0, filter: "brightness(1.6) contrast(1.5)" } : { opacity: 1, filter: "brightness(1) contrast(1)" }}
-			transition={release ? { duration: INTRO.veilDry, delay: index * INTRO.veilStrokeStagger, ease: "easeIn" } : { duration: 0 }}
-			style={{
-				position: "absolute",
-				left: "-15vw",
-				top: def.top,
-				width: "130vw",
-				height: def.height,
-				rotate: def.rotate,
-				scaleX: def.flip,
-				x,
-			}}
-		>
-			{/* Wet stroke: fades to its dry skeleton on release (the drying is the delta). */}
-			<motion.span
-				animate={release ? { opacity: 0 } : { opacity: 1 }}
-				transition={release ? { duration: INTRO.veilDry * 0.4, delay: index * INTRO.veilStrokeStagger } : { duration: 0 }}
-				style={{
-					position: "absolute",
-					inset: 0,
-					overflow: "hidden",
-					WebkitMaskImage: `url(/images/intro/${def.veil}.png)`,
-					maskImage: `url(/images/intro/${def.veil}.png)`,
-					WebkitMaskSize: "100% 100%",
-					maskSize: "100% 100%",
-				}}
-			>
-				<motion.span
-					style={{
-						position: "absolute",
-						top: 0,
-						bottom: 0,
-						left: WIPE_LEFT,
-						width: WIPE_WIDTH,
-						background: "#17120e",
-						WebkitMaskImage: `url(${inkWipeSrc(def.wipe)})`,
-						maskImage: `url(${inkWipeSrc(def.wipe)})`,
-						WebkitMaskSize: "100% 100%",
-						maskSize: "100% 100%",
-						x: xWipe,
-					}}
-				/>
-			</motion.span>
-			<motion.span
-				animate={release ? { opacity: 1 } : { opacity: 0 }}
-				transition={release ? { duration: INTRO.veilDry * 0.4, delay: index * INTRO.veilStrokeStagger } : { duration: 0 }}
-				style={{ ...MASK_FILL, WebkitMaskImage: dry, maskImage: dry }}
-			/>
-		</motion.div>
-	);
+	return <mesh ref={mesh} geometry={PLANE} material={material} scale={[size.width, size.height, 1]} />;
 };
+
+/** No WebGPU and no WebGL2: a plain ink fade keeps the swap covered. */
+const FallbackVeil = ({ release, onCovered, onDone }: VeilProps) => (
+	<motion.div
+		initial={{ opacity: 0 }}
+		animate={{ opacity: release ? 0 : 1 }}
+		transition={{ duration: release ? INK.veilDry * 0.6 : INK.veilPour * 0.6 }}
+		onAnimationComplete={() => (release ? onDone() : onCovered())}
+		style={{ position: "absolute", inset: 0, background: INK.inkColor }}
+	/>
+);
 
 export interface InkTransitionProps {
 	/** True while the app wants the screen covered (game starting). */
@@ -118,37 +87,27 @@ export interface InkTransitionProps {
 }
 
 /**
- * The lobby→duel veil: sumi strokes are DRAWN onto the screen one after another until it is
- * fully inked (→ `onCovered`, the canvases swap underneath), hold, then — once `release` —
- * each stroke dries to a granulated skeleton and fades, unveiling the new scene in motion.
+ * The lobby→duel veil, as slashed sumi (TSL shader, `ink/inkNodes`). It blocks input while it
+ * covers; once released and dried out it UNMOUNTS (no full-screen canvas idling over the duel).
+ * `done` resets whenever `covering` drops, re-arming the veil for the next session.
  */
-export const InkTransition = ({ covering, release, onCovered }: InkTransitionProps) => (
-	<AnimatePresence>
-		{covering && (
-			<motion.div
-				key="veil"
-				// While covering the old screen must not accept clicks; once drying (release), the new scene is live.
-				style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: release ? "none" : "auto", overflow: "hidden" }}
-				exit={{ opacity: 0 }}
-			>
-				{STROKES.map((s, i) => (
-					<VeilStroke key={i} def={s} index={i} release={release} />
-				))}
-				{/* Seal: closes the ragged gaps between strokes right as the last sweep lands. */}
-				<motion.div
-					initial={{ opacity: 0 }}
-					animate={release ? { opacity: 0 } : { opacity: 1 }}
-					transition={
-						release
-							? { duration: INTRO.veilDry * 0.6 }
-							: { duration: 0.18, delay: STROKES.length * INTRO.veilStrokeStagger + INTRO.veilCover * 0.7 }
-					}
-					onAnimationComplete={() => {
-						if (!release) onCovered();
-					}}
-					style={{ position: "absolute", inset: 0, background: "#17120e" }}
-				/>
-			</motion.div>
-		)}
-	</AnimatePresence>
-);
+export const InkTransition = ({ covering, release, onCovered }: InkTransitionProps) => {
+	const [done, setDone] = useState(false);
+	// Re-arm for the next session — adjusted during render ("state from props"), not in an effect.
+	if (!covering && done) setDone(false);
+	if (!covering || done) return null;
+
+	const props: VeilProps = { release, onCovered, onDone: () => setDone(true) };
+	return (
+		<div style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: release ? "none" : "auto" }}>
+			{inkSupported() ? (
+				// Capped DPR: a full-screen fbm shader at 3× would cost a phone dearly for no visible gain.
+				<InkCanvas maxDpr={1.5}>
+					<Veil {...props} />
+				</InkCanvas>
+			) : (
+				<FallbackVeil {...props} />
+			)}
+		</div>
+	);
+};

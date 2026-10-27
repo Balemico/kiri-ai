@@ -101,6 +101,29 @@ export const GAME_HUD = {
 	splashSeconds: 1.6, // how long the splash lingers before it fades
 } as const;
 
+// --- Sumi ink (TSL shader) ---
+// Action sumi-e (haboku / hatsuboku): fast dry-brush slashes whose bristles split into streaks,
+// flung splatter, and pale wash beside the solid black. Drives the lobby buttons and the
+// lobby→duel veil (src/common/ink). Look params are SHARED live uniforms ("Ink" Leva folder).
+export const INK = {
+	// Look
+	bristles: 11, // bristle clumps across a menu-sized stroke (the veil scales it up)
+	tailDry: 0.85, // how dry the brush runs by the end of a stroke (0 = solid to the tip)
+	edgeDry: 0.5, // how broken the stroke's flanks are (bristles splaying at the edges)
+	tooth: 0.3, // paper tooth breaking the dry-brush (vs pure bristle streaks)
+	wash: 0.28, // pale diluted-ink wash bleeding beside the stroke
+	splatter: 1, // flung-droplet density multiplier
+	drift: 0.05, // speed the wet wash edge keeps creeping/breathing (noise evolution / s)
+	inkColor: "#0c0a09",
+	// Menu strokes
+	strokePour: 0.55, // s for the brush to slash a button's stroke left → right
+	strokeMargin: 44, // px of room around a button for the tail, wash and splatter
+	// Veil (lobby → duel)
+	veilStrokes: 6, // giant slashes that cover the screen (combed: even ones first, then the odd)
+	veilPour: 1.5, // s until the slashes (and the final flood) cover everything
+	veilDry: 1.6, // s for the cover to dry into bristle streaks and lift away
+} as const;
+
 // --- Seal disc ---
 // The team kanji avatar (赤 / 青) rendered as a carved, nearly 3D seal: a raised bevelled rim
 // around a recessed face, with the kanji standing in relief. Light comes from the top-left.
@@ -338,13 +361,6 @@ export const INTRO = {
 	menuDelay: 2.5, // first DOM element (the logo) starts painting
 	menuStagger: 0.35, // per-menu-item stagger after menuDelay
 	total: 4.5, // full entry choreography (3D paint-on + DOM menu) — the natural finish beat
-	// Exit veil: brush strokes cover one after another, then "dry" out in order.
-	veilCover: 0.55, // one stroke's sweep duration
-	veilStrokeStagger: 0.14,
-	veilDry: 0.7, // one stroke's dry/fade-out duration
-	// Ink paint-on (continuous wipe masks from scripts/ink_masks.py; see src/common/inkWipe.ts).
-	strokePaint: 0.55, // one button stroke's draw duration
-	veilDrag: 10, // vw of residual wrist-drag while a veil stroke is being drawn
 	// Fly-back reveal: bird view above the board pulling back to the FitCamera pose.
 	flightDur: 2.5,
 	flightStartHeight: 2.4, // start y above the final camera y
