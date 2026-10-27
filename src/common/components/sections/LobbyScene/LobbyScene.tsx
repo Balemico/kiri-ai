@@ -7,15 +7,18 @@ import { FitCamera, Floor, FallingLeaves, Mist, ParallaxLayer } from "../../atom
 import { useFloorControls } from "../../../hooks/useFloorControls";
 import { useLobbyControls } from "../../../hooks/useLobbyControls";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
-import { DEFAULT_SCENE_FRAME, INTRO, LOBBY, PAPER, STAGE, STAGE_LAYERS, frameViewport } from "../../../layout";
+import { useTexture } from "@react-three/drei";
+import { DEFAULT_SCENE_FRAME, INTRO, LOBBY, PAPER, STAGE, STAGE_BASE_URL, STAGE_LAYERS, frameViewport } from "../../../layout";
 
 const TREE_URL = "/images/backgroud/4-tree.png";
 
-/** The shared painting minus the tree (the lobby re-stages it), same paint order as Stage. */
-const SHARED_LAYERS = STAGE_LAYERS.filter((l) => l.url !== TREE_URL);
+/** The shared painting minus the tree (the lobby re-stages it) and minus the paper plate (the
+ *  full-view `PaperPlate` replaces it — a panel-sized plate would show its edge on tall screens),
+ *  same paint order as Stage. */
+const SHARED_LAYERS = STAGE_LAYERS.filter((l) => l.url !== TREE_URL && l.url !== STAGE_BASE_URL);
 
 /** Total layer materials the cinematic waits for: the shared layers plus the re-staged tree. */
-const EXPECTED_MATERIALS = STAGE_LAYERS.length;
+const EXPECTED_MATERIALS = SHARED_LAYERS.length + 1;
 
 export interface LobbySceneProps {
 	/** False = skip the cinematic entirely (reduced motion / intro already played). */
@@ -45,12 +48,19 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 
 	// Panorama sizing — mirrors Stage (visible width, native aspect), but on the LOBBY's deeper
 	// horizon: more painting, less bare paper below the menu.
-	const horizonY = frame.top - (frame.top - frame.bottom) * LOBBY.horizonFraction;
 	const vp = frameViewport(frame, size.width / size.height);
 	const visibleWidth = vp.width;
-	const width = visibleWidth * STAGE.widthOverscan * STAGE.scale;
+	const landHorizonY = frame.top - (frame.top - frame.bottom) * LOBBY.horizonFraction;
+	// Portrait: the panorama is pulled up under the logo (horizon at a fraction of the VISIBLE
+	// height) and enlarged; the panel keeps the same placement relative to its horizon, scaled.
+	const portrait = size.height > size.width;
+	const panScale = portrait ? c.portraitScale : 1;
+	const horizonY = portrait ? vp.bottom + vp.height * (1 - c.portraitHorizon) : landHorizonY;
+	const width = visibleWidth * STAGE.widthOverscan * STAGE.scale * panScale;
 	const height = width / STAGE.imageAspect;
-	const centerY = (frame.top + horizonY) / 2 + STAGE.lift;
+	const centerY = horizonY + ((frame.top - landHorizonY) / 2 + STAGE.lift) * panScale;
+	// The floor takes its horizon as a fraction of the frame — re-express the (possibly moved) one.
+	const floorHorizonFraction = (frame.top - horizonY) / (frame.top - frame.bottom);
 
 	// The tree art is a full-frame panel with the tree far bottom-left INSIDE the frame: anchor
 	// its measured footprint (LOBBY.treeAnchor) to TWO view edges — mass centre `treeEdge` inside
@@ -62,6 +72,8 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	const treeHeight = treeWidth / STAGE.imageAspect;
 	const treeCenterX = treeWorldX - (LOBBY.treeAnchor.x - 0.5) * treeWidth;
 	const treeCenterY = vp.bottom + c.treeBottom + (LOBBY.treeAnchor.bottom - 0.5) * treeHeight;
+	// How far below the frame bottom the visible bottom (and so the tree) sits — 0 on wide screens.
+	const treeDrop = vp.bottom - frame.bottom;
 
 	// --- Entry cinematic: collect layer materials, then build one master timeline. ---
 	const materials = useRef(new Map<string, THREE.MeshBasicMaterial>());
@@ -118,12 +130,16 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 		() => ({
 			...LOBBY.leaves,
 			emitterX: treeWorldX + LOBBY.treeCanopyOffsetX,
+			// The tree is anchored to the VISIBLE bottom: on a tall screen it (and its canopy) sits
+			// lower than the frame bottom the defaults were tuned on — the emitter and exit line follow.
+			emitterY: LOBBY.leaves.emitterY + treeDrop,
+			floorY: LOBBY.leaves.floorY + treeDrop,
 			count: reducedLeaves ? LOBBY.leaves.reducedCount : c.leafCount,
 			windStrength: c.windStrength,
 			drift: c.drift,
 			fallSpeed: c.fallSpeed,
 		}),
-		[c.leafCount, c.windStrength, c.drift, c.fallSpeed, reducedLeaves, treeWorldX],
+		[c.leafCount, c.windStrength, c.drift, c.fallSpeed, reducedLeaves, treeWorldX, treeDrop],
 	);
 
 	return (
@@ -131,6 +147,9 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 			<color attach="background" args={[PAPER]} />
 			<FitCamera frame={frame} />
 			<Suspense fallback={null}>
+				{/* Tall (portrait) screens see far more than the panorama band: the paper plate covers
+				    the WHOLE view behind it, so no flat-colour strip shows above or below the painting. */}
+				<PaperPlate width={vp.width} height={vp.height} centerY={vp.centerY} />
 				{SHARED_LAYERS.map((layer, i) => (
 					<ParallaxLayer
 						key={layer.url}
@@ -141,7 +160,7 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 						renderOrder={-100 + i}
 						width={width}
 						height={height}
-						centerY={centerY + (layer.y ?? 0)}
+						centerY={centerY + (layer.y ?? 0) * panScale}
 						parallaxX={STAGE.parallaxX}
 						parallaxY={STAGE.parallaxY}
 						driftAmp={STAGE.driftAmp}
@@ -168,13 +187,31 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 					driftSpeed={STAGE.driftSpeed}
 					onMaterial={onLayerMaterial(TREE_URL)}
 				/>
-				<Floor frame={frame} controls={floor} orientation="landscape" horizonFraction={LOBBY.horizonFraction} />
+				<Floor frame={frame} controls={floor} orientation="landscape" horizonFraction={floorHorizonFraction} bottomY={vp.bottom} />
 			</Suspense>
 			<Mist bands={LOBBY.mist.bands} opacity={c.mistOpacity} speed={c.mistSpeed} height={LOBBY.mist.height} y={horizonY + LOBBY.mist.y} width={visibleWidth * 1.2} />
 			{/* The field's own clock starts when the ref flips true — an empty canopy shedding leaves
 			    one by one (leafPose staggers detachment from t=0), never a mid-air switch-on. */}
 			<FallingLeaves cfg={leafCfg} armedRef={leafVisibleRef} />
 		</>
+	);
+};
+
+/** Margin so the plate (a touch behind the frame plane) still covers the view's edges. */
+const PLATE_OVERSCAN = 1.3;
+
+/** The washi plate (0-base) "cover"-fitted to the whole visible view, at native aspect, behind every layer. */
+const PaperPlate = ({ width, height, centerY }: { width: number; height: number; centerY: number }) => {
+	const paper = useTexture(STAGE_BASE_URL, (loaded) => {
+		const tex = Array.isArray(loaded) ? loaded[0] : loaded;
+		tex.colorSpace = THREE.SRGBColorSpace;
+	});
+	const w = Math.max(width, height * STAGE.imageAspect) * PLATE_OVERSCAN;
+	return (
+		<mesh position={[0, centerY, STAGE.planeZ - 0.05]} renderOrder={-200}>
+			<planeGeometry args={[w, w / STAGE.imageAspect]} />
+			<meshBasicMaterial map={paper} toneMapped={false} depthWrite={false} />
+		</mesh>
 	);
 };
 

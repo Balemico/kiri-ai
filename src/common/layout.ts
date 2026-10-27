@@ -394,6 +394,13 @@ export const LOBBY = {
 		y: -0.05, // band-cluster centre relative to the horizon
 	},
 	columnWidthPct: 34, // landscape DOM menu column, % of viewport width
+	// Portrait composition, stacked top → bottom: logo on the sky, the panorama pulled UP right under
+	// it (its horizon at `horizonFraction` of the VISIBLE height, not the frame's) and enlarged so
+	// the sun and mountains still read on a narrow screen, then the menu on the floor paper below.
+	portrait: {
+		horizonFraction: 0.38, // horizon, as a fraction of the visible height from the top
+		panoramaScale: 1.4, // panorama size vs landscape (sides crop; layer offsets scale with it)
+	},
 } as const;
 
 // --- Intro choreography (entry cinematic, exit veil, fly-back reveal) ---

@@ -99,6 +99,8 @@ export const LobbyColumn = ({ children }: { children: ReactNode }) => {
 				display: "flex",
 				flexDirection: "column",
 				justifyContent: "center",
+				// Portrait: the logo is pushed to the top (Lobby's auto margins), the screen centred below it.
+				paddingBlock: portrait ? "max(5vh, env(safe-area-inset-top, 0px)) 5vh" : undefined,
 				gap: 26,
 				pointerEvents: "auto",
 			}}

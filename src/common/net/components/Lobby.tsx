@@ -9,7 +9,7 @@ import { INTRO } from "../../layout";
 import { LAYOUT_TRANSITION } from "../../motionPresets";
 import { Menu } from "./Menu";
 import { MultiplayerLobby } from "./MultiplayerLobby";
-import { BackStroke, HankoStamp, LobbyColumn } from "./ui";
+import { BackStroke, HankoStamp, LobbyColumn, usePortraitWindow } from "./ui";
 
 // The cinematic plays once per app load — coming back from a game (or the multiplayer flow)
 // re-enters a lobby that is already "awake".
@@ -66,6 +66,7 @@ export const Lobby = () => {
 	const [introDone, setIntroDone] = useState(() => introPlayed || !!reduced);
 	const [beat, setBeat] = useState(() => (introPlayed || !!reduced ? MENU_BEATS : 0));
 	const skip3D = useRef<() => void>(() => {});
+	const portrait = usePortraitWindow();
 
 	// Advance the beats on the INTRO schedule. Runs once when the intro starts; when introDone
 	// flips (skip or natural end) the cleanup clears any pending timers and the early return
@@ -116,7 +117,9 @@ export const Lobby = () => {
 					}}
 					initial="hidden"
 					animate={beat > 0 ? "painted" : "hidden"}
-					style={{ width: "100%", alignSelf: "center", marginBottom: 10, filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
+					// Portrait: logo at the top (on the sky), the panorama pulled up right under it
+					// (LobbyScene / LOBBY.portrait), the menu centred in the space below.
+					style={{ width: "100%", alignSelf: "center", marginBottom: portrait ? "auto" : 10, filter: "drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35))" }}
 				/>
 
 				<AnimatePresence mode="wait">
@@ -162,6 +165,9 @@ export const Lobby = () => {
 						</ScreenFade>
 					)}
 				</AnimatePresence>
+				{/* Portrait: the matching auto margin below, so the screen centres in the space under the logo —
+				    which lands it just below the panorama's mountains, clear of the tree's canopy. */}
+				{portrait && <div style={{ marginTop: "auto" }} />}
 			</LobbyColumn>
 		</div>
 	);

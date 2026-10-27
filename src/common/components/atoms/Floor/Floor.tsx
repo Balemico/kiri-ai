@@ -20,11 +20,15 @@ export const Floor = ({
 	// Where the floor's top edge meets the scenery — the duel keeps the shared default; the lobby
 	// passes its own, deeper horizon (LOBBY.horizonFraction) for a shorter bare-paper band.
 	horizonFraction = HORIZON_FRACTION,
+	// World y of the floor's near (bottom) edge. Defaults to the frame's bottom; the lobby passes the
+	// VISIBLE bottom, which on a tall portrait screen lies well below the frame.
+	bottomY,
 }: {
 	frame: SceneFrame;
 	controls: FloorControls;
 	orientation?: Orientation;
 	horizonFraction?: number;
+	bottomY?: number;
 }) => {
 	const c = controls;
 
@@ -40,10 +44,11 @@ export const Floor = ({
 	const portrait = orientation === "portrait";
 	const horizonY = frame.top - (frame.top - frame.bottom) * horizonFraction;
 	const topEdge = portrait ? frame.top : horizonY;
-	const band = topEdge - frame.bottom;
+	const bottom = Math.min(bottomY ?? frame.bottom, frame.bottom);
+	const band = topEdge - bottom;
 	// Compensate the tilt foreshortening so the projected height still spans the band.
 	const height = (band / Math.cos(c.tilt)) * FLOOR.overscan;
-	const centerY = (topEdge + frame.bottom) / 2 + c.yNudge;
+	const centerY = (topEdge + bottom) / 2 + c.yNudge;
 	const width = portrait ? frameViewport(frame, size.width / size.height).width * c.widthScale : frame.halfWidth * 2 * c.widthScale;
 
 	return (
