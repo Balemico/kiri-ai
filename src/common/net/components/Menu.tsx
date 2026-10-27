@@ -27,7 +27,9 @@ export const Menu = ({ onMultiplayer, beat }: { onMultiplayer: () => void; beat:
 				}}
 				initial="hidden"
 				animate={beat > 2 ? "painted" : "hidden"}
-				style={{ margin: "2px 0 0", fontSize: 12, textAlign: "center", lineHeight: 1.5, color: "#17120e" }}
+				// Sits as far below the last stroke's ink as the logo sits above the first (≈48px of
+				// clear paper): 34px + the stroke's own ~12px of air in its 70px box + the 2px row gap.
+				style={{ margin: "34px 0 0", fontSize: 12, textAlign: "center", lineHeight: 1.5, color: "#17120e" }}
 			>
 				Passa e gioca sullo stesso dispositivo, oppure sfida un avversario online.
 			</motion.p>
