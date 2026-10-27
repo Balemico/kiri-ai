@@ -86,15 +86,16 @@ interface BrushSpec {
 	flankDrops: number;
 	/** Multiplier on the pale wash (giant overlapping slashes need less, or they fog together). */
 	washScale: number;
-	/** Symmetric stroke (menu): both ends rounded, tapered and feathered alike, no long dry tail —
-	 *  versus the directional slash (veil): pressed head, dry tip. */
-	symmetric: boolean;
+	/** Straight stroke (menu, like the kanji 一): constant width with parallel flanks, a blunt
+	 *  pressed head and a tip that splits into bristles of uneven length — versus the tapering
+	 *  slash (veil): pressed head, long dry taper. */
+	straight: boolean;
 	/** Bow/tremor/swell amplitude multiplier (lower = a more controlled, refined hand). */
 	wildness: number;
 }
 
 /** Flung droplets on an anisotropic cell grid in stroke space (cells stretched along the gesture). */
-const droplets = (x: N, y: N, s: N, zs: N, n: N, b: BrushSpec, cellAlong: number, cellAcross: number, rMin: number, rMax: number, density: number, z: number): N => {
+const droplets = (x: N, y: N, s: N, n: N, b: BrushSpec, cellAlong: number, cellAcross: number, rMin: number, rMax: number, density: number, z: number): N => {
 	const cl = b.dropScale.mul(cellAlong);
 	const cw = b.dropScale.mul(cellAcross);
 	const g = vec2(x.div(cl), y.div(cw));
@@ -105,9 +106,8 @@ const droplets = (x: N, y: N, s: N, zs: N, n: N, b: BrushSpec, cellAlong: number
 	const r2 = mx_cell_noise_float(vec3(cell, b.seed.add(z + 2.71)));
 	const r3 = mx_cell_noise_float(vec3(cell, b.seed.add(z + 4.13)));
 	// Where drops fly: thrown past the slowing tip, and flicked off the flanks along the body.
-	// `zs` = position along the stroke for the zones (symmetric strokes fold both ends onto 1).
-	const tipZone = smoothstep(0.45, 0.85, zs).mul(smoothstep(1.55, 1.0, zs)).mul(smoothstep(3.0, 0.9, abs(n)));
-	const flankZone = smoothstep(0.08, 0.3, zs).mul(smoothstep(1.1, 0.7, zs)).mul(smoothstep(0.9, 0, abs(abs(n).sub(1.6))));
+	const tipZone = smoothstep(0.45, 0.85, s).mul(smoothstep(1.55, 1.0, s)).mul(smoothstep(3.0, 0.9, abs(n)));
+	const flankZone = smoothstep(0.08, 0.3, s).mul(smoothstep(1.1, 0.7, s)).mul(smoothstep(0.9, 0, abs(abs(n).sub(1.6))));
 	const zone = tipZone.mul(b.tipDrops).add(flankZone.mul(b.flankDrops)).mul(INK_LOOK.splatter).mul(density);
 	const exists = step(float(1).sub(zone), r0);
 	const centre = vec2(r1, r2).mul(0.56).add(0.22);
@@ -131,15 +131,13 @@ const brush = (b: BrushSpec) => {
 	// Centre line: a bow plus the hand's tremor.
 	const wobble = mx_noise_float(vec3(s.mul(3.1), b.seed, 0.5)).mul(b.width.mul(0.05 * b.wildness));
 	const yc = sin(sc.mul(PI)).mul(b.bend).add(wobble);
-	// 0 at the middle of the stroke → 1 at either end.
-	const c = abs(s.mul(2).sub(1));
 	// Pressure. Slash: a rounded attack (brush pressed down — quarter-circle profile), a swell,
-	// a long taper to the tip. Symmetric: both ends capped round the same way, a gentle taper.
-	const a = b.symmetric ? smoothstep(1.02, 0.84, c) : smoothstep(-0.015, 0.09, s);
-	const cap = a.mul(float(2).sub(a)).sqrt();
-	const taper = b.symmetric ? mix(float(1), float(0.78), smoothstep(0.45, 1.0, c)) : mix(float(1), float(0.3), smoothstep(0.5, 1.0, s));
+	// a long taper to the tip. Straight: constant width — its ends are cut below, in px.
+	const a = smoothstep(-0.015, 0.09, s);
+	const cap = b.straight ? float(1) : a.mul(float(2).sub(a)).sqrt();
+	const taper = b.straight ? float(1) : mix(float(1), float(0.3), smoothstep(0.5, 1.0, s));
 	const swell = mx_noise_float(vec3(s.mul(4.3), b.seed.add(3.3), 0)).mul(0.1 * b.wildness).add(1);
-	const ends = b.symmetric ? float(1) : smoothstep(1.04, 0.97, s);
+	const ends = b.straight ? float(1) : smoothstep(1.04, 0.97, s);
 	const half = max(b.width.mul(0.5).mul(cap).mul(taper).mul(swell).mul(ends), 0.001);
 	const n = y.sub(yc).div(half);
 	const an = abs(n);
@@ -153,8 +151,8 @@ const brush = (b: BrushSpec) => {
 	const tooth = mx_noise_float(vec3(b.P.mul(0.42), b.seed.add(2.9))).mul(0.5).add(0.5);
 	const tex = mix(bristle, tooth, L.tooth);
 	// Ink load: full at the head, running dry toward the tip and at the splayed flanks.
-	// Symmetric strokes only feather at both ends (a fraction of the slash's dry tip).
-	const runDry = b.symmetric ? smoothstep(0.6, 1.0, c).mul(L.tailDry.mul(0.55)) : smoothstep(0.38, 1.0, s).mul(L.tailDry);
+	// A straight stroke stays loaded almost to the end, running dry only as the brush lifts.
+	const runDry = b.straight ? smoothstep(0.8, 1.02, s).mul(L.tailDry) : smoothstep(0.38, 1.0, s).mul(L.tailDry);
 	const load = float(1)
 		.sub(runDry)
 		.sub(smoothstep(0.45, 1.0, an).mul(L.edgeDry))
@@ -162,8 +160,15 @@ const brush = (b: BrushSpec) => {
 	const thr = float(1).sub(load);
 	const filled = smoothstep(thr.sub(0.05), thr.add(0.05), tex);
 	// Ragged flank: bristle ends stick out unevenly.
-	const flank = bristle.sub(0.5).mul(0.22).add(0.98);
-	const body = smoothstep(flank, flank.sub(float(1.6).div(half)), an).mul(b.symmetric ? float(1) : step(0, s));
+	const flank = bristle.sub(0.5).mul(b.straight ? 0.1 : 0.22).add(0.98);
+	// Straight ends, in px: a blunt head laid slightly oblique with softened corners; a tip where
+	// the lifting brush leaves bristles of uneven length (streaks of different reach).
+	const hw = b.width.mul(0.5);
+	const corner = hw.mul(0.42).mul(float(1).sub(max(float(1).sub(an.mul(an)), 0).sqrt()));
+	const dHead = x.add(b.length.mul(0.5)).sub(n.mul(hw.mul(0.16))).sub(corner);
+	const dTip = b.length.mul(0.5).sub(x).add(n.mul(hw.mul(0.12))).add(bristle.sub(0.5).mul(hw.mul(1.8)));
+	const straightEnds = smoothstep(0, 1.5, dHead).mul(smoothstep(0, 1.5, dTip));
+	const body = smoothstep(flank, flank.sub(float(1.6).div(half)), an).mul(b.straight ? straightEnds : step(0, s));
 	// The brush front: bristles lead and lag a little, so the frontier itself is streaky.
 	const lead = b.front.add(bristle.sub(0.5).mul(0.05));
 	const drawn = smoothstep(lead, lead.sub(0.012), s);
@@ -174,16 +179,15 @@ const brush = (b: BrushSpec) => {
 	// creeping slowly — the one part that stays alive after the stroke is laid.
 	const t = time.mul(L.drift);
 	const washEdge = mx_fractal_noise_float(vec3(x.mul(0.01), y.mul(0.01), t.add(b.seed)), 3, 2.0, 0.5).mul(0.35).add(1.4);
-	const washShape = smoothstep(washEdge, washEdge.sub(0.55), an).mul(b.symmetric ? smoothstep(1.0, 0.7, c) : smoothstep(-0.02, 0.08, s).mul(smoothstep(0.95, 0.45, s)));
+	const washShape = smoothstep(washEdge, washEdge.sub(0.55), an).mul(b.straight ? smoothstep(-0.02, 0.06, s).mul(smoothstep(1.02, 0.85, s)) : smoothstep(-0.02, 0.08, s).mul(smoothstep(0.95, 0.45, s)));
 	const washDrawn = smoothstep(b.front, b.front.sub(0.15), s);
 	const washBody = mx_noise_float(vec3(b.P.mul(0.012), t.mul(0.6).add(b.seed.add(5.5)))).mul(0.35).add(0.65);
 	const wash = washShape.mul(washDrawn).mul(washBody).mul(L.wash).mul(b.washScale).mul(clamp(float(1).sub(b.dry.mul(2)), 0, 1));
 
 	const dropsFade = clamp(float(1).sub(b.dry.mul(2.2)), 0, 1);
-	const zs = b.symmetric ? c.mul(0.5).add(0.5) : s;
 	const drops = max(
-		droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
-		droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
+		droplets(x, y, s, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
+		droplets(x, y, s, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
 	).mul(dropsFade);
 	return { ink, wash, drops };
 };
@@ -222,9 +226,9 @@ export interface StrokeUniforms {
 }
 
 /**
- * One refined, symmetric stroke behind a menu button, centred under the label: both ends capped
- * round and feathering into bristle streaks alike, fine bristles, a whisper of spray off the ends.
- * A barely-there per-seed tilt and bow keep sibling buttons from looking stamped.
+ * One straight brush stroke behind a menu button (like the kanji 一), centred under the label:
+ * parallel flanks, a blunt pressed head, a tip splitting into uneven bristles as the brush lifts,
+ * fine bristles and a whisper of spray. A barely-there per-seed tilt and bow keep siblings apart.
  */
 export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: StrokeUniforms } => {
 	const u = {
@@ -263,7 +267,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		tipDrops: 0.3,
 		flankDrops: 0.03,
 		washScale: 0.55,
-		symmetric: true,
+		straight: true,
 		wildness: 0.35,
 	});
 	// Hover deepens the wash WHERE IT ALREADY IS (multiply) — adding to it would tint the whole plane.
@@ -324,7 +328,7 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 			tipDrops: 0.4,
 			flankDrops: 0.15,
 			washScale: 0.35,
-			symmetric: false,
+			straight: false,
 			wildness: 1,
 		});
 		coverages.push(ink, wash, drops);
