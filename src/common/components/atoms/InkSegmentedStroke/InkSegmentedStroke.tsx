@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { inkStrokes, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
 import { INK } from "../../../layout";
+import { InkDelayContext } from "../../../ink/inkDelay";
 
 // CSS stand-in used only where the ink canvas can't run (no WebGPU and no WebGL2).
 const FALLBACK: Record<InkTone, string> = { ink: "#17120e", red: "#b73225", blue: "#2f6f86", ghost: "rgba(23, 18, 14, 0.34)" };
@@ -31,6 +32,7 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 	const [id] = useState(newInkStrokeId);
 	const [hovered, setHovered] = useState(false);
 	const ink = inkSupported();
+	const delay = useContext(InkDelayContext);
 
 	useEffect(() => {
 		if (!ink || !ref.current) return;
@@ -42,9 +44,10 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 			visible,
 			hovered,
 			disabled: false,
+			delay,
 			segment: { left: options[0].tone, right: options[1].tone, active: value },
 		});
-	}, [ink, id, variant, visible, hovered, value, options]);
+	}, [ink, id, variant, visible, hovered, value, options, delay]);
 	useEffect(() => () => inkStrokes.remove(id), [id]);
 
 	return (
@@ -85,7 +88,7 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 						<motion.span
 							variants={{
 								hidden: { opacity: 0, letterSpacing: "6px", filter: "blur(3px)" },
-								painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+								painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: delay + INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 							}}
 							style={{ position: "relative", color: "#f2ead9", fontSize: 16, fontWeight: 700, letterSpacing: 3, whiteSpace: "nowrap" }}
 						>

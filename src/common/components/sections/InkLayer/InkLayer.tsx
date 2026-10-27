@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { PlaneGeometry, type Mesh } from "three";
 import { InkCanvas } from "../../atoms/InkCanvas";
 import { createStrokeMaterial, inkUniforms, type StrokeUniforms } from "../../../ink/inkNodes";
-import { easeInOutCubic, phaseProgress } from "../../../ink/inkMath";
+import { easeOutCubic, phaseProgress } from "../../../ink/inkMath";
 import { effectiveOpacity, inkStrokes, inkSupported, type InkStrokeEntry, type InkTone } from "../../../ink/inkRegistry";
 import { useInkControls } from "../../../hooks/useInkControls";
 import { INK } from "../../../layout";
@@ -52,9 +52,11 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 
 		if (!e.visible) startedAt.current = null;
 		else if (startedAt.current === null) startedAt.current = clock.elapsedTime;
-		const age = startedAt.current === null ? 0 : clock.elapsedTime - startedAt.current;
-		// Soft in, soft out: the brush drags left → right, the ink soaking in behind it.
-		u.pour.value = easeInOutCubic(phaseProgress(age, INK.strokePour));
+		// A staggered row lays its stroke when the row arrives (`delay`), not when it mounts.
+		const age = startedAt.current === null ? 0 : Math.max(0, clock.elapsedTime - startedAt.current - e.delay);
+		// The brush sets off at once and slows as it lands (ease-out): a slow start would leave the
+		// row empty for a beat, stalling the screen's stagger. The ink soaks in behind it.
+		u.pour.value = easeOutCubic(phaseProgress(age, INK.strokePour));
 		// Hover reaches the ends out and thickens a touch — eased exponentially (frame-rate
 		// independent), so it glides in and out instead of popping.
 		hover.current += ((e.hovered && !e.disabled ? 1 : 0) - hover.current) * (1 - Math.exp(-dt * 7));

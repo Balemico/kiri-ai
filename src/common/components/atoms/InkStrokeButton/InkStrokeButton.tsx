@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
 import { inkStrokes, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
 import { INK } from "../../../layout";
+import { InkDelayContext } from "../../../ink/inkDelay";
 
 // CSS stand-in used only where the ink canvas can't run (no WebGPU and no WebGL2).
 const FALLBACK: Record<InkTone, string> = { ink: "#17120e", red: "#b73225", blue: "#2f6f86", ghost: "rgba(23, 18, 14, 0.34)" };
@@ -33,11 +34,13 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 	const [id] = useState(newInkStrokeId);
 	const [hovered, setHovered] = useState(false);
 	const ink = inkSupported();
+	// Row stagger (from an enclosing `Stagger`): the stroke and its label wait for the row.
+	const delay = useContext(InkDelayContext);
 
 	useEffect(() => {
 		if (!ink || !ref.current) return;
-		inkStrokes.upsert({ id, el: ref.current, tone, variant, visible, hovered, disabled: !!disabled });
-	}, [ink, id, tone, variant, visible, hovered, disabled]);
+		inkStrokes.upsert({ id, el: ref.current, tone, variant, visible, hovered, disabled: !!disabled, delay });
+	}, [ink, id, tone, variant, visible, hovered, disabled, delay]);
 	useEffect(() => () => inkStrokes.remove(id), [id]);
 
 	return (
@@ -74,7 +77,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 			<motion.span
 				variants={{
 					hidden: { opacity: 0, letterSpacing: "6px", filter: "blur(3px)" },
-					painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+					painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: delay + INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 					bleed: { opacity: 1, letterSpacing: "4.5px", filter: "blur(0px)", transition: { duration: 0.25 } },
 				}}
 				style={{ position: "relative", color: "#f2ead9", fontSize: 16, fontWeight: 700, letterSpacing: 3, whiteSpace: "nowrap" }}
@@ -85,7 +88,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 				<motion.span
 					variants={{
 						hidden: { opacity: 0, scale: 0.4, rotate: -6 },
-						painted: { opacity: 1, scale: 1, rotate: -6, transition: { delay: INK.strokePour, duration: 0.3 } },
+						painted: { opacity: 1, scale: 1, rotate: -6, transition: { delay: delay + INK.strokePour, duration: 0.3 } },
 					}}
 					style={{
 						position: "absolute",

@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useSession } from "../useSession";
 import { useNetDiagnostics } from "../diagnostics";
 import { InkLayer, LobbyScene } from "../../components/sections";
-import { InkStrokeButton } from "../../components/atoms";
+import { InkStrokeButton, Stagger } from "../../components/atoms";
 import { INTRO } from "../../layout";
 import { Menu } from "./Menu";
 import { MultiplayerLobby } from "./MultiplayerLobby";
@@ -35,20 +35,13 @@ const NetDiagLine = () => {
 };
 
 /**
- * Shared cross-fade wrapper: every lobby screen slides/fades in the SAME column — the panorama
- * never blinks. Each CALL SITE must set a unique `key` — AnimatePresence diffs its direct
- * children, so the key has to live on the ScreenFade element itself for exits to run.
+ * Screen wrapper: the column never blinks between lobby screens — the leaving screen lifts away
+ * as one, and the arriving one's rows come in one after another (`Stagger`, inside each screen).
+ * Each CALL SITE must set a unique `key` — AnimatePresence diffs its direct children, so the key
+ * has to live on the ScreenFade element itself for exits to run.
  */
 const ScreenFade = ({ children }: { children: ReactNode }) => (
-	<motion.div
-		initial={{ opacity: 0, y: 14 }}
-		animate={{ opacity: 1, y: 0 }}
-		exit={{ opacity: 0, y: -10 }}
-		transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-		// Tight rows (each stroke already carries vertical air in its 70px box); back strokes add
-		// their own top margin (BackStroke) to sit apart.
-		style={{ display: "flex", flexDirection: "column", gap: 2 }}
-	>
+	<motion.div exit={{ opacity: 0, y: -8, filter: "blur(3px)" }} transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }} style={{ display: "flex", flexDirection: "column" }}>
 		{children}
 	</motion.div>
 );
@@ -135,26 +128,30 @@ export const Lobby = () => {
 
 					{status === "waiting" && (
 						<ScreenFade key="waiting">
-							<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 15, letterSpacing: 2 }}>
-								In attesa… condividi la parola chiave
-							</p>
-							<HankoStamp>{roomKeyword}</HankoStamp>
-							<p style={{ margin: 0, fontSize: 13, opacity: 0.65, textAlign: "center", color: "#17120e" }}>
-								Non appena si unisce, la partita inizia.
-							</p>
-							<NetDiagLine />
-							<BackStroke onClick={backToMenu}>ANNULLA</BackStroke>
+							<Stagger>
+								<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 15, letterSpacing: 2 }}>
+									In attesa… condividi la parola chiave
+								</p>
+								<HankoStamp>{roomKeyword}</HankoStamp>
+								<p style={{ margin: 0, fontSize: 13, opacity: 0.65, textAlign: "center", color: "#17120e" }}>
+									Non appena si unisce, la partita inizia.
+								</p>
+								<NetDiagLine />
+								<BackStroke onClick={backToMenu}>ANNULLA</BackStroke>
+							</Stagger>
 						</ScreenFade>
 					)}
 
 					{status === "peer-left" && (
 						<ScreenFade key="peer-left">
-							<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 17, letterSpacing: 2 }}>
-								Avversario uscito — la partita è stata interrotta
-							</p>
-							<InkStrokeButton onClick={backToMenu} seal>
-								TORNA AL MENU
-							</InkStrokeButton>
+							<Stagger>
+								<p style={{ margin: 0, textAlign: "center", color: "#17120e", fontSize: 17, letterSpacing: 2 }}>
+									Avversario uscito — la partita è stata interrotta
+								</p>
+								<InkStrokeButton onClick={backToMenu} seal>
+									TORNA AL MENU
+								</InkStrokeButton>
+							</Stagger>
 						</ScreenFade>
 					)}
 				</AnimatePresence>

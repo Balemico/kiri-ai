@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { useSession } from "../useSession";
-import { InkStrokeButton } from "../../components/atoms";
+import { InkStrokeButton, Stagger } from "../../components/atoms";
 
 /**
  * Root screen: the two mode strokes floating on the panorama (the logo lives in Lobby's column).
@@ -11,7 +11,7 @@ import { InkStrokeButton } from "../../components/atoms";
 export const Menu = ({ onMultiplayer, beat }: { onMultiplayer: () => void; beat: number }) => {
 	const { startLocal } = useSession();
 	return (
-		<>
+		<Stagger>
 			<InkStrokeButton onClick={startLocal} variant={0} visible={beat > 1}>
 				PASSA E GIOCA
 			</InkStrokeButton>
@@ -31,6 +31,6 @@ export const Menu = ({ onMultiplayer, beat }: { onMultiplayer: () => void; beat:
 			>
 				Passa e gioca sullo stesso dispositivo, oppure sfida un avversario online.
 			</motion.p>
-		</>
+		</Stagger>
 	);
 };

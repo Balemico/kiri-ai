@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { AnimatePresence } from "motion/react";
 import type { Team } from "../../game";
 import { useSession } from "../useSession";
-import { InkSegmentedStroke, InkStrokeButton, type InkSegmentOption } from "../../components/atoms";
+import { InkSegmentedStroke, InkStrokeButton, Stagger, type InkSegmentOption } from "../../components/atoms";
 import { BackStroke, TextField } from "./ui";
 
 type View = "choose" | "create" | "join";
@@ -20,7 +21,12 @@ const Heading = ({ title, subtitle }: { title: string; subtitle: string }) => (
 	</div>
 );
 
-/** Multiplayer lobby: create a room (keyword + colour) or join one (keyword → the other colour). */
+/**
+ * Multiplayer lobby: create a room (keyword + colour) or join one (keyword → the other colour).
+ * Each view is a `Stagger` keyed by the view: switching lets the old view lift away, then the new
+ * rows — and their ink strokes — arrive one after another. Keyword and colour live here, above
+ * the keyed views, so they survive switching between them.
+ */
 export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 	const { createRoom, joinRoom } = useSession();
 	const [view, setView] = useState<View>("choose");
@@ -29,47 +35,47 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 
 	const trimmed = keyword.trim();
 
-	if (view === "choose") {
-		return (
-			<>
-				<Heading title="Multiplayer" subtitle="Crea una partita o unisciti a una esistente" />
-				<InkStrokeButton tone="red" variant={0} onClick={() => setView("create")}>
-					CREA PARTITA
-				</InkStrokeButton>
-				<InkStrokeButton tone="blue" variant={1} onClick={() => setView("join")}>
-					UNISCITI
-				</InkStrokeButton>
-				<BackStroke onClick={onBack}>← INDIETRO</BackStroke>
-			</>
-		);
-	}
-
-	if (view === "create") {
-		return (
-			<>
-				<Heading title="Crea partita" subtitle="Scegli una parola chiave e il tuo colore" />
-				<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave (es. duello)" onEnter={() => trimmed && createRoom(trimmed, color)} />
-				{/* One stroke, two halves: the chosen colour lights its half, the other goes grey. */}
-				<InkSegmentedStroke options={TEAM_OPTIONS} value={TEAMS.indexOf(color) as 0 | 1} onChange={(i) => setColor(TEAMS[i])} variant={1} />
-				<InkStrokeButton disabled={!trimmed} seal onClick={() => createRoom(trimmed, color)}>
-					CREA E ATTENDI
-				</InkStrokeButton>
-				<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
-			</>
-		);
-	}
-
 	return (
-		<>
-			<Heading title="Unisciti" subtitle="Inserisci la parola chiave della partita" />
-			<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave" onEnter={() => trimmed && joinRoom(trimmed)} />
-			<p style={{ margin: 0, fontSize: 12, opacity: 0.6, textAlign: "center", color: "#17120e" }}>
-				Ti verrà assegnato il colore opposto a chi ha creato la partita.
-			</p>
-			<InkStrokeButton disabled={!trimmed} seal onClick={() => joinRoom(trimmed)}>
-				UNISCITI
-			</InkStrokeButton>
-			<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
-		</>
+		<AnimatePresence mode="wait">
+			{view === "choose" && (
+				<Stagger key="choose">
+					<Heading title="Multiplayer" subtitle="Crea una partita o unisciti a una esistente" />
+					<InkStrokeButton tone="red" variant={0} onClick={() => setView("create")}>
+						CREA PARTITA
+					</InkStrokeButton>
+					<InkStrokeButton tone="blue" variant={1} onClick={() => setView("join")}>
+						UNISCITI
+					</InkStrokeButton>
+					<BackStroke onClick={onBack}>← INDIETRO</BackStroke>
+				</Stagger>
+			)}
+
+			{view === "create" && (
+				<Stagger key="create">
+					<Heading title="Crea partita" subtitle="Scegli una parola chiave e il tuo colore" />
+					<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave (es. duello)" onEnter={() => trimmed && createRoom(trimmed, color)} />
+					{/* One stroke, two halves: the chosen colour lights its half, the other goes grey. */}
+					<InkSegmentedStroke options={TEAM_OPTIONS} value={TEAMS.indexOf(color) as 0 | 1} onChange={(i) => setColor(TEAMS[i])} variant={1} />
+					<InkStrokeButton disabled={!trimmed} seal onClick={() => createRoom(trimmed, color)}>
+						CREA E ATTENDI
+					</InkStrokeButton>
+					<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
+				</Stagger>
+			)}
+
+			{view === "join" && (
+				<Stagger key="join">
+					<Heading title="Unisciti" subtitle="Inserisci la parola chiave della partita" />
+					<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave" onEnter={() => trimmed && joinRoom(trimmed)} />
+					<p style={{ margin: 0, fontSize: 12, opacity: 0.6, textAlign: "center", color: "#17120e" }}>
+						Ti verrà assegnato il colore opposto a chi ha creato la partita.
+					</p>
+					<InkStrokeButton disabled={!trimmed} seal onClick={() => joinRoom(trimmed)}>
+						UNISCITI
+					</InkStrokeButton>
+					<BackStroke onClick={() => setView("choose")}>← INDIETRO</BackStroke>
+				</Stagger>
+			)}
+		</AnimatePresence>
 	);
 };

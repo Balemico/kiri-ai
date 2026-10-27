@@ -299,7 +299,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		seed: u.seed,
 		// The brush drags left → right from just before the head to past the frayed tip (the
 		// soak trails it, so the tip only fills in at the very end of the pour).
-		front: u.pour.mul(1.5).sub(0.15),
+		front: u.pour.mul(1.35).sub(0.04),
 		dry: float(0),
 		bristleScale: 1.7,
 		dropScale: float(0.6),
