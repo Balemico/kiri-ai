@@ -126,6 +126,7 @@ export const INK = {
 	veilStrokes: 12, // slashes laid top → bottom that, between them, ink the WHOLE screen
 	veilPour: 1.8, // s for the slashes to be laid, one after another, until the screen is fully inked
 	veilDry: 1.6, // s for the cover to dry into bristle streaks and lift away
+	veilLayer: 0.72, // opacity of ONE veil slash — translucent, they add up until the screen is full
 } as const;
 
 // --- Seal disc ---

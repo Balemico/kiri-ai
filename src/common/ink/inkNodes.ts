@@ -99,9 +99,10 @@ interface BrushSpec {
 	wildness: number;
 	/** Fine spray layer on top of the drops (off for the giant veil: cheaper, and lost at that scale). */
 	fineSpray: boolean;
-	/** A COVER stroke (the veil): while laid it is fully loaded — solid, opaque, no dry-brush gaps,
-	 *  no grey tones — so the slashes themselves make the screen opaque; the dry brush and the tones
-	 *  come back as it dries (`dry`). Also tapers less (`VEIL_TIP_TAPER`) so its tail still covers. */
+	/** A COVER stroke (the veil): a TRANSLUCENT layer (`INK.veilLayer`) with the button strokes'
+	 *  grain — bristles, grey tones, a little dry brush — so the slashes ADD UP until the screen is
+	 *  full; no wash, no spray (cheaper — several stack on every pixel). Tapers less
+	 *  (`VEIL_TIP_TAPER`) so its tail still covers. */
 	cover: boolean;
 }
 
@@ -171,7 +172,7 @@ const brush = (b: BrushSpec) => {
 	const soak = b.straight ? float(1).sub(smoothstep(0, 0.32, b.front.sub(s))).mul(0.7) : float(0);
 	// Cover strokes: the dry brush (and, below, the grey tones and uneven deposit) only shows as they
 	// dry — while being laid they are solid ink.
-	const dryBrush = b.cover ? b.dry.mul(0.9).add(0.1) : float(1);
+	const dryBrush = b.cover ? b.dry.mul(0.5).add(0.5) : float(1);
 	const load = float(1)
 		.sub(runDry.mul(dryBrush))
 		.sub(soak)
@@ -208,23 +209,28 @@ const brush = (b: BrushSpec) => {
 	const belly = smoothstep(-0.35, 1.0, n);
 	const dilution = L.tones.mul(toneStreak.mul(0.6).add(mottle.mul(0.35))).add(L.sanboku.mul(belly).mul(0.6));
 	const concentration = clamp(float(1).sub(dilution.mul(dryBrush)), 0.22, 1);
-	const deposit = b.cover ? mix(float(1), bristle.mul(0.3).add(0.78), b.dry) : bristle.mul(0.3).add(0.78);
+	// Cover strokes are TRANSLUCENT layers (like a button stroke, with its bristle streaks and grey
+	// tones), `veilLayer` opaque each: the screen turns black only where enough of them pile up.
+	const deposit = bristle.mul(0.3).add(0.78).mul(b.cover ? INK.veilLayer : 1);
 	const ink = body.mul(filled).mul(drawn).mul(deposit).mul(concentration);
 
 	// Pale wash (bokashi): diluted ink bleeding past the flanks near the head and body, its edge
 	// creeping slowly — the one part that stays alive after the stroke is laid.
 	const t = time.mul(L.drift);
+	// Cover strokes skip the wash and the spray: invisible under the stacked layers / off-screen at
+	// the tips, and the costliest parts of the brush — the veil evaluates several slashes per pixel.
 	const washEdge = mx_fractal_noise_float(vec3(x.mul(0.01), y.mul(0.01), t.add(b.seed)), 3, 2.0, 0.5).mul(0.35).add(1.4);
 	const washShape = smoothstep(washEdge, washEdge.sub(0.55), an).mul(b.straight ? smoothstep(1.02, 0.7, ends01) : smoothstep(-0.02, 0.08, s).mul(smoothstep(0.95, 0.45, s)));
 	// The wash blooms in the brush's wake.
 	const washDrawn = b.straight ? smoothstep(b.front.sub(0.08), b.front.sub(0.4), s) : smoothstep(b.front, b.front.sub(0.15), s);
 	const washBody = mx_noise_float(vec3(b.P.mul(0.012), t.mul(0.6).add(b.seed.add(5.5)))).mul(0.35).add(0.65);
-	const wash = washShape.mul(washDrawn).mul(washBody).mul(L.wash).mul(b.washScale).mul(clamp(float(1).sub(b.dry.mul(2)), 0, 1));
+	const wash = b.cover ? float(0) : washShape.mul(washDrawn).mul(washBody).mul(L.wash).mul(b.washScale).mul(clamp(float(1).sub(b.dry.mul(2)), 0, 1));
 
 	const dropsFade = clamp(float(1).sub(b.dry.mul(2.2)), 0, 1);
 	const zs = b.straight ? ends01.mul(0.5).add(0.5) : s;
-	const coarse = droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0);
-	const drops = (b.fineSpray ? max(coarse, droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20)) : coarse).mul(dropsFade);
+	const drops = b.cover
+		? float(0)
+		: (b.fineSpray ? max(droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0), droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20)) : droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0)).mul(dropsFade);
 	return { ink, wash, drops, s, n, bristle };
 };
 
@@ -360,8 +366,8 @@ export interface VeilUniforms {
 
 /**
  * The lobby→duel veil: giant alternating slashes cut across the screen in sequence, overlapping
- * one over another (each with its own bristles, spray and wash), laid fully loaded, until their
- * bodies have inked every point of the screen → full cover. On release the slashes dry at
+ * one over another — translucent layers with the brush's bristles and tones — ADDING UP until
+ * every point of the screen lies under several of them → (practically) full cover. On release the slashes dry at
  * DIFFERENT times (shuffled `dryStart`), each breaking into bristle streaks that thin and vanish —
  * the duel shows through piecewise.
  * Geometry comes from `veilStrokes` (screen-height units), baked at build time.
@@ -378,8 +384,8 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 	const half = u.resolution.mul(0.5);
 	// Giant strokes: more bristles across, bigger flung drops (scaled to the screen).
 	const dropScale = H.div(700);
-	// No flood: the slashes alone make the screen opaque — `veilStrokes` guarantees their bodies
-	// cover every point (tested), and cover strokes are laid fully loaded (`cover`).
+	// No flood: the slashes alone make the screen opaque — `veilStrokes` stacks at least
+	// VEIL_MIN_LAYERS of them over every point (tested), each `INK.veilLayer` opaque.
 
 	// PERFORMANCE: a pixel lies within at most two or three slashes, so each slash's full brush
 	// (≈17 noise lookups) runs only behind a cheap test — near its body/spray zone, already
@@ -401,7 +407,7 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 			const near = along
 				.greaterThan(-0.2)
 				.and(along.lessThan(1.6))
-				.and(across.lessThan(wid.mul(0.8).add(H.mul(Math.abs(st.bend)))))
+				.and(across.lessThan(wid.mul(0.6).add(H.mul(Math.abs(st.bend)))))
 				.and(grow.greaterThan(0))
 				.and(dryI.lessThan(1));
 			If(near, () => {

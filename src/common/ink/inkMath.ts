@@ -48,17 +48,18 @@ export interface VeilStroke {
 
 /**
  * Giant brush slashes for the full-screen veil: `count` near-horizontal strokes stacked down the
- * screen, alternating direction, each `widthFactor` stacking steps wide so neighbours overlap
- * generously. Their BODIES alone ink the whole screen (tested at 100% across aspects): the cover
- * is made by the brush strokes themselves — there is no flood that turns the screen opaque on its own.
+ * screen, each `widthFactor` stacking steps wide so they overlap deeply: every point lies under at
+ * least VEIL_MIN_LAYERS of them (tested across aspects). The slashes are translucent and simply
+ * ADD UP until the screen is full — there is no flood that turns it opaque on its own.
  */
-export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor = VEIL_WIDTH_FACTOR, lengthExtra = VEIL_LENGTH_EXTRA): VeilStroke[] => {
+export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor = VEIL_WIDTH_FACTOR, lengthExtra = VEIL_LENGTH_EXTRA, bandPad = BAND_PAD): VeilStroke[] => {
 	const rand = rng(seed);
 	const maxTilt = 0.3;
 	// The tilt drops each slash by up to tan(maxTilt)·aspect/2 at the screen sides: stack them over
 	// a band that much taller than the screen, so the top-right / bottom-left corners stay inked.
 	const reach = 1 + Math.tan(maxTilt) * aspect;
 	const width = (widthFactor * reach) / count;
+	const band = reach + width * bandPad;
 	const baseTilt = -0.22 + (rand() - 0.5) * 0.12;
 	// Laying mirrors the drying: a seeded SHUFFLE (own generator — never perturbs the geometry), at
 	// an irregular cadence (random gaps: some blows close together, some after a beat), each slash
@@ -85,7 +86,7 @@ export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor
 		return {
 			cx: (rand() - 0.5) * 0.1,
 			// Jitter and bow scale with the stroke (not the screen), so thin slashes keep their overlap.
-			cy: reach / 2 - ((i + 0.5) / count) * reach + (rand() - 0.5) * 0.15 * (reach / count),
+			cy: band / 2 - ((i + 0.5) / count) * band + (rand() - 0.5) * 0.15 * (band / count),
 			angle,
 			length: (aspect + lengthExtra) / Math.cos(tilt) + width,
 			width,
@@ -102,8 +103,16 @@ export const veilStrokes = (count: number, aspect: number, seed = 1, widthFactor
  *  than a free slash, so the tails can't leave the screen's corners uncovered. Shared with the shader. */
 export const VEIL_TIP_TAPER = 0.35;
 
-/** Slash width as a multiple of the stacking step (> 1 = neighbours overlap). */
-export const VEIL_WIDTH_FACTOR = 2.6;
+/** Slash width as a multiple of the stacking step: the slashes are translucent layers, so each
+ *  point must lie under several of them (see VEIL_MIN_LAYERS). */
+export const VEIL_WIDTH_FACTOR = 8;
+
+/** Extra stacking band beyond `reach`, in slash widths (so the screen edges get full overlap depth). */
+export const BAND_PAD = 0.3;
+
+/** Fewest slashes stacked over any point of the screen (tested): with translucent layers this is
+ *  what makes the cover (practically) opaque — ~5 on average, never fewer than this. */
+export const VEIL_MIN_LAYERS = 3;
 
 /** Extra length (screen heights) past the screen width, so the tapered ends land off-screen. */
 export const VEIL_LENGTH_EXTRA = 1.0;

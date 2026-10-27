@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { easeInOutCubic, easeOutCubic, insideStroke, phaseProgress, rng, veilStrokes } from "./inkMath";
+import { VEIL_MIN_LAYERS, easeInOutCubic, easeOutCubic, insideStroke, phaseProgress, rng, veilStrokes } from "./inkMath";
 
 describe("rng", () => {
 	it("is deterministic per seed", () => {
@@ -26,14 +26,16 @@ describe("timing", () => {
 });
 
 describe("veilStrokes", () => {
-	// The cover is made by the brush strokes alone (no flood): their bodies must ink every point of
-	// the screen, at any aspect.
-	it.each([0.46, 0.75, 1, 1.3, 1.6, 2, 2.4])("their bodies ink the whole screen (aspect %f)", (aspect) => {
+	// The cover is made by translucent brush strokes ADDING UP (no flood): every point of the screen
+	// must lie under at least VEIL_MIN_LAYERS of them, at any aspect.
+	it.each([0.46, 0.75, 1, 1.3, 1.6, 2, 2.4])("stack at least VEIL_MIN_LAYERS slashes over every point (aspect %f)", (aspect) => {
 		for (const seed of [1, 2, 3, 7]) {
 			const strokes = veilStrokes(12, aspect, seed);
-			for (let sx = 0; sx <= 40; sx++) {
-				for (let sy = 0; sy <= 40; sy++) {
-					expect(strokes.some((st) => insideStroke(st, -aspect / 2 + (sx / 40) * aspect, -0.5 + sy / 40))).toBe(true);
+			for (let sx = 0; sx <= 30; sx++) {
+				for (let sy = 0; sy <= 30; sy++) {
+					const x = -aspect / 2 + (sx / 30) * aspect;
+					const y = -0.5 + sy / 30;
+					expect(strokes.filter((st) => insideStroke(st, x, y)).length).toBeGreaterThanOrEqual(VEIL_MIN_LAYERS);
 				}
 			}
 		}
