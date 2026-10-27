@@ -16,6 +16,17 @@ export interface SealDiscProps {
 // Hand-cut outline: an uneven radius reads as a carved stone, not a CSS dot.
 const DISC_RADIUS = "47% 53% 49% 51% / 52% 46% 54% 48%";
 
+/**
+ * The breathing halo as a box-shadow with EVERY keyframe in the same shape — px units on all four
+ * lengths and an rgba() colour. Motion can only interpolate matching shapes: with "0 0 0 0 #rrggbb00"
+ * at the ends it animated the swell but not the way back, holding at full size and then snapping off.
+ */
+const halo = (colour: string, spreadPx: number, alpha: number): string => {
+	// Straight from the #rrggbb digits (sRGB) — three's Color would hand back LINEAR components.
+	const n = parseInt(colour.replace("#", ""), 16);
+	return `0px 0px 0px ${spreadPx.toFixed(2)}px rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+};
+
 const tint = (colour: string, pct: number) => `color-mix(in srgb, ${colour}, white ${Math.round(pct * 100)}%)`;
 const shade = (colour: string, pct: number) => `color-mix(in srgb, ${colour}, black ${Math.round(pct * 100)}%)`;
 
@@ -36,8 +47,8 @@ export const SealDisc = ({ kanji, colour, size, active = false }: SealDiscProps)
 		<motion.div
 			animate={
 				active
-					? { scale: [1, 1.05, 1], boxShadow: [`0 0 0 0 ${colour}00`, `0 0 0 ${size * 0.13}px ${colour}2e`, `0 0 0 0 ${colour}00`] }
-					: { scale: 1, boxShadow: `0 0 0 0 ${colour}00` }
+					? { scale: [1, 1.05, 1], boxShadow: [halo(colour, 0, 0), halo(colour, size * 0.13, 0.18), halo(colour, 0, 0)] }
+					: { scale: 1, boxShadow: halo(colour, 0, 0) }
 			}
 			transition={active ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
 			style={{
