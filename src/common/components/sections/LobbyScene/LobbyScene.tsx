@@ -195,11 +195,15 @@ export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves }: L
 	const coarse = useCoarsePointer();
 	const leafVisibleRef = useRef(!intro);
 	return (
-		<div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+		<>
+			{/* OUTSIDE the click-through wrapper: `pointer-events` is inherited, so mounted inside it
+			    the debug panel would render but ignore every click. */}
 			<Leva collapsed hidden={import.meta.env.PROD || coarse} />
-			<Canvas dpr={coarse ? [1, 1.5] : [1, 2]} camera={{ position: [0, 0, 6], fov: 30 }} fallback={<StaticFallback />}>
-				<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} reducedLeaves={reducedLeaves} leafVisibleRef={leafVisibleRef} />
-			</Canvas>
-		</div>
+			<div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+				<Canvas dpr={coarse ? [1, 1.5] : [1, 2]} camera={{ position: [0, 0, 6], fov: 30 }} fallback={<StaticFallback />}>
+					<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} reducedLeaves={reducedLeaves} leafVisibleRef={leafVisibleRef} />
+				</Canvas>
+			</div>
+		</>
 	);
 };
