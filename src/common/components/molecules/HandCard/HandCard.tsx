@@ -114,7 +114,9 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 		g.traverse((o) => {
 			const mesh = o as THREE.Mesh;
 			if (!mesh.isMesh) return;
-			mesh.renderOrder = order;
+			// `orderBump` (userData) keeps a card's own overlays (e.g. a movement card's dim) drawn right
+			// after its face — never decided by an unstable distance sort against the face.
+			mesh.renderOrder = order + ((mesh.userData.orderBump as number | undefined) ?? 0);
 			const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 			for (const m of mats) {
 				if (!m || !(m instanceof THREE.Material)) continue;

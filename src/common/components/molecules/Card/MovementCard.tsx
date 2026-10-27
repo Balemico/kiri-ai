@@ -25,18 +25,27 @@ export interface MovementCardProps {
 	onUnplace?: () => void;
 }
 
-const newOverlayMaterial = () =>
-	new THREE.MeshBasicMaterial({
+// Invisible pick volumes for the two halves (raycasting hits geometry whatever the material opacity).
+const HIT_MATERIAL = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+
+/** The dim for ONE half: a black overlay whose alpha mask is that half of the card's rounded-rect
+ *  mask (rounded outer corners, straight seam). */
+const newOverlayMaterial = (half: Side) => {
+	const alphaMap = CARD_ALPHA_MAP.clone();
+	alphaMap.repeat.set(1, 0.5);
+	// The plane's v = 1 edge is the half's OUTER edge for "top" (toward −Z), the seam for "bottom".
+	alphaMap.offset.set(0, half === "top" ? 0.5 : 0);
+	alphaMap.needsUpdate = true;
+	return new THREE.MeshBasicMaterial({
 		color: 0x000000,
 		transparent: true,
 		opacity: 0,
-		alphaMap: CARD_ALPHA_MAP, // match the card's rounded corners
+		alphaMap,
 		depthWrite: false,
 		depthTest: false, // same as the card faces — overlays sit on top regardless of z
-		polygonOffset: true,
-		polygonOffsetFactor: -0.1,
-		polygonOffsetUnits: -1,
+		toneMapped: false,
 	});
+};
 
 /** A movement card with two selectable faces (top / bottom). */
 export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnplace }: MovementCardProps) => {
@@ -46,13 +55,15 @@ export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnpla
 
 	const [hoveredSide, setHoveredSide] = useState<Side | null>(null);
 	// Stable per-card overlay materials (useMemo keeps them readable during render).
-	const topMat = useMemo(() => newOverlayMaterial(), []);
-	const bottomMat = useMemo(() => newOverlayMaterial(), []);
+	const topMat = useMemo(() => newOverlayMaterial("top"), []);
+	const bottomMat = useMemo(() => newOverlayMaterial("bottom"), []);
 
-	// Free the per-card overlay materials on unmount.
+	// Free the per-card overlay materials (and their cloned masks) on unmount.
 	useEffect(() => () => {
-		topMat.dispose();
-		bottomMat.dispose();
+		[topMat, bottomMat].forEach((m) => {
+			m.alphaMap?.dispose();
+			m.dispose();
+		});
 	}, [topMat, bottomMat]);
 
 	const inHand = view.location === "hand";
@@ -68,13 +79,13 @@ export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnpla
 		gsap.to(bottomMat, { opacity: dimBottom ? 0.4 : 0, duration: 0.3, ease: "power2.out" });
 	}, [effectiveHover, selectedSide, topMat, bottomMat]);
 
-	const { quarterHeight, cardWidth } = useMemo(() => {
+	const { quarterHeight, cardWidth, faceY } = useMemo(() => {
 		const g = (nodes.Cube_1 as THREE.Mesh).geometry;
 		g.computeBoundingBox();
 		const bb = g.boundingBox;
 		const height = bb ? bb.max.z - bb.min.z : 0.14; // local Z = the card's long (top↔bottom) axis
 		const width = bb ? bb.max.x - bb.min.x : 0.1; // local X = the card's width
-		return { quarterHeight: height / 4, cardWidth: width };
+		return { quarterHeight: height / 4, cardWidth: width, faceY: bb ? bb.max.y : 0 }; // local +Y = the face's normal
 	}, [nodes]);
 	// Touch only: a hairline across the seam advertises that the lifted card is split into two pickable
 	// faces (there's no hover to reveal that). Shown only while the card is lifted and interactive.
@@ -83,8 +94,16 @@ export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnpla
 	const geom = (nodes.Cube_1 as THREE.Mesh).geometry;
 
 	const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
-	const section = (side: Side, zOffset: number, material: THREE.Material) => {
-		const common = { position: [0, 0.00001, zOffset] as [number, number, number], scale: [1, 1, 0.5] as [number, number, number], geometry: geom, material };
+	// Each half = an invisible pick volume (the card body, halved) + a FLAT dim plane lying on the face.
+	// The dim used to be the halved card BOX itself: with depth testing off, its sides and underside
+	// drew too, so on a tilted card the shadow spilled off the card onto whatever lay beside it.
+	const dimPlane = (zOffset: number, material: THREE.Material) => (
+		<mesh position={[0, faceY + 0.0005, zOffset]} rotation={[-Math.PI / 2, 0, 0]} material={material} userData={{ orderBump: 0.5 }} raycast={() => null}>
+			<planeGeometry args={[cardWidth, quarterHeight * 2]} />
+		</mesh>
+	);
+	const section = (side: Side, zOffset: number) => {
+		const common = { position: [0, 0.00001, zOffset] as [number, number, number], scale: [1, 1, 0.5] as [number, number, number], geometry: geom, material: HIT_MATERIAL };
 		// Touch (portrait drag): each half starts the shared drag from its side. A plain tap on a lifted card
 		// plays that half; a drag out is resolved by Hand (movement cards return to the hand lifted, not
 		// auto-placed). Press feedback dims the other half once the card is lifted.
@@ -138,8 +157,10 @@ export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnpla
 	return (
 		<CardModel ref={flipRef} frontMaterial={frontMaterial} backMaterial={backMaterial}>
 			{/* -Z is "up" on screen after the card's base rotation. */}
-			{section("top", -quarterHeight, topMat)}
-			{section("bottom", quarterHeight, bottomMat)}
+			{section("top", -quarterHeight)}
+			{section("bottom", quarterHeight)}
+			{dimPlane(-quarterHeight, topMat)}
+			{dimPlane(quarterHeight, bottomMat)}
 			{/* Touch affordance: a hairline along the seam (local Z=0) so the lifted card visibly reads as
 			    two pickable halves. Sits a hair above the face; depthTest off + last child = always on top. */}
 			{showSeam && (
