@@ -1,24 +1,23 @@
 import { AnimatePresence, motion } from "motion/react";
-import { Typography } from "../../atoms";
+import { InkStrokeButton } from "../../atoms";
 import { useGame, canConfirm } from "../../../state";
 import { useSession } from "../../../net";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
-import { SEAL } from "../../../hudPalette";
 
 interface Action {
-	/** Kanji shown inside the hanko seal. */
-	kanji: string;
 	label: string;
 	onClick: () => void;
-	/** Whether the seal is "armed" (lit + interactive). */
-	enabled: boolean;
 }
 
+// Same footprint as a lobby menu stroke, so every button in the app reads as one family.
+const STROKE_WIDTH = "min(300px, 78vw)";
+
 /**
- * Elegant sumi-e action control, fixed bottom-right. While a player is placing it shows CONFIRM
- * (decision kanji 決) only ONCE both cards are down (hidden until the selection is complete); on
- * game-over it becomes NUOVA PARTITA locally (renewal kanji 新) or MENU online (return kanji 戻). During
- * the timed reveal sequence — and, online, after you've confirmed — it stays hidden. Breathes when armed.
+ * The duel's action button — the same sumi brush stroke as every lobby button (`InkStrokeButton`,
+ * drawn by the scene's `InkLayer`). While a player is placing it shows CONFERMA only ONCE both
+ * cards are down; on game-over it becomes NUOVA PARTITA locally or MENU online. During the timed
+ * reveal sequence — and, online, after you've confirmed — it stays hidden. Each new action keys a
+ * fresh mount, so its stroke is laid again.
  */
 export const ConfirmButton = () => {
 	const { state, dispatch } = useGame();
@@ -31,11 +30,11 @@ export const ConfirmButton = () => {
 
 	const config: Action | null =
 		placing && canConfirm(state, viewerTeam)
-			? { kanji: "決", label: "CONFERMA", onClick: () => dispatch({ type: "CONFIRM_SELECTION" }), enabled: true }
+			? { label: "CONFERMA", onClick: () => dispatch({ type: "CONFIRM_SELECTION" }) }
 			: over
 				? mode === "online"
-					? { kanji: "戻", label: "MENU", onClick: () => leave(), enabled: true }
-					: { kanji: "新", label: "NUOVA PARTITA", onClick: () => dispatch({ type: "RESET_GAME" }), enabled: true }
+					? { label: "MENU", onClick: () => leave() }
+					: { label: "NUOVA PARTITA", onClick: () => dispatch({ type: "RESET_GAME" }) }
 				: null;
 
 	return (
@@ -43,63 +42,19 @@ export const ConfirmButton = () => {
 			{config && (
 				<motion.div
 					key={config.label}
-					initial={{ opacity: 0, y: 24 }}
+					initial={{ opacity: 0, y: 16 }}
 					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: 24 }}
-					transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-					style={
-						coarse
-							? { position: "fixed", left: 0, right: 0, bottom: "clamp(20px, 3vh, 40px)", display: "flex", justifyContent: "center", zIndex: 1500 }
-							: { position: "fixed", right: "clamp(20px, 3vw, 44px)", bottom: "clamp(20px, 3vh, 40px)", zIndex: 1500 }
-					}
+					exit={{ opacity: 0, y: 16 }}
+					transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+					style={{
+						position: "fixed",
+						bottom: "clamp(16px, 3vh, 36px)",
+						width: STROKE_WIDTH,
+						zIndex: 1500,
+						...(coarse ? { left: "50%", marginLeft: `calc(${STROKE_WIDTH} / -2)` } : { right: "clamp(36px, 4vw, 64px)" }),
+					}}
 				>
-					<motion.button
-						type="button"
-						disabled={!config.enabled}
-						onClick={config.onClick}
-						aria-label={config.label}
-						initial={false}
-						animate={{ opacity: config.enabled ? 1 : 0.45 }}
-						whileHover={config.enabled ? { scale: 1.04 } : undefined}
-						whileTap={config.enabled ? { scale: 0.96 } : undefined}
-						transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 16,
-							padding: "12px 26px 12px 14px",
-							background: "rgba(20, 18, 16, 0.72)",
-							border: "1px solid rgba(255, 255, 255, 0.14)",
-							borderRadius: 999,
-							backdropFilter: "blur(6px)",
-							boxShadow: "0 8px 28px rgba(0, 0, 0, 0.4)",
-							cursor: config.enabled ? "pointer" : "default",
-						}}
-					>
-						{/* Hanko seal — vermillion disc with the action kanji, gently breathing when armed. */}
-						<motion.span
-							animate={config.enabled ? { boxShadow: ["0 0 0 0 rgba(183,50,37,0)", "0 0 0 6px rgba(183,50,37,0.18)", "0 0 0 0 rgba(183,50,37,0)"] } : {}}
-							transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-							style={{
-								display: "grid",
-								placeItems: "center",
-								width: 42,
-								height: 42,
-								borderRadius: "50%",
-								background: config.enabled ? SEAL : "rgba(120, 120, 120, 0.35)",
-								color: "#f5ede0",
-								fontSize: 22,
-								lineHeight: 1,
-								// Genjiro display face for the kanji.
-								fontFamily: "var(--font-display)",
-							}}
-						>
-							{config.kanji}
-						</motion.span>
-						<Typography as="span" variant="section-label" style={{ fontSize: 16, letterSpacing: "5px", paddingTop: 1 }}>
-							{config.label}
-						</Typography>
-					</motion.button>
+					<InkStrokeButton onClick={config.onClick}>{config.label}</InkStrokeButton>
 				</motion.div>
 			)}
 		</AnimatePresence>

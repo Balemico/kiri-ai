@@ -81,14 +81,15 @@ const Strokes = ({ entries }: { entries: InkStrokeEntry[] }) => {
 };
 
 /**
- * The lobby's ink: a transparent TSL canvas between the panorama and the menu column, drawing a
- * living sumi stroke under every registered `InkStrokeButton`. The labels stay DOM, on top.
+ * Button ink: a transparent TSL canvas drawing a living sumi stroke under every registered
+ * `InkStrokeButton`; the labels stay DOM, on top. The lobby places it by DOM order (between the
+ * panorama and the menu column); the duel gives it a z-index just under its button overlay.
  */
-export const InkLayer = () => {
+export const InkLayer = ({ zIndex }: { zIndex?: number }) => {
 	const entries = useSyncExternalStore(inkStrokes.subscribe, inkStrokes.getSnapshot);
 	if (!inkSupported()) return null;
 	return (
-		<InkCanvas>
+		<InkCanvas style={zIndex === undefined ? undefined : { zIndex }}>
 			<Strokes entries={entries} />
 		</InkCanvas>
 	);

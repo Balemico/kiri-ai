@@ -8,6 +8,7 @@ import { Hand } from "../Hand";
 import { LandingZones } from "../LandingZones";
 import { CardNameReveal } from "../CardNameReveal";
 import { ConfirmButton } from "../ConfirmButton";
+import { InkLayer } from "../InkLayer";
 import { WinBanner } from "../WinBanner";
 import { GameHud } from "../GameHud";
 import { HandoffVeil } from "../HandoffVeil";
@@ -141,6 +142,8 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 			{showInterface && (
 				<>
 					<GameHud />
+					{/* Sumi strokes of the action button: over the duel canvas, under its label (1500). */}
+					<InkLayer zIndex={1450} />
 					<ConfirmButton />
 				</>
 			)}
