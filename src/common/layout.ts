@@ -167,11 +167,11 @@ export const PAWN = {
 // gracefully — like a figure in a paper theatre lifted by hand — and eased back into place. Single source for the "Paper Cutout" Leva folder.
 export const PAPER_CUTOUT = {
 	lieAngle: -1.45, // radians the figure lies back on the floor (hinged at the feet) before the duel
-	standDur: 2.8, // seconds for the whole stand-up: the slow lift + the soft settle
+	standDur: 1.2, // seconds for the whole stand-up: the slow lift + the soft settle
 	liftShare: 0.74, // share of standDur spent lifting off the floor (the rest is the settle)
-	overshoot: 0.045, // radians the cut-out drifts PAST vertical before easing back — barely there
+	overshoot: 0.08, // radians the cut-out drifts PAST vertical before easing back — barely there
 	revealDelay: 0.05, // red starts standing this long after the veil has OPENED (ink/veilSignal)
-	stagger: 0.9, // blue stands this long after red (once red is halfway up)
+	stagger: 0.35, // blue stands this long after red
 	rimScale: 1.035, // paper rim: the silhouette scaled up behind the coloured one
 	rimColor: "#f4eee0", // the cut paper's cream
 	edgeOffsetX: 0.012, // offset of the sheet-thickness shadow (world units)
