@@ -6,6 +6,7 @@ import { useNetDiagnostics } from "../diagnostics";
 import { InkLayer, LobbyScene } from "../../components/sections";
 import { InkStrokeButton, Stagger } from "../../components/atoms";
 import { INTRO } from "../../layout";
+import { LAYOUT_TRANSITION } from "../../motionPresets";
 import { Menu } from "./Menu";
 import { MultiplayerLobby } from "./MultiplayerLobby";
 import { BackStroke, HankoStamp, LobbyColumn } from "./ui";
@@ -41,7 +42,7 @@ const NetDiagLine = () => {
  * has to live on the ScreenFade element itself for exits to run.
  */
 const ScreenFade = ({ children }: { children: ReactNode }) => (
-	<motion.div exit={{ opacity: 0, y: -8, filter: "blur(3px)" }} transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }} style={{ display: "flex", flexDirection: "column" }}>
+	<motion.div layout="position" exit={{ opacity: 0, y: -8, filter: "blur(3px)" }} transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1], layout: LAYOUT_TRANSITION }} style={{ display: "flex", flexDirection: "column" }}>
 		{children}
 	</motion.div>
 );
@@ -103,6 +104,9 @@ export const Lobby = () => {
 
 			<LobbyColumn>
 				<motion.img
+					// Re-centred when the screen below changes height: glide, never jump.
+					layout="position"
+					transition={{ layout: LAYOUT_TRANSITION }}
 					src="/images/logo/kiri-ai-logo.png"
 					alt="Kiri-ai: The Duel"
 					variants={{

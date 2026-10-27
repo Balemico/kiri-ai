@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { LayoutGroup, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { LOBBY } from "../../layout";
@@ -103,7 +103,9 @@ export const LobbyColumn = ({ children }: { children: ReactNode }) => {
 				pointerEvents: "auto",
 			}}
 		>
-			{children}
+			{/* One layout group for the whole column: when any screen/view inside changes height, the
+			    re-centred column's elements (logo included) glide to their new place together. */}
+			<LayoutGroup>{children}</LayoutGroup>
 		</div>
 	);
 };

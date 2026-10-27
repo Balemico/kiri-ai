@@ -90,6 +90,7 @@ Turn phases: `red-place → blue-place → ready → reveal-first → reveal-sec
 
 - **Leva controls**: every component/feature gets its **own named folder, collapsed by default** — `useControls("Name", schema, { collapsed: true })` — and its defaults come from **ONE well-defined object in `layout.ts`**, never scattered constants (e.g. `STAGE`, `FLOOR`, `BATTLEGROUND`, `PLAYED_CARDS`, `DEFAULT_FAN`, `DEFAULT_SCENE_FRAME`). The global `<Leva collapsed />` lives in `Scene`.
 - **Layout constants** live only in `layout.ts` (zones, scales, fan geometry, offsets, scene-staging objects). `spaceToX` stays in `game/rules` because it's tied to the rules.
+- **Layout changes are always animated (general rule)**: any element whose position can change because the layout around it changes (a column re-centring, a sibling appearing / leaving / resizing) gets Motion `layout="position"` with `LAYOUT_TRANSITION` (`src/common/motionPresets.ts`), inside a `LayoutGroup` spanning the region (so a change in one subtree re-measures siblings that didn't re-render) — it glides, never jumps. Reference: the lobby column (`LobbyColumn` = `LayoutGroup`; logo, `ScreenFade`, `Stagger` and its rows are `layout="position"`).
 - **Card visibility** (face up/down, interactive) is decided centrally in `selectors.ts`, never re-derived inside card components.
 - Keep `yarn lint`, `yarn build`, and `yarn test` green before considering work done.
 
