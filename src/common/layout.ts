@@ -101,6 +101,17 @@ export const GAME_HUD = {
 	splashSeconds: 1.6, // how long the splash lingers before it fades
 } as const;
 
+// --- Seal disc ---
+// The team kanji avatar (赤 / 青) rendered as a carved, nearly 3D seal: a raised bevelled rim
+// around a recessed face, with the kanji standing in relief. Light comes from the top-left.
+export const SEAL_DISC = {
+	rim: 0.11, // rim width, as a fraction of the disc size
+	bevel: 0.45, // rim highlight/shadow strength (0 = flat colour, 1 = white/black extremes)
+	depth: 1, // how deep the face sits below the rim (inner-shadow multiplier)
+	relief: 1, // how far the kanji stands out of the face (highlight/shadow multiplier)
+	gloss: 0.3, // specular sheen on the upper-left (0 = matte)
+} as const;
+
 // The samurai pawns are flat billboard sprites (white silhouettes in public/images/characters,
 // tinted per team). One PNG per stance: heaven = sword raised high, earth = sword forward.
 // `frames` holds metrics measured from each PNG's alpha so the figure is anchored by its BODY

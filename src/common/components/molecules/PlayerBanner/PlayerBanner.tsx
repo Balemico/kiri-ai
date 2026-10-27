@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
-import { LifeSeal } from "../../atoms";
+import { LifeSeal, SealDisc } from "../../atoms";
 import { MAX_HITS, type Stance, type Team } from "../../../game";
-import { INK, PAPER_LIGHT, STANCE_LABEL, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
+import { INK, STANCE_LABEL, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
 
 export interface PlayerBannerProps {
 	team: Team;
@@ -17,11 +17,8 @@ export interface PlayerBannerProps {
 	scale?: number;
 }
 
-// Hand-drawn disc: an uneven radius reads as a brushed circle, not a CSS dot.
-const DISC_RADIUS = "47% 53% 49% 51% / 52% 46% 54% 48%";
-
 /**
- * A duellist's banner: the team kanji in a brushed disc (赤 / 青), the name, the current stance
+ * A duellist's banner: the team kanji on a carved seal (赤 / 青), the name, the current stance
  * (天 heaven / 地 earth) and one hanko seal per life. No panel — ink straight on the paper sky,
  * like the lobby menu.
  */
@@ -32,30 +29,7 @@ export const PlayerBanner = ({ team, damage, stance, active, caption, align, sca
 	const stanceLabel = STANCE_LABEL[stance];
 	return (
 		<div style={{ display: "flex", flexDirection: right ? "row-reverse" : "row", alignItems: "center", gap: 14 * scale }}>
-			<motion.div
-				animate={
-					active
-						? { scale: [1, 1.05, 1], boxShadow: [`0 0 0 0 ${colour}00`, `0 0 0 ${8 * scale}px ${colour}2e`, `0 0 0 0 ${colour}00`] }
-						: { scale: 1, boxShadow: `0 0 0 0 ${colour}00` }
-				}
-				transition={active ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
-				style={{
-					width: disc,
-					height: disc,
-					flex: "none",
-					display: "grid",
-					placeItems: "center",
-					borderRadius: DISC_RADIUS,
-					background: colour,
-					color: PAPER_LIGHT,
-					fontFamily: "var(--font-display)",
-					fontSize: disc * 0.56,
-					lineHeight: 1,
-					filter: "drop-shadow(0 4px 10px rgba(0, 0, 0, 0.22))",
-				}}
-			>
-				{TEAM_KANJI[team]}
-			</motion.div>
+			<SealDisc kanji={TEAM_KANJI[team]} colour={colour} size={disc} active={active} />
 			<div style={{ display: "flex", flexDirection: "column", alignItems: right ? "flex-end" : "flex-start", gap: 4 * scale, color: INK }}>
 				<div style={{ position: "relative", fontWeight: 700, fontSize: 21 * scale, lineHeight: 1, letterSpacing: "0.16em" }}>
 					{TEAM_NAME[team]}

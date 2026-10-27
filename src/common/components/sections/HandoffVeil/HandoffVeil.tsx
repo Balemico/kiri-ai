@@ -4,10 +4,9 @@ import { useGame } from "../../../state";
 import { useSession } from "../../../net";
 import { useLagged } from "../../../hooks/useLagged";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
-import { INK, PAPER_LIGHT, TEAM_INK, TEAM_KANJI, TEAM_NAME, kanjiNumeral } from "../../../hudPalette";
+import { SealDisc } from "../../atoms";
+import { INK, TEAM_INK, TEAM_KANJI, TEAM_NAME, kanjiNumeral } from "../../../hudPalette";
 import { PAPER } from "../../../layout";
-
-const DISC_RADIUS = "47% 53% 49% 51% / 52% 46% 54% 48%";
 
 /**
  * Pass & play only: whenever the device has to change hands (a new placing turn), an opaque washi
@@ -34,6 +33,8 @@ export const HandoffVeil = () => {
 	const show = turnKey !== null && settledKey === turnKey && dismissed !== turnKey;
 
 	const team = viewerTeam;
+	// The seal's bevel/shadows are px-based, so size it in px: ~22vmin, clamped 110–180.
+	const discSize = Math.round(Math.min(180, Math.max(110, 0.22 * Math.min(window.innerWidth, window.innerHeight))));
 	return (
 		<AnimatePresence>
 			{show && (
@@ -74,21 +75,8 @@ export const HandoffVeil = () => {
 						initial={{ scale: 1.6, opacity: 0, rotate: -8 }}
 						animate={{ scale: 1, opacity: 1, rotate: -3 }}
 						transition={{ duration: 0.4, delay: 0.15, ease: [0.3, 1.4, 0.5, 1] }}
-						style={{
-							width: "clamp(110px, 22vmin, 180px)",
-							aspectRatio: "1",
-							display: "grid",
-							placeItems: "center",
-							borderRadius: DISC_RADIUS,
-							background: TEAM_INK[team],
-							color: PAPER_LIGHT,
-							fontFamily: "var(--font-display)",
-							fontSize: "clamp(64px, 13vmin, 108px)",
-							lineHeight: 1,
-							boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
-						}}
 					>
-						{TEAM_KANJI[team]}
+						<SealDisc kanji={TEAM_KANJI[team]} colour={TEAM_INK[team]} size={discSize} />
 					</motion.div>
 					<motion.h2
 						initial={{ opacity: 0, y: 10 }}

@@ -3,6 +3,7 @@ export * from "./BoardLine";
 export * from "./ClashEffect";
 export * from "./LifeSeal";
 export * from "./InkSplash";
+export * from "./SealDisc";
 export * from "./CardModel";
 export * from "./Lights";
 export * from "./FitCamera";
