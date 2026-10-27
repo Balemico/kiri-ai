@@ -36,7 +36,9 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 	const trimmed = keyword.trim();
 
 	return (
-		<AnimatePresence mode="wait">
+		// `propagate`: when the whole multiplayer screen leaves (outer AnimatePresence in Lobby), the
+		// current view's rows still run their exit cascade instead of vanishing.
+		<AnimatePresence mode="wait" propagate>
 			{view === "choose" && (
 				<Stagger key="choose">
 					<Heading title="Multiplayer" subtitle="Crea una partita o unisciti a una esistente" />

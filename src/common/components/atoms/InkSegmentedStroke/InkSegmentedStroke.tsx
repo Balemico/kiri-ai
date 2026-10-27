@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 import { inkStrokes, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
 import { INK } from "../../../layout";
 import { InkDelayContext } from "../../../ink/inkDelay";
@@ -32,7 +32,9 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 	const [id] = useState(newInkStrokeId);
 	const [hovered, setHovered] = useState(false);
 	const ink = inkSupported();
-	const delay = useContext(InkDelayContext);
+	const { enter: delay, exit: exitDelay } = useContext(InkDelayContext);
+	// Leaving (inside an AnimatePresence exit): the ink lifts away instead of vanishing.
+	const leaving = !useIsPresent();
 
 	useEffect(() => {
 		if (!ink || !ref.current) return;
@@ -45,9 +47,11 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 			hovered,
 			disabled: false,
 			delay,
+			leaving,
+			exitDelay,
 			segment: { left: options[0].tone, right: options[1].tone, active: value },
 		});
-	}, [ink, id, variant, visible, hovered, value, options, delay]);
+	}, [ink, id, variant, visible, hovered, value, options, delay, leaving, exitDelay]);
 	useEffect(() => () => inkStrokes.remove(id), [id]);
 
 	return (

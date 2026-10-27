@@ -1,7 +1,7 @@
 import { Children, isValidElement, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { InkDelayContext } from "../../../ink/inkDelay";
-import { EASE_OUT, LAYOUT_TRANSITION } from "../../../motionPresets";
+import { EASE_IN, EASE_OUT, EXIT_DURATION, EXIT_STEP, LAYOUT_TRANSITION } from "../../../motionPresets";
 
 export interface StaggerProps {
 	children: ReactNode;
@@ -12,21 +12,23 @@ export interface StaggerProps {
 }
 
 /**
- * A column whose rows enter one after another — each rising a little out of a soft blur — and
- * which leaves as one (quick fade + lift) when keyed out of an AnimatePresence. Every row's delay
- * is also handed to the ink (`InkDelayContext`), so a button's stroke is laid as its row arrives.
+ * A column whose rows enter one after another — each rising a little out of a soft blur — and,
+ * when keyed out of an AnimatePresence, leave the same way in reverse (bottom row first). Each
+ * row's timing is handed to the ink (`InkDelayContext`): a button's stroke is laid as its row
+ * arrives and lifts away as its row leaves.
  */
 export const Stagger = ({ children, step = 0.08, base = 0.05 }: StaggerProps) => (
 	<motion.div
 		layout="position"
 		transition={{ layout: LAYOUT_TRANSITION }}
-		exit={{ opacity: 0, y: -8, filter: "blur(3px)", transition: { duration: 0.26, ease: EASE_OUT } }}
 		// Tight rows: each stroke already carries vertical air in its 70px box; back strokes add
 		// their own top margin (BackStroke) to sit apart.
 		style={{ display: "flex", flexDirection: "column", gap: 2 }}
 	>
-		{Children.toArray(children).map((child, i) => {
+		{Children.toArray(children).map((child, i, all) => {
 			const delay = base + i * step;
+			// Leaving runs in reverse: the bottom row goes first, the heading last.
+			const exitDelay = (all.length - 1 - i) * EXIT_STEP;
 			return (
 				<motion.div
 					key={isValidElement(child) && child.key !== null ? child.key : i}
@@ -34,10 +36,11 @@ export const Stagger = ({ children, step = 0.08, base = 0.05 }: StaggerProps) =>
 					layout="position"
 					initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
 					animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+					exit={{ opacity: 0, y: -8, filter: "blur(4px)", transition: { delay: exitDelay, duration: EXIT_DURATION, ease: EASE_IN } }}
 					transition={{ delay, duration: 0.55, ease: EASE_OUT, layout: LAYOUT_TRANSITION }}
 					style={{ display: "flex", flexDirection: "column" }}
 				>
-					<InkDelayContext.Provider value={delay}>{child}</InkDelayContext.Provider>
+					<InkDelayContext.Provider value={{ enter: delay, exit: exitDelay }}>{child}</InkDelayContext.Provider>
 				</motion.div>
 			);
 		})}

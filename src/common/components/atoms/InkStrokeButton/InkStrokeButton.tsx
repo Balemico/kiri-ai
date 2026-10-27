@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { motion } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 import { inkStrokes, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
 import { INK } from "../../../layout";
 import { InkDelayContext } from "../../../ink/inkDelay";
@@ -35,12 +35,14 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 	const [hovered, setHovered] = useState(false);
 	const ink = inkSupported();
 	// Row stagger (from an enclosing `Stagger`): the stroke and its label wait for the row.
-	const delay = useContext(InkDelayContext);
+	const { enter: delay, exit: exitDelay } = useContext(InkDelayContext);
+	// Leaving (inside an AnimatePresence exit): the ink lifts away instead of vanishing.
+	const leaving = !useIsPresent();
 
 	useEffect(() => {
 		if (!ink || !ref.current) return;
-		inkStrokes.upsert({ id, el: ref.current, tone, variant, visible, hovered, disabled: !!disabled, delay });
-	}, [ink, id, tone, variant, visible, hovered, disabled, delay]);
+		inkStrokes.upsert({ id, el: ref.current, tone, variant, visible, hovered, disabled: !!disabled, delay, leaving, exitDelay });
+	}, [ink, id, tone, variant, visible, hovered, disabled, delay, leaving, exitDelay]);
 	useEffect(() => () => inkStrokes.remove(id), [id]);
 
 	return (

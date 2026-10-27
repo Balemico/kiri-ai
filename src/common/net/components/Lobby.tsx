@@ -36,13 +36,14 @@ const NetDiagLine = () => {
 };
 
 /**
- * Screen wrapper: the column never blinks between lobby screens — the leaving screen lifts away
- * as one, and the arriving one's rows come in one after another (`Stagger`, inside each screen).
+ * Screen wrapper: the column never blinks between lobby screens — the leaving screen's rows lift
+ * away bottom-first and the arriving one's rows come in one after another (`Stagger`, inside each
+ * screen; this wrapper adds no fade of its own, which would cut the cascade short).
  * Each CALL SITE must set a unique `key` — AnimatePresence diffs its direct children, so the key
  * has to live on the ScreenFade element itself for exits to run.
  */
 const ScreenFade = ({ children }: { children: ReactNode }) => (
-	<motion.div layout="position" exit={{ opacity: 0, y: -8, filter: "blur(3px)" }} transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1], layout: LAYOUT_TRANSITION }} style={{ display: "flex", flexDirection: "column" }}>
+	<motion.div layout="position" transition={{ layout: LAYOUT_TRANSITION }} style={{ display: "flex", flexDirection: "column" }}>
 		{children}
 	</motion.div>
 );

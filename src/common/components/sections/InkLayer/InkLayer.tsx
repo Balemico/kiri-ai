@@ -7,6 +7,7 @@ import { easeOutCubic, phaseProgress } from "../../../ink/inkMath";
 import { effectiveOpacity, inkStrokes, inkSupported, type InkStrokeEntry, type InkTone } from "../../../ink/inkRegistry";
 import { useInkControls } from "../../../hooks/useInkControls";
 import { INK } from "../../../layout";
+import { EXIT_DURATION } from "../../../motionPresets";
 
 // One unit plane, scaled per stroke to its button box (+ margin for the tail, wash and spray).
 const PLANE = new PlaneGeometry(1, 1);
@@ -34,6 +35,7 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		latest.current = entry;
 	}, [entry]);
 	const startedAt = useRef<number | null>(null);
+	const leftAt = useRef<number | null>(null);
 	const hover = useRef(0);
 	const segActive = useRef(entry.segment?.active ?? 0);
 
@@ -56,7 +58,13 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		const age = startedAt.current === null ? 0 : Math.max(0, clock.elapsedTime - startedAt.current - e.delay);
 		// The brush sets off at once and slows as it lands (ease-out): a slow start would leave the
 		// row empty for a beat, stalling the screen's stagger. The ink soaks in behind it.
-		u.pour.value = easeOutCubic(phaseProgress(age, INK.strokePour));
+		const laid = easeOutCubic(phaseProgress(age, INK.strokePour));
+		// Leaving: after its row's exit delay the brush runs back over the stroke (tip → head),
+		// lifting the ink as it goes, while the row itself fades — never a hard cut.
+		if (e.leaving && leftAt.current === null) leftAt.current = clock.elapsedTime;
+		if (!e.leaving) leftAt.current = null;
+		const lift = leftAt.current === null ? 0 : phaseProgress(clock.elapsedTime - leftAt.current - e.exitDelay, EXIT_DURATION);
+		u.pour.value = laid * (1 - lift * lift);
 		// Hover reaches the ends out and thickens a touch — eased exponentially (frame-rate
 		// independent), so it glides in and out instead of popping.
 		hover.current += ((e.hovered && !e.disabled ? 1 : 0) - hover.current) * (1 - Math.exp(-dt * 7));

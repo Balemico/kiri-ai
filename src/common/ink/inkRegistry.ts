@@ -18,6 +18,9 @@ export interface InkStrokeEntry {
 	disabled: boolean;
 	/** Seconds to wait after becoming visible before the stroke is laid (row stagger). */
 	delay: number;
+	/** The button is leaving (AnimatePresence exit): after `exitDelay` the stroke lifts away. */
+	leaving: boolean;
+	exitDelay: number;
 	/** A two-option toggle drawn as ONE stroke: the active half takes its tone, the other half
 	 *  goes ghost (see InkSegmentedStroke). */
 	segment?: { left: InkTone; right: InkTone; active: 0 | 1 };
