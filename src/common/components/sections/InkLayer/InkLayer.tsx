@@ -35,6 +35,7 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 	}, [entry]);
 	const startedAt = useRef<number | null>(null);
 	const hover = useRef(0);
+	const segActive = useRef(entry.segment?.active ?? 0);
 
 	useFrame(({ clock }, dt) => {
 		const e = latest.current;
@@ -63,6 +64,15 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		u.tint.value.set(tone.tint);
 		u.tintAmount.value = tone.amount;
 		u.opacity.value = tone.opacity * effectiveOpacity(e.el);
+		// Split toggle: the lit half glides across (eased) when the choice changes.
+		const seg = e.segment;
+		u.segOn.value = seg ? 1 : 0;
+		if (seg) {
+			u.segLeft.value.set(TONE[seg.left].tint);
+			u.segRight.value.set(TONE[seg.right].tint);
+			segActive.current += (seg.active - segActive.current) * (1 - Math.exp(-dt * 6));
+			u.segActive.value = segActive.current;
+		}
 		u.seed.value = e.variant * 1.7 + e.id * 0.31;
 	});
 

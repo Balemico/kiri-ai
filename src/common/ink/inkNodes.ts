@@ -215,7 +215,7 @@ const brush = (b: BrushSpec) => {
 		droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
 		droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
 	).mul(dropsFade);
-	return { ink, wash, drops };
+	return { ink, wash, drops, s, bristle };
 };
 
 /** Union of coverages: 1 − Π(1 − cᵢ). */
@@ -248,6 +248,12 @@ export interface StrokeUniforms {
 	tint: U<Color>;
 	/** Mix from sumi to the tint (0 = black ink, 1 = coloured stroke). */
 	tintAmount: U<number>;
+	/** Split stroke (a two-option toggle): 1 = on. One half takes its colour, the other half
+	 *  goes ghost-grey; `segActive` slides 0 (left half lit) → 1 (right half lit). */
+	segOn: U<number>;
+	segActive: U<number>;
+	segLeft: U<Color>;
+	segRight: U<Color>;
 	opacity: U<number>;
 }
 
@@ -265,6 +271,10 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		seed: num(0),
 		tint: uniform(new Color(INK.inkColor)),
 		tintAmount: num(0),
+		segOn: num(0),
+		segActive: num(0),
+		segLeft: uniform(new Color(INK.inkColor)),
+		segRight: uniform(new Color(INK.inkColor)),
 		opacity: num(1),
 	} as unknown as StrokeUniforms;
 
@@ -279,7 +289,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const centre = u.size.mul(0.5);
 	const width = box.y.mul(INK_LOOK.strokeHeight).mul(u.hover.mul(0.07).add(1));
 	const bend = box.y.mul(0.03).mul(sin(u.seed.mul(7.31)));
-	const { ink, wash, drops } = brush({
+	const { ink, wash, drops, s: along, bristle } = brush({
 		P,
 		centre,
 		dir,
@@ -304,8 +314,15 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const washTone = float(1).sub(u.tintAmount.mul(0.8));
 	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)).mul(washTone), drops);
 	const material = baseMaterial();
-	material.colorNode = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
-	material.opacityNode = alpha.mul(u.opacity);
+	// Split stroke: which half is "right" — the seam follows the bristles, so it reads as ink
+	// changing colour along the hairs, not a ruler line.
+	const rightHalf = smoothstep(0.47, 0.53, along.add(bristle.sub(0.5).mul(0.07)));
+	const lit = mix(float(1).sub(rightHalf), rightHalf, u.segActive);
+	const segColour = mix(u.segLeft, u.segRight, rightHalf);
+	const baseColour = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
+	material.colorNode = mix(baseColour, segColour, lit.mul(u.segOn));
+	// The unlit half dims to the ghost tone.
+	material.opacityNode = alpha.mul(u.opacity).mul(mix(float(1), float(0.34), float(1).sub(lit).mul(u.segOn)));
 	material.userData.ink = u;
 	return { material, u };
 };

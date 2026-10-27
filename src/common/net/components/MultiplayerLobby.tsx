@@ -1,12 +1,17 @@
 import { useState } from "react";
 import type { Team } from "../../game";
 import { useSession } from "../useSession";
-import { InkStrokeButton } from "../../components/atoms";
+import { InkSegmentedStroke, InkStrokeButton, type InkSegmentOption } from "../../components/atoms";
 import { TextField } from "./ui";
 
 type View = "choose" | "create" | "join";
 
-const TEAM_LABEL: Record<Team, string> = { red: "ROSSO", blue: "BLU" };
+const TEAMS: [Team, Team] = ["red", "blue"];
+// Module constant: a stable identity, so the toggle doesn't re-register its stroke every render.
+const TEAM_OPTIONS: [InkSegmentOption, InkSegmentOption] = [
+	{ label: "ROSSO", tone: "red" },
+	{ label: "BLU", tone: "blue" },
+];
 
 const Heading = ({ title, subtitle }: { title: string; subtitle: string }) => (
 	<div style={{ textAlign: "center", color: "#17120e" }}>
@@ -46,13 +51,8 @@ export const MultiplayerLobby = ({ onBack }: { onBack: () => void }) => {
 			<>
 				<Heading title="Crea partita" subtitle="Scegli una parola chiave e il tuo colore" />
 				<TextField value={keyword} onChange={setKeyword} placeholder="Parola chiave (es. duello)" onEnter={() => trimmed && createRoom(trimmed, color)} />
-				<div style={{ display: "flex", gap: 10 }}>
-					{(["red", "blue"] as Team[]).map((t) => (
-						<InkStrokeButton key={t} tone={color === t ? t : "ghost"} variant={t === "red" ? 0 : 1} onClick={() => setColor(t)}>
-							{TEAM_LABEL[t]}
-						</InkStrokeButton>
-					))}
-				</div>
+				{/* One stroke, two halves: the chosen colour lights its half, the other goes grey. */}
+				<InkSegmentedStroke options={TEAM_OPTIONS} value={TEAMS.indexOf(color) as 0 | 1} onChange={(i) => setColor(TEAMS[i])} variant={1} />
 				<InkStrokeButton disabled={!trimmed} seal onClick={() => createRoom(trimmed, color)}>
 					CREA E ATTENDI
 				</InkStrokeButton>

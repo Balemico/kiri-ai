@@ -16,6 +16,9 @@ export interface InkStrokeEntry {
 	visible: boolean;
 	hovered: boolean;
 	disabled: boolean;
+	/** A two-option toggle drawn as ONE stroke: the active half takes its tone, the other half
+	 *  goes ghost (see InkSegmentedStroke). */
+	segment?: { left: InkTone; right: InkTone; active: 0 | 1 };
 }
 
 let entries: InkStrokeEntry[] = [];
