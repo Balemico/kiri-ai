@@ -109,7 +109,9 @@ export const InkLayer = ({ zIndex }: { zIndex?: number }) => {
 	const entries = useSyncExternalStore(inkStrokes.subscribe, inkStrokes.getSnapshot);
 	if (!inkSupported()) return null;
 	return (
-		<InkCanvas style={zIndex === undefined ? undefined : { zIndex }}>
+		// Renders only while there is a stroke to draw — an empty full-screen canvas would still
+		// clear and composite every frame for nothing.
+		<InkCanvas style={zIndex === undefined ? undefined : { zIndex }} frameloop={entries.length ? "always" : "demand"}>
 			<Strokes entries={entries} />
 		</InkCanvas>
 	);

@@ -1,6 +1,8 @@
 import { Color, Vector2 } from "three";
 import { MeshBasicNodeMaterial, type Node } from "three/webgpu";
 import {
+	Fn,
+	If,
 	PI,
 	abs,
 	clamp,
@@ -367,37 +369,61 @@ export const createVeilMaterial = (strokes: VeilStroke[]): { material: MeshBasic
 	const half = u.resolution.mul(0.5);
 	// Giant strokes: more bristles across, bigger flung drops (scaled to the screen).
 	const dropScale = H.div(700);
-	const coverages: N[] = [];
-	strokes.forEach((st, i) => {
-		const grow = clamp(u.pour.sub(st.start).div(st.dur), 0, 1);
-		const front = float(1).sub(pow(float(1).sub(grow), 2.2)).mul(1.3);
-		const { ink, wash, drops } = brush({
-			P,
-			centre: half.add(vec2(st.cx, st.cy).mul(H)),
-			dir: vec2(Math.cos(st.angle), Math.sin(st.angle)),
-			length: H.mul(st.length),
-			width: H.mul(st.width),
-			bend: H.mul(st.bend),
-			seed: float(11 + i * 7.7),
-			front,
-			// Each slash dries on its own schedule (shuffled), so the scene shows through piecewise.
-			dry: clamp(u.dry.sub(st.dryStart).div(st.dryDur), 0, 1),
-			bristleScale: 2.4,
-			dropScale,
-			tipDrops: 0.4,
-			flankDrops: 0.15,
-			washScale: 0.35,
-			straight: false,
-			wildness: 1,
-			fineSpray: false,
-		});
-		coverages.push(ink, wash, drops);
-	});
 	// Flood: ink soaks the gaps once every slash has landed; it drains first when drying. Kept
 	// just short of opaque (0.9) so, while the duel mounts underneath, the cover still reads as
 	// living ink — the slashes' texture and tones stay visible over it — not a dead black frame.
 	const flood = smoothstep(0.86, 1, u.pour).mul(smoothstep(0.22, 0, u.dry)).mul(0.9);
-	const alpha = union(...coverages, flood);
+
+	// PERFORMANCE: a pixel lies within at most two or three slashes, so each slash's full brush
+	// (≈17 noise lookups) runs only behind a cheap test — near its body/spray zone, already
+	// started, not yet fully dried. Without it every pixel paid for all six slashes.
+	const alpha = Fn(() => {
+		const clear = float(1).sub(flood).toVar(); // Π(1 − coverage): how much paper still shows
+		strokes.forEach((st, i) => {
+			const grow = clamp(u.pour.sub(st.start).div(st.dur), 0, 1);
+			const dryI = clamp(u.dry.sub(st.dryStart).div(st.dryDur), 0, 1);
+			const centre = half.add(vec2(st.cx, st.cy).mul(H));
+			const dir = vec2(Math.cos(st.angle), Math.sin(st.angle));
+			const len = H.mul(st.length);
+			const wid = H.mul(st.width);
+			const d = P.sub(centre);
+			const along = dot(d, dir).div(len).add(0.5);
+			const across = abs(dot(d, vec2(-Math.sin(st.angle), Math.cos(st.angle))));
+			// Body + bow + wash + flung spray all live within this box (s past the tip for the spray,
+			// ~1.7 widths across for the flank drops).
+			const near = along
+				.greaterThan(-0.2)
+				.and(along.lessThan(1.6))
+				.and(across.lessThan(wid.mul(1.7).add(H.mul(Math.abs(st.bend)))))
+				.and(grow.greaterThan(0))
+				.and(dryI.lessThan(1));
+			If(near, () => {
+				const front = float(1).sub(pow(float(1).sub(grow), 2.2)).mul(1.3);
+				const { ink, wash, drops } = brush({
+					P,
+					centre,
+					dir,
+					length: len,
+					width: wid,
+					bend: H.mul(st.bend),
+					seed: float(11 + i * 7.7),
+					front,
+					// Each slash dries on its own schedule (shuffled), so the scene shows through piecewise.
+					dry: dryI,
+					bristleScale: 2.4,
+					dropScale,
+					tipDrops: 0.4,
+					flankDrops: 0.15,
+					washScale: 0.35,
+					straight: false,
+					wildness: 1,
+					fineSpray: false,
+				});
+				clear.mulAssign(float(1).sub(clamp(ink, 0, 1)).mul(float(1).sub(clamp(wash, 0, 1))).mul(float(1).sub(clamp(drops, 0, 1))));
+			});
+		});
+		return float(1).sub(clear);
+	})();
 	const material = baseMaterial();
 	material.colorNode = INK_LOOK.inkColor;
 	material.opacityNode = alpha;

@@ -24,6 +24,8 @@ export interface LobbySceneProps {
 	onIntroEnd: () => void;
 	/** True = cap the leaf field to LOBBY.leaves.reducedCount (prefers-reduced-motion / low-end). */
 	reducedLeaves?: boolean;
+	/** True = stop rendering frames (the game veil is covering the lobby). */
+	paused?: boolean;
 }
 
 interface PanoramaProps extends LobbySceneProps {
@@ -191,7 +193,7 @@ const StaticFallback = () => (
 );
 
 /** The lobby's animated backdrop canvas. Fills its parent; pointer events pass through to the page. */
-export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves }: LobbySceneProps) => {
+export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves, paused = false }: LobbySceneProps) => {
 	const coarse = useCoarsePointer();
 	const leafVisibleRef = useRef(!intro);
 	return (
@@ -200,7 +202,9 @@ export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves }: L
 			    the debug panel would render but ignore every click. */}
 			<Leva collapsed hidden={import.meta.env.PROD || coarse} />
 			<div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-				<Canvas dpr={coarse ? [1, 1.5] : [1, 2]} camera={{ position: [0, 0, 6], fov: 30 }} fallback={<StaticFallback />}>
+				{/* Paused while the game veil covers the lobby: one less full-screen canvas competing
+				    with the ink for the GPU — the panorama is about to be inked over anyway. */}
+				<Canvas dpr={coarse ? [1, 1.5] : [1, 2]} frameloop={paused ? "demand" : "always"} camera={{ position: [0, 0, 6], fov: 30 }} fallback={<StaticFallback />}>
 					<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} reducedLeaves={reducedLeaves} leafVisibleRef={leafVisibleRef} />
 				</Canvas>
 			</div>

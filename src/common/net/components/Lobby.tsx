@@ -99,7 +99,7 @@ export const Lobby = () => {
 
 	return (
 		<div style={{ position: "fixed", inset: 0, zIndex: 3000, overflow: "hidden" }} onPointerDown={introDone ? undefined : finishIntro}>
-			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} />
+			<LobbyScene intro={!introDone} registerSkip={registerSkip} onIntroEnd={finishIntro} reducedLeaves={!!reduced} paused={status === "playing"} />
 			{/* Sumi strokes of the menu buttons — between the panorama and the column (DOM order). */}
 			<InkLayer />
 

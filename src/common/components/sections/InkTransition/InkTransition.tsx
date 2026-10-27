@@ -131,12 +131,49 @@ export const InkTransition = ({ covering, release, onCovered }: InkTransitionPro
 	if (!covering && done) setDone(false);
 	const running = covering && !done;
 
-	const props: VeilProps = { covering: running, release, onCovered, onDone: () => setDone(true) };
+	// Safety nets on the wall clock — the sequence must never hang on GPU frames arriving (a
+	// stalled or lost canvas would otherwise freeze the app under a black veil):
+	//  - cover: if the veil hasn't reported covered shortly after its pour should have ended;
+	//  - finish: if it hasn't dried out shortly after its drying should have ended.
+	const coveredOnce = useRef(false);
+	const onCoveredOnce = () => {
+		if (coveredOnce.current) return;
+		coveredOnce.current = true;
+		onCovered();
+	};
+	useEffect(() => {
+		if (!running) {
+			coveredOnce.current = false;
+			return;
+		}
+		const t = window.setTimeout(onCoveredOnce, (INK.veilPour + 0.8) * 1000);
+		return () => window.clearTimeout(t);
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- armed once per session
+	}, [running]);
+	useEffect(() => {
+		if (!running || !release) return;
+		const t = window.setTimeout(() => setDone(true), (INK.veilDry + 1.2) * 1000);
+		return () => window.clearTimeout(t);
+	}, [running, release]);
+
+	const props: VeilProps = { covering: running, release, onCovered: onCoveredOnce, onDone: () => setDone(true) };
 	return (
-		<div style={{ position: "fixed", inset: 0, zIndex: 4000, pointerEvents: running && !release ? "auto" : "none" }}>
+		<div
+			style={{
+				position: "fixed",
+				inset: 0,
+				zIndex: 4000,
+				pointerEvents: running && !release ? "auto" : "none",
+				// Belt and braces: once a session is over the layer fades out even if its canvas froze
+				// on an inked frame.
+				opacity: running ? 1 : 0,
+				transition: running ? "none" : "opacity 0.4s ease",
+			}}
+		>
 			{inkSupported() ? (
-				// DPR 1: a full-screen multi-stroke shader; the veil's soft ink loses nothing at 1×.
-				<InkCanvas maxDpr={1} frameloop={running ? "always" : "demand"}>
+				// DPR 0.75: a full-screen multi-stroke shader; the soft, moving ink loses nothing below
+				// 1× and the fill cost drops by almost half.
+				<InkCanvas dpr={0.75} frameloop={running ? "always" : "demand"}>
 					<Veil {...props} />
 				</InkCanvas>
 			) : (

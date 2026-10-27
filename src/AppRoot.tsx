@@ -11,6 +11,9 @@ import type { EngineConfig } from "./common/game";
  * veil holds until the scene has rendered a frame, then dries out over the fly-back reveal.
  * Reduced motion: no veil, no flight — the swap is immediate, as before.
  */
+/** Longest the veil waits, once covered, for the duel to report it renders smoothly. */
+const READY_TIMEOUT_MS = 3500;
+
 export const AppRoot = () => {
 	const { status, mode, specials, roomKeyword } = useSession();
 	const reduced = !!useReducedMotion();
@@ -38,6 +41,17 @@ export const AppRoot = () => {
 
 	const showGame = playing && (covered || reduced);
 
+	// Safety net: the reveal must never hang on the scene's "ready" signal (it relies on the duel
+	// canvas producing frames — a lost GPU context or a very slow device would stall it forever).
+	// A wall-clock timeout releases the veil anyway. setState only inside the timer callback.
+	const [forceRelease, setForceRelease] = useState(false);
+	if (!showGame && forceRelease) setForceRelease(false);
+	useEffect(() => {
+		if (!showGame || sceneReady) return;
+		const t = window.setTimeout(() => setForceRelease(true), READY_TIMEOUT_MS);
+		return () => window.clearTimeout(t);
+	}, [showGame, sceneReady]);
+
 	const config: EngineConfig = { firstPlayer: "red", ...(mode === "online" && specials ? { specials } : {}) };
 	return (
 		<>
@@ -52,7 +66,7 @@ export const AppRoot = () => {
 			{!reduced && (
 				<InkTransition
 					covering={playing}
-					release={sceneReady}
+					release={sceneReady || forceRelease}
 					onCovered={() => {
 						if (playingRef.current) setCovered(true);
 					}}

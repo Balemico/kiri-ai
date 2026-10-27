@@ -7,6 +7,8 @@ export interface InkCanvasProps {
 	style?: CSSProperties;
 	/** Device-pixel-ratio cap: the ink is a full-screen fragment shader, keep the fill cost bounded. */
 	maxDpr?: number;
+	/** Fixed DPR (overrides `maxDpr`), e.g. below 1 for a soft full-screen effect. */
+	dpr?: number;
 	/** "demand" parks an idle canvas (no frames until invalidated); "always" while animating. */
 	frameloop?: "always" | "demand";
 }
@@ -17,12 +19,12 @@ export interface InkCanvasProps {
  * orthographic at zoom 1, so ONE WORLD UNIT IS ONE CSS PIXEL, origin at the canvas centre, y up.
  * The game/lobby scenes keep their own WebGL canvases; only the ink lives here.
  */
-export const InkCanvas = ({ children, style, maxDpr = 2, frameloop = "always" }: InkCanvasProps) => (
+export const InkCanvas = ({ children, style, maxDpr = 2, dpr, frameloop = "always" }: InkCanvasProps) => (
 	<Canvas
 		orthographic
 		flat
 		frameloop={frameloop}
-		dpr={[1, maxDpr]}
+		dpr={dpr ?? [1, maxDpr]}
 		camera={{ position: [0, 0, 100], zoom: 1, near: 0.1, far: 1000 }}
 		gl={async ({ canvas }) => {
 			const renderer = new WebGPURenderer({ canvas: canvas as HTMLCanvasElement, alpha: true, antialias: true });
