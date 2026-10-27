@@ -215,7 +215,7 @@ const brush = (b: BrushSpec) => {
 		droplets(x, y, s, zs, n, b, 30, 22, 1.4, 7.5, 0.5, 0),
 		droplets(x, y, s, zs, n, b, 11, 8, 0.5, 2.1, 0.45, 20),
 	).mul(dropsFade);
-	return { ink, wash, drops, s, bristle };
+	return { ink, wash, drops, s, n, bristle };
 };
 
 /** Union of coverages: 1 − Π(1 − cᵢ). */
@@ -289,7 +289,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const centre = u.size.mul(0.5);
 	const width = box.y.mul(INK_LOOK.strokeHeight).mul(u.hover.mul(0.07).add(1));
 	const bend = box.y.mul(0.03).mul(sin(u.seed.mul(7.31)));
-	const { ink, wash, drops, s: along, bristle } = brush({
+	const { ink, wash, drops, s: along, n: across, bristle } = brush({
 		P,
 		centre,
 		dir,
@@ -314,11 +314,20 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const washTone = float(1).sub(u.tintAmount.mul(0.8));
 	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)).mul(washTone), drops);
 	const material = baseMaterial();
-	// Split stroke: which half is "right" — the seam follows the bristles, so it reads as ink
-	// changing colour along the hairs, not a ruler line.
-	const rightHalf = smoothstep(0.47, 0.53, along.add(bristle.sub(0.5).mul(0.07)));
-	const lit = mix(float(1).sub(rightHalf), rightHalf, u.segActive);
-	const segColour = mix(u.segLeft, u.segRight, rightHalf);
+	// Split stroke seam, behaving like the stroke's own frayed ends: the lit colour reaches into
+	// the other half along the bristles (streaks of uneven length), on a wide soft feather that
+	// wanders slowly with time like the wash edge — and it leans toward the unlit half, so the
+	// chosen colour invades it rather than stopping at the middle.
+	const seamFray = bristle.sub(0.5).mul(0.26);
+	const seamDrift = mx_noise_float(vec3(across.mul(1.3), time.mul(INK_LOOK.drift), u.seed.add(61.3))).mul(0.06);
+	const seamLean = mix(float(0.06), float(-0.06), u.segActive);
+	const rightHalf = smoothstep(0.4, 0.6, along.add(seamFray).add(seamDrift).sub(seamLean));
+	// Each half lights with ITS option's colour: on a switch the old half drains while the new
+	// one fills — never a blend of the two team colours (that reads as muddy purple).
+	const litLeft = float(1).sub(rightHalf).mul(float(1).sub(u.segActive));
+	const litRight = rightHalf.mul(u.segActive);
+	const lit = litLeft.add(litRight);
+	const segColour = mix(u.segLeft, u.segRight, litRight.div(max(lit, 0.001)));
 	const baseColour = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
 	material.colorNode = mix(baseColour, segColour, lit.mul(u.segOn));
 	// The unlit half dims to the ghost tone.
