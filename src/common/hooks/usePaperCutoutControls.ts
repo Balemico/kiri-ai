@@ -6,8 +6,6 @@ export interface PaperCutoutControls {
 	standDur: number;
 	liftShare: number;
 	overshoot: number;
-	amplitude: number;
-	period: number;
 	revealDelay: number;
 	stagger: number;
 	rimScale: number;
@@ -28,13 +26,11 @@ export const usePaperCutoutControls = (onReplay: () => void): PaperCutoutControl
 		{
 			"play stand-up": button(() => onReplay()),
 			lieAngle: { value: PAPER_CUTOUT.lieAngle, min: -1.57, max: 0, step: 0.01, label: "lie angle" },
-			standDur: { value: PAPER_CUTOUT.standDur, min: 0.3, max: 3, step: 0.05, label: "stand (s)" },
+			standDur: { value: PAPER_CUTOUT.standDur, min: 0.3, max: 6, step: 0.05, label: "stand (s)" },
 			liftShare: { value: PAPER_CUTOUT.liftShare, min: 0.1, max: 0.9, step: 0.01, label: "lift share" },
-			overshoot: { value: PAPER_CUTOUT.overshoot, min: 0, max: 0.6, step: 0.01, label: "overshoot (rad)" },
-			amplitude: { value: PAPER_CUTOUT.amplitude, min: 1, max: 2, step: 0.05, label: "recoil" },
-			period: { value: PAPER_CUTOUT.period, min: 0.1, max: 1, step: 0.01, label: "wobble period" },
+			overshoot: { value: PAPER_CUTOUT.overshoot, min: 0, max: 0.3, step: 0.005, label: "overshoot (rad)" },
 			revealDelay: { value: PAPER_CUTOUT.revealDelay, min: 0, max: 2, step: 0.05, label: "after veil opens (s)" },
-			stagger: { value: PAPER_CUTOUT.stagger, min: 0, max: 1, step: 0.01 },
+			stagger: { value: PAPER_CUTOUT.stagger, min: 0, max: 3, step: 0.05 },
 			rimScale: { value: PAPER_CUTOUT.rimScale, min: 1, max: 1.1, step: 0.005, label: "paper rim" },
 			rimColor: { value: PAPER_CUTOUT.rimColor, label: "rim colour" },
 			edgeOffsetX: { value: PAPER_CUTOUT.edgeOffsetX, min: -0.05, max: 0.05, step: 0.001, label: "edge x" },

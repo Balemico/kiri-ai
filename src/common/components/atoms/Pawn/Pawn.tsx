@@ -340,8 +340,8 @@ export const Pawn = ({
 	}, [linePos, moveKey, lateral, lift, axis, tilt, moveDelay, moveDur]);
 
 	// Entrance — the paper cut-out stands up: hinged at the feet, it lies back flat on the floor
-	// (`lieAngle`) until `standing`, then springs upright with an elastic recoil (overshoots
-	// forward, wobbles, settles) while its contact shadow fades in. Plays once per mount; the Leva
+	// (`lieAngle`) until `standing`, then is raised slowly, like a paper-theatre figure, while its
+	// contact shadow fades in. Plays once per mount; the Leva
 	// "play stand-up" (`standTick`) lays it back down and replays it.
 	const stood = useRef(false);
 	const shadowMatOf = () => shadowRef.current?.material as THREE.MeshBasicMaterial | undefined;
@@ -353,17 +353,16 @@ export const Pawn = ({
 	const standUp = (delay: number) => {
 		const h = hingeRef.current;
 		if (!h) return;
-		// Two beats, so the rise itself is SEEN (a single elastic ease snaps upright in its first
-		// ~15% and only wobbles): a smooth lift that swings a little PAST vertical (forward), then
-		// the paper's recoil — an elastic settle back to upright.
+		// Paper theatre: raised slowly by an unseen hand — a long sine-eased lift that drifts just past
+		// vertical, then one soft ease back into place (no spring, no wobble).
 		const lift = paper.standDur * paper.liftShare;
 		gsap.killTweensOf(h.rotation);
 		gsap
 			.timeline({ delay })
-			.to(h.rotation, { x: paper.overshoot, duration: lift, ease: "power2.out" })
-			.to(h.rotation, { x: 0, duration: paper.standDur - lift, ease: `elastic.out(${paper.amplitude}, ${paper.period})` });
+			.to(h.rotation, { x: paper.overshoot, duration: lift, ease: "sine.inOut" })
+			.to(h.rotation, { x: 0, duration: paper.standDur - lift, ease: "sine.inOut" });
 		const sm = shadowMatOf();
-		if (sm) gsap.to(sm, { opacity: paper.shadowOpacity, duration: paper.standDur * 0.5, delay, ease: "power2.out", overwrite: true });
+		if (sm) gsap.to(sm, { opacity: paper.shadowOpacity, duration: paper.standDur * paper.liftShare, delay, ease: "sine.inOut", overwrite: true });
 	};
 	useLayoutEffect(() => {
 		if (!standing) layDown();

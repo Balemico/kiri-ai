@@ -163,17 +163,15 @@ export const PAWN = {
 
 // The samurai as PAPER CUT-OUTS: a cream paper rim around the coloured silhouette, a faint offset
 // edge for the sheet's thickness, a contact shadow at the feet — and the entrance: hinged at the
-// feet, each figure lies back flat on the floor until the duel starts, then springs up with a
-// paper-like recoil. Single source for the "Paper Cutout" Leva folder.
+// feet, each figure lies back flat on the floor until the duel starts, then is raised slowly and
+// gracefully — like a figure in a paper theatre lifted by hand — and eased back into place. Single source for the "Paper Cutout" Leva folder.
 export const PAPER_CUTOUT = {
 	lieAngle: -1.45, // radians the figure lies back on the floor (hinged at the feet) before the duel
-	standDur: 1.6, // seconds for the whole stand-up: the lift + the recoil
-	liftShare: 0.42, // share of standDur spent lifting off the floor (the rest is the recoil)
-	overshoot: 0.16, // radians the cut-out swings PAST vertical (forward) before recoiling
-	amplitude: 1.15, // elastic overshoot (> 1 = springier recoil)
-	period: 0.38, // elastic period (lower = quicker, tighter wobble)
+	standDur: 2.8, // seconds for the whole stand-up: the slow lift + the soft settle
+	liftShare: 0.74, // share of standDur spent lifting off the floor (the rest is the settle)
+	overshoot: 0.045, // radians the cut-out drifts PAST vertical before easing back — barely there
 	revealDelay: 0.05, // red starts standing this long after the veil has OPENED (ink/veilSignal)
-	stagger: 0.18, // blue stands this long after red
+	stagger: 0.9, // blue stands this long after red (once red is halfway up)
 	rimScale: 1.035, // paper rim: the silhouette scaled up behind the coloured one
 	rimColor: "#f4eee0", // the cut paper's cream
 	edgeOffsetX: 0.012, // offset of the sheet-thickness shadow (world units)
