@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
 import { FitCamera, Lights, Floor, IntroFlight } from "../../atoms";
@@ -11,6 +11,7 @@ import { ConfirmButton } from "../ConfirmButton";
 import { InkLayer } from "../InkLayer";
 import { WinBanner } from "../WinBanner";
 import { GameHud } from "../GameHud";
+import { HudVignette } from "../HudVignette";
 import { HandoffVeil } from "../HandoffVeil";
 import { StrikeSplash } from "../StrikeSplash";
 import { WaitingOverlay } from "../../../net";
@@ -22,6 +23,7 @@ import { useAutoReveal } from "../../../hooks/useAutoReveal";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
 import { veilSignal } from "../../../ink/veilSignal";
+import { duelIntro } from "../../../state/duelIntro";
 import { prioritizedEvents } from "../../../eventPriority";
 
 // The scene counts as ready once it renders this many consecutive smooth frames (< ~24 fps
@@ -111,6 +113,8 @@ const SceneContents = ({
 			    and card textures are preloaded (useCardTextures), so passing the turn doesn't suspend. */}
 			{showBoard && (
 				<>
+					{/* Corner vignette behind the DOM HUD banners — in the scene so the cards paint over it. */}
+					<HudVignette />
 					<Suspense fallback={null}>
 						{/* The paper samurai lie flat until the duel is revealed, then spring up. */}
 						<Battlefield orientation={orientation} frame={frame} floorTilt={floor.tilt} standUp={entrance === "none" || (ready && veilOpen)} />
@@ -148,6 +152,9 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 	useCombatAudio();
 	// Once both players confirm, the reveal sequence plays out automatically every 2s.
 	useAutoReveal();
+	// The duel-opening stage outlives the duel (module store): rewind it on leaving, so the next duel
+	// opens with the samurai lying down again.
+	useEffect(() => () => duelIntro.reset(), []);
 	// The debug panel is for tuning on desktop — hide it in production and on touch (no room, no mouse).
 	const coarse = useCoarsePointer();
 	return (

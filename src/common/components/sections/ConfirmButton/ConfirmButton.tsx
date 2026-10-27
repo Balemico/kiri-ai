@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { InkStrokeButton } from "../../atoms";
 import { useGame, canConfirm } from "../../../state";
 import { useSession } from "../../../net";
-import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 
 interface Action {
 	label: string;
@@ -22,8 +22,7 @@ const STROKE_WIDTH = "min(300px, 78vw)";
 export const ConfirmButton = () => {
 	const { state, dispatch } = useGame();
 	const { mode, viewerTeam, leave } = useSession();
-	// Touch: centre the control along the bottom edge (thumb-reachable), rather than pinned bottom-right.
-	const coarse = useCoarsePointer();
+	const mobile = useIsMobile();
 
 	const placing = state.phase === "place" && !state.confirmed[viewerTeam];
 	const over = state.phase === "game-over";
@@ -51,7 +50,8 @@ export const ConfirmButton = () => {
 						bottom: "clamp(16px, 3vh, 36px)",
 						width: STROKE_WIDTH,
 						zIndex: 1500,
-						...(coarse ? { left: "50%", marginLeft: `calc(${STROKE_WIDTH} / -2)` } : { right: "clamp(36px, 4vw, 64px)" }),
+						// Mobile: centred along the bottom edge (thumb-reachable); desktop: pinned bottom-right.
+						...(mobile ? { left: "50%", marginLeft: `calc(${STROKE_WIDTH} / -2)` } : { right: "clamp(36px, 4vw, 64px)" }),
 					}}
 				>
 					<InkStrokeButton onClick={config.onClick}>{config.label}</InkStrokeButton>

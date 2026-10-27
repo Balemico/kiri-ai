@@ -2,7 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { gsap } from "gsap";
 import * as THREE from "three";
 import { BOARD_SPACES, RED_START, BLUE_START, spaceToX, type Team } from "../../../game";
-import { lineCoord, portraitLateralSign, rakeLine, type Orientation } from "../../../layout";
+import { lineCoord, portraitLateralSign, rakeLine, BATTLEFIELD_HALF_WIDTH, type Orientation } from "../../../layout";
+
+/** Landscape x of a space on a line `length` long (the outer spaces land on its ends). */
+const landscapeCoord = (space: number, length: number): number => spaceToX(space) * (length / (BATTLEFIELD_HALF_WIDTH * 2));
 
 export interface BoardLineProps {
 	y?: number;
@@ -92,7 +95,7 @@ const TeamMarker = ({ team, space, y, z, length, diamondTilt, active, moveDelay,
 	const initialized = useRef(false);
 	const portrait = orientation === "portrait";
 	// Position along the line for the current space, on the moving axis (portrait scales to the line).
-	const coord = portrait ? lineCoord(space, bottomTeam, length) : spaceToX(space);
+	const coord = portrait ? lineCoord(space, bottomTeam, length) : landscapeCoord(space, length);
 	// Viewport-INDEPENDENT logical coordinate (line at unit length): changes only on a real move or a
 	// portrait side-swap, NOT on a resize (which only rescales `length`). Drives animate-vs-snap below.
 	const moveKey = portrait ? lineCoord(space, bottomTeam) : spaceToX(space);
@@ -207,7 +210,7 @@ export const BoardLine = ({ y = 0.5, z = 0, length = 3.0, diamondTilt = 0, redSp
 	const lineArgs: [number, number, number] = portrait ? [0.01 * markerScale, length, 0.005] : [length, 0.01 * markerScale, 0.005];
 	const diamondSize = DIAMOND * markerScale;
 	const spaceCoord = (i: number): [number, number, number] => {
-		if (!portrait) return [spaceToX(i), y, z];
+		if (!portrait) return [landscapeCoord(i, length), y, z];
 		const { y: ry, z: rz } = rakeLine(lineCoord(i, bottomTeam, length), diamondTilt, y, z);
 		return [0, ry, rz];
 	};

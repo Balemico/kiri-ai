@@ -442,12 +442,21 @@ export const Pawn = ({
 							const zi = -i * 0.002;
 							return (
 								<group key={s}>
-									{/* Sheet thickness: a faint dark copy, offset down-right, furthest back. */}
-									<mesh ref={edgeRefs[s]} position={[offsetX + paper.edgeOffsetX * mirror, y + paper.edgeOffsetY, zi - 0.006]} material={edgeMats[s]} renderOrder={PAWN.renderOrder - 2}>
+									{/* Sheet thickness: a faint dark copy of the WHOLE sheet (rim included), furthest back,
+									    offset toward the figure's OUTER side (its back — away from the opponent / the line), so
+									    the two cut-outs mirror each other: red's thickness on the left, blue's on the right.
+									    Inside the mirrored group, a constant −x local offset is exactly that in both layouts. */}
+									<mesh
+										ref={edgeRefs[s]}
+										position={[offsetX - paper.edgeOffsetX,y + paper.rimOffsetY + paper.edgeOffsetY, zi - 0.006]}
+										scale={[paper.rimScale, paper.rimScale, 1]}
+										material={edgeMats[s]}
+										renderOrder={PAWN.renderOrder - 2}
+									>
 										<planeGeometry args={[worldW, worldH]} />
 									</mesh>
 									{/* Paper rim: the silhouette scaled up in cream — the cut-out's margin. */}
-									<mesh ref={rimRefs[s]} position={[offsetX, y, zi - 0.003]} scale={[paper.rimScale, paper.rimScale, 1]} material={rimMats[s]} renderOrder={PAWN.renderOrder - 1}>
+									<mesh ref={rimRefs[s]} position={[offsetX, y + paper.rimOffsetY, zi - 0.003]} scale={[paper.rimScale, paper.rimScale, 1]} material={rimMats[s]} renderOrder={PAWN.renderOrder - 1}>
 										<planeGeometry args={[worldW, worldH]} />
 									</mesh>
 									<mesh ref={meshRefs[s]} position={[offsetX, y, zi]} material={materials[s]} renderOrder={PAWN.renderOrder}>

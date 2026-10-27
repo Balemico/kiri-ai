@@ -2,11 +2,11 @@ import { useCallback, useState } from "react";
 import { Html } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { motion } from "motion/react";
-import { BoardLine, Pawn, ClashEffect, InkSplash } from "../../atoms";
+import { BoardLine, Pawn, ClashEffect } from "../../atoms";
 import { useGame } from "../../../state";
 import { useSession } from "../../../net";
 import { spaceToX, type Stance, type Team } from "../../../game";
-import { frameViewport, lineCoord, portraitLateralSign, portraitLineLength, rakeLine, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
+import { frameViewport, landscapeLineScale, lineCoord, BATTLEFIELD_HALF_WIDTH, portraitLateralSign, portraitLineLength, rakeLine, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
 import { useBattlegroundControls } from "../../../hooks/useBattlegroundControls";
 import { useBottomTeam } from "../../../hooks/useBottomTeam";
 import { usePawnControls } from "../../../hooks/usePawnControls";
@@ -15,7 +15,8 @@ import { useClashControls } from "../../../hooks/useClashControls";
 import { attackBeat, moveDelays, useResolutionControls } from "../../../hooks/useResolutionControls";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
 import { usePaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
-import { SEAL } from "../../../hudPalette";
+import { useDuelIntroDriver } from "../../../hooks/useDuelIntroDriver";
+import { useDuelIntroReached } from "../../../state/duelIntro";
 
 /** The battlefield line with both samurai pawns, positioned by the "Battleground" controls. */
 export const Battlefield = ({
@@ -48,9 +49,13 @@ export const Battlefield = ({
 	const [standTick, setStandTick] = useState(0);
 	const replayStand = useCallback(() => setStandTick((t) => t + 1), []);
 	const cutout = usePaperCutoutControls(replayStand);
+	// Duel opening: the HUD, then the first turn, follow once the second samurai is fully up.
+	useDuelIntroDriver(standUp, cutout.revealDelay + cutout.stagger + cutout.standDur, hud.introHudDelay, hud.introTurnDelay);
+	const turnOpen = useDuelIntroReached("turn");
 	// The active (pulsing) marker shows only while placing — highlighting the viewer's own pawn (the
 	// colour this device plays). Once both are ready, through the reveal and round end, no marker pulses.
-	const isPlacing = state.phase === "place";
+	// Not before the first turn has begun (duel opening).
+	const isPlacing = state.phase === "place" && turnOpen;
 	const activeTeam = isPlacing ? viewerTeam : null;
 
 	// Portrait: the line turns vertical. The turn player sits at the BOTTOM (its character + marker to
@@ -68,12 +73,14 @@ export const Battlefield = ({
 	// Visible world height of the active frame — the basis for both the portrait line length and the
 	// marker size, so the markers read at a consistent on-screen size in both orientations and scale
 	// with the window (rather than a fixed world size 2.45× bigger in portrait).
-	const viewportHeight = frameViewport(frame, size.width / size.height).height;
-	const lineLength = portrait ? portraitLineLength(viewportHeight, bg.handReserve, bg.margin, floorTilt) : 0;
+	const { height: viewportHeight, width: viewportWidth } = frameViewport(frame, size.width / size.height);
+	// Landscape: the line narrows on narrow windows so its end pawns clear the edge-hugging played cards.
+	const lineScale = portrait ? 1 : landscapeLineScale(viewportWidth);
+	const lineLength = portrait ? portraitLineLength(viewportHeight, bg.handReserve, bg.margin, floorTilt) : BATTLEFIELD_HALF_WIDTH * 2 * lineScale;
 	const markerScale = (viewportHeight / MARKER_REF_HEIGHT) * bg.thickness;
 	// Each pawn's coordinate ALONG the line (world-x landscape, world-y portrait).
-	const redLine = portrait ? lineCoord(state.red.space, bottomTeam, lineLength) : spaceToX(state.red.space);
-	const blueLine = portrait ? lineCoord(state.blue.space, bottomTeam, lineLength) : spaceToX(state.blue.space);
+	const redLine = portrait ? lineCoord(state.red.space, bottomTeam, lineLength) : spaceToX(state.red.space) * lineScale;
+	const blueLine = portrait ? lineCoord(state.blue.space, bottomTeam, lineLength) : spaceToX(state.blue.space) * lineScale;
 	// Viewport-INDEPENDENT logical coordinate (line at unit length): unchanged by a resize, so the pawns
 	// snap (not tween) to a rescaled line and stay locked to it (see Pawn `moveKey`).
 	const redMoveKey = portrait ? lineCoord(state.red.space, bottomTeam) : spaceToX(state.red.space);
@@ -142,23 +149,7 @@ export const Battlefield = ({
 
 	return (
 		<group position={[bg.x, 0, 0]}>
-			<BoardLine y={pawnBaseY} length={portrait ? lineLength : undefined} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} />
-			{/* Vermilion ink bursts on a pawn the moment a blow lands on it (not on a clash: no damage). */}
-			{(["red", "blue"] as Team[]).map((team) => {
-				if (!resolved || !resolution || resolution.clash || !resolution[team === "red" ? "blue" : "red"].hit) return null;
-				return (
-					<PawnSplash
-						key={`${state.round}-${resolution.slot}-${team}`}
-						x={calloutX(team)}
-						y={calloutYOf(team) - 0.2 - pawn.height * 0.45}
-						z={calloutZOf(team)}
-						seed={state.round * 13 + (resolution.slot === "first" ? 1 : 5) + (team === "red" ? 0 : 3)}
-						delay={attackDelay}
-						scale={hud.splashScale}
-						seconds={hud.splashSeconds}
-					/>
-				);
-			})}
+			<BoardLine y={pawnBaseY} length={lineLength} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} />
 			{(["red", "blue"] as Team[]).map((team) => {
 				const callout = calloutFor(team);
 				if (!callout) return null;
@@ -279,33 +270,3 @@ const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
 	</Html>
 );
 
-interface PawnSplashProps {
-	x: number;
-	y: number;
-	z: number;
-	seed: number;
-	/** Seconds to wait — the attack beat, so the ink flies as the blade lands. */
-	delay: number;
-	scale: number;
-	/** How long the splash lingers before drying out. */
-	seconds: number;
-}
-
-/** A landed blow: a seeded vermilion ink burst over the struck pawn, which then dries out. */
-const PawnSplash = ({ x, y, z, seed, delay, scale, seconds }: PawnSplashProps) => {
-	const size = `min(${(34 * scale).toFixed(1)}vmin, ${Math.round(360 * scale)}px)`;
-	return (
-		<Html position={[x, y, z]} style={{ pointerEvents: "none" }}>
-			<div style={{ width: size, height: size, transform: "translate(-50%, -50%)" }}>
-				<motion.div
-					initial={{ opacity: 0, scale: 0.3, rotate: (seed * 47) % 360 }}
-					animate={{ opacity: [0, 0.85, 0.75, 0], scale: [0.3, 1.06, 1, 1] }}
-					transition={{ duration: seconds, delay, times: [0, 0.07, 0.55, 1], ease: "easeOut" }}
-					style={{ width: "100%", height: "100%" }}
-				>
-					<InkSplash color={SEAL} seed={seed} size={1} style={{ width: "100%", height: "100%" }} />
-				</motion.div>
-			</div>
-		</Html>
-	);
-};

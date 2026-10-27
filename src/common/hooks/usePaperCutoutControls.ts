@@ -10,6 +10,7 @@ export interface PaperCutoutControls {
 	stagger: number;
 	rimScale: number;
 	rimColor: string;
+	rimOffsetY: number;
 	edgeOffsetX: number;
 	edgeOffsetY: number;
 	edgeOpacity: number;
@@ -33,6 +34,7 @@ export const usePaperCutoutControls = (onReplay: () => void): PaperCutoutControl
 			stagger: { value: PAPER_CUTOUT.stagger, min: 0, max: 3, step: 0.05 },
 			rimScale: { value: PAPER_CUTOUT.rimScale, min: 1, max: 1.1, step: 0.005, label: "paper rim" },
 			rimColor: { value: PAPER_CUTOUT.rimColor, label: "rim colour" },
+			rimOffsetY: { value: PAPER_CUTOUT.rimOffsetY, min: -0.05, max: 0.05, step: 0.001, label: "rim y" },
 			edgeOffsetX: { value: PAPER_CUTOUT.edgeOffsetX, min: -0.05, max: 0.05, step: 0.001, label: "edge x" },
 			edgeOffsetY: { value: PAPER_CUTOUT.edgeOffsetY, min: -0.05, max: 0.05, step: 0.001, label: "edge y" },
 			edgeOpacity: { value: PAPER_CUTOUT.edgeOpacity, min: 0, max: 1, step: 0.01, label: "edge opacity" },

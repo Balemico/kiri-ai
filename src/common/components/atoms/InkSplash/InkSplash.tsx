@@ -7,6 +7,9 @@ export interface InkSplashProps {
 	seed?: number;
 	/** Rendered edge in px (the splash is square). */
 	size: number;
+	/** Fling the ink along this line (radians, screen, counter-clockwise) instead of all round: no
+	 *  pooled core — just droplets and streaks thrown off both ways, as off a sword cut. */
+	direction?: number;
 	style?: CSSProperties;
 }
 
@@ -28,23 +31,29 @@ const blobPath = (rand: () => number, cx: number, cy: number, r: number, n: numb
 };
 
 interface Shape {
-	core: string;
+	core: string | null;
 	drops: { x: number; y: number; r: number }[];
 	streaks: { d: string; w: number }[];
 }
 
-/** One splash in a 200×200 box: a ragged core, flung droplets and a few thrown streaks. */
-const buildSplash = (seed: number): Shape => {
+/**
+ * One splash in a 200×200 box: a ragged core, flung droplets and a few thrown streaks — or, given a
+ * `direction`, a spray thrown off both ways along that line (fanned by a narrow cone), no core.
+ */
+const buildSplash = (seed: number, direction?: number): Shape => {
 	const rand = rng(seed);
-	const core = blobPath(rand, 100, 100, 38, 22, 0.55);
-	const drops = Array.from({ length: 16 }, () => {
-		const a = rand() * Math.PI * 2;
-		const dist = 46 + rand() * 50;
-		return { x: 100 + Math.cos(a) * dist, y: 100 + Math.sin(a) * dist, r: 1.5 + rand() * (dist < 70 ? 7 : 4) };
+	const directed = direction !== undefined;
+	// SVG y points down, so a counter-clockwise screen angle is negated here.
+	const angle = () => (directed ? -direction + (rand() - 0.5) * 0.7 + (rand() < 0.5 ? 0 : Math.PI) : rand() * Math.PI * 2);
+	const core = directed ? null : blobPath(rand, 100, 100, 38, 22, 0.55);
+	const drops = Array.from({ length: directed ? 26 : 16 }, () => {
+		const a = angle();
+		const dist = directed ? 18 + rand() * 82 : 46 + rand() * 50;
+		return { x: 100 + Math.cos(a) * dist, y: 100 + Math.sin(a) * dist, r: 1.2 + rand() * (dist < 70 ? 6 : 3.5) };
 	});
-	const streaks = Array.from({ length: 5 }, () => {
-		const a = rand() * Math.PI * 2;
-		const r0 = 30 + rand() * 10;
+	const streaks = Array.from({ length: directed ? 7 : 5 }, () => {
+		const a = angle();
+		const r0 = directed ? 12 + rand() * 20 : 30 + rand() * 10;
 		const r1 = 62 + rand() * 30;
 		const bend = (rand() - 0.5) * 0.3;
 		const p = (r: number, da = 0) => `${(100 + Math.cos(a + da) * r).toFixed(1)} ${(100 + Math.sin(a + da) * r).toFixed(1)}`;
@@ -57,9 +66,9 @@ const buildSplash = (seed: number): Shape => {
  * A procedural sumi splash (no asset): seeded geometry roughened by an SVG turbulence displacement,
  * so the edges bleed like ink on washi rather than reading as vector circles.
  */
-export const InkSplash = ({ color, seed = 1, size, style }: InkSplashProps) => {
+export const InkSplash = ({ color, seed = 1, size, direction, style }: InkSplashProps) => {
 	const filterId = useId().replace(/:/g, "");
-	const shape = useMemo(() => buildSplash(seed), [seed]);
+	const shape = useMemo(() => buildSplash(seed, direction), [seed, direction]);
 	return (
 		<svg viewBox="0 0 200 200" width={size} height={size} style={{ overflow: "visible", ...style }} aria-hidden>
 			<defs>
@@ -69,7 +78,7 @@ export const InkSplash = ({ color, seed = 1, size, style }: InkSplashProps) => {
 				</filter>
 			</defs>
 			<g filter={`url(#${filterId})`} fill={color}>
-				<path d={shape.core} />
+				{shape.core && <path d={shape.core} />}
 				{shape.drops.map((d, i) => (
 					<circle key={i} cx={d.x} cy={d.y} r={d.r} />
 				))}

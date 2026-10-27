@@ -5,7 +5,8 @@ import { useBottomTeam } from "../../../hooks/useBottomTeam";
 import { useIsPortrait } from "../../../hooks/useIsPortrait";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
 import { attackBeat, useResolutionControls } from "../../../hooks/useResolutionControls";
-import { SEAL } from "../../../hudPalette";
+import { GAME_HUD } from "../../../layout";
+import { useHitPreviewTick } from "../../../state/hitPreview";
 import type { Team } from "../../../game";
 
 type Edge = "left" | "right" | "top" | "bottom";
@@ -17,13 +18,14 @@ const GRADIENT_AT: Record<Edge, string> = {
 	bottom: "ellipse 110% 45% at 50% 100%",
 };
 
-/** The struck player's edge of the screen flushes vermilion, then fades. */
-const EdgeFlush = ({ edge, delay, seconds }: { edge: Edge; delay: number; seconds: number }) => (
+/** The struck player's edge of the screen darkens with a sumi wash bleeding in, then fades. */
+const EdgeWash = ({ edge, delay, seconds }: { edge: Edge; delay: number; seconds: number }) => (
 	<motion.div
 		initial={{ opacity: 0 }}
-		animate={{ opacity: [0, 0.6, 0.3, 0] }}
+		animate={{ opacity: [0, 0.55, 0.3, 0] }}
 		transition={{ duration: seconds, delay, times: [0, 0.06, 0.5, 1], ease: "easeOut" }}
-		style={{ position: "absolute", inset: 0, background: `radial-gradient(${GRADIENT_AT[edge]}, ${SEAL}70, transparent 70%)` }}
+		// Dense blood-red ink at the edge thinning out into a diluted wash, multiplied into the paper.
+		style={{ position: "absolute", inset: 0, mixBlendMode: "multiply", background: `radial-gradient(${GRADIENT_AT[edge]}, ${GAME_HUD.hitInk}b0, ${GAME_HUD.hitInk}40 38%, transparent 70%)` }}
 	/>
 );
 
@@ -39,8 +41,8 @@ const ClashFlash = ({ delay }: { delay: number }) => (
 
 /**
  * Screen-space punctuation for each resolved action, on the attack beat (the same one the pawns
- * strike on): the struck player's side of the screen flushes red — the ink burst itself sits on the
- * pawn (Battlefield) — and a clash flashes white. Keyed by `round-slot` so each action plays once;
+ * strike on): the struck player's side of the screen takes a sumi wash — the brush cut itself sits on
+ * the pawn (Battlefield) — and a clash flashes white. Keyed by `round-slot` so each action plays once;
  * the layers animate back to invisible on their own, so there's no timer state to clean up.
  */
 export const StrikeSplash = () => {
@@ -50,17 +52,30 @@ export const StrikeSplash = () => {
 	const portrait = useIsPortrait();
 	const { splashSeconds } = useGameHudControls();
 	const beats = useResolutionControls();
+	// Leva "Game HUD → ▶ Play hit": replays a blow on blue, right now.
+	const hitTick = useHitPreviewTick();
 	const res = state.lastResolution;
-	if (!res) return null;
+
+	const edgeOf = (team: Team): Edge => (portrait ? (team === bottomTeam ? "bottom" : "top") : team === "red" ? "left" : "right");
+	const layer = { position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 1100 } as const;
+	const preview =
+		hitTick > 0 ? (
+			<div key={`preview-${hitTick}`} style={layer}>
+				<EdgeWash edge={edgeOf("blue")} delay={0} seconds={splashSeconds} />
+			</div>
+		) : null;
+	if (!res) return preview;
 
 	const delay = attackBeat(res, beats);
-	const edgeOf = (team: Team): Edge => (portrait ? (team === bottomTeam ? "bottom" : "top") : team === "red" ? "left" : "right");
 	// `hit` = this player's attack connected, so the flush lands on the OTHER side.
 	const struck = (["red", "blue"] as Team[]).filter((t) => res[t === "red" ? "blue" : "red"].hit);
 
 	return (
-		<div key={`${state.round}-${res.slot}`} style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 1100 }}>
-			{res.clash ? <ClashFlash delay={delay} /> : struck.map((team) => <EdgeFlush key={team} edge={edgeOf(team)} delay={delay} seconds={splashSeconds} />)}
-		</div>
+		<>
+			<div key={`${state.round}-${res.slot}`} style={layer}>
+				{res.clash ? <ClashFlash delay={delay} /> : struck.map((team) => <EdgeWash key={team} edge={edgeOf(team)} delay={delay} seconds={splashSeconds} />)}
+			</div>
+			{preview}
+		</>
 	);
 };

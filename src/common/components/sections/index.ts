@@ -10,5 +10,6 @@ export * from "./LobbyScene";
 export * from "./InkTransition";
 export * from "./InkLayer";
 export * from "./GameHud";
+export * from "./HudVignette";
 export * from "./HandoffVeil";
 export * from "./StrikeSplash";

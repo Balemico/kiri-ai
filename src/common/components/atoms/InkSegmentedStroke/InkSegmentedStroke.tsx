@@ -1,11 +1,8 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { motion, useIsPresent } from "motion/react";
-import { inkStrokes, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
+import { inkStrokes, INK_TONE_FALLBACK, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
 import { INK } from "../../../layout";
 import { InkDelayContext } from "../../../ink/inkDelay";
-
-// CSS stand-in used only where the ink canvas can't run (no WebGPU and no WebGL2).
-const FALLBACK: Record<InkTone, string> = { ink: "#17120e", red: "#b73225", blue: "#2f6f86", ghost: "rgba(23, 18, 14, 0.34)" };
 
 export interface InkSegmentOption {
 	label: string;
@@ -78,7 +75,7 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 							position: "relative",
 							flex: 1,
 							padding: 0,
-							background: !ink ? (selected ? FALLBACK[o.tone] : FALLBACK.ghost) : "none",
+							background: !ink ? (selected ? INK_TONE_FALLBACK[o.tone] : INK_TONE_FALLBACK.ghost) : "none",
 							border: "none",
 							borderRadius: !ink ? (i === 0 ? "40% 0 0 40% / 50% 0 0 50%" : "0 40% 40% 0 / 0 50% 50% 0") : undefined,
 							margin: !ink ? "10px 0" : undefined,

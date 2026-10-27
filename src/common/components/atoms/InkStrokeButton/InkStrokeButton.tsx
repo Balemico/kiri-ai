@@ -1,12 +1,9 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { motion, useIsPresent } from "motion/react";
-import { inkStrokes, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
+import { inkStrokes, INK_TONE_FALLBACK, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
 import { INK } from "../../../layout";
 import { InkDelayContext } from "../../../ink/inkDelay";
-
-// CSS stand-in used only where the ink canvas can't run (no WebGPU and no WebGL2).
-const FALLBACK: Record<InkTone, string> = { ink: "#17120e", red: "#b73225", blue: "#2f6f86", ghost: "rgba(23, 18, 14, 0.34)" };
 
 export interface InkStrokeButtonProps {
 	children: ReactNode;
@@ -72,7 +69,7 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 			{!ink && (
 				<motion.span
 					variants={{ hidden: { opacity: 0 }, painted: { opacity: 1, transition: { duration: 0.3 } } }}
-					style={{ position: "absolute", inset: "10px 4px", borderRadius: "40% 12% 30% 10% / 50% 20% 50% 20%", background: FALLBACK[tone] }}
+					style={{ position: "absolute", inset: "10px 4px", borderRadius: "40% 12% 30% 10% / 50% 20% 50% 20%", background: INK_TONE_FALLBACK[tone] }}
 				/>
 			)}
 			{/* The label settles in (letters drawing together out of a soft blur) as the ink soaks. */}

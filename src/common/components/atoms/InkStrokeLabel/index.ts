@@ -1,0 +1,1 @@
+export { InkStrokeLabel } from "./InkStrokeLabel";

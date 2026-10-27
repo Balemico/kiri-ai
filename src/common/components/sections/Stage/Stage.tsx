@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { useThree } from "@react-three/fiber";
 import { useControls } from "leva";
 import { ParallaxLayer } from "../../atoms";
+import { STAGE_BOTTOM_ALPHA } from "../../../floorTexture";
 import { STAGE, STAGE_LAYERS, HORIZON_FRACTION, frameViewport, type SceneFrame } from "../../../layout";
 
 /**
@@ -52,6 +53,7 @@ export const Stage = ({ frame }: { frame: SceneFrame }) => {
 						parallaxY={c.parallaxY}
 						driftAmp={c.driftAmp}
 						driftSpeed={c.driftSpeed}
+						alphaMap={STAGE_BOTTOM_ALPHA}
 					/>
 				))}
 			</Suspense>

@@ -10,7 +10,9 @@ export interface PlayerBannerProps {
 	stance: Stance;
 	/** This player is the one acting now (placing cards) — the disc breathes, the name is underlined. */
 	active: boolean;
-	/** Short status under the name ("TOCCA A TE", "PRONTO", …); null hides it. */
+	/** Opacity the whole banner fades to while this player is not acting (1 = no fade). */
+	idleOpacity?: number;
+	/** Short status under the name ("PRONTO", "STA SCEGLIENDO", …); null hides it. */
 	caption?: string | null;
 	/** Mirror the layout for the right-hand banner. */
 	align: "left" | "right";
@@ -22,13 +24,19 @@ export interface PlayerBannerProps {
  * (天 heaven / 地 earth) and one hanko seal per life. No panel — ink straight on the paper sky,
  * like the lobby menu.
  */
-export const PlayerBanner = ({ team, damage, stance, active, caption, align, scale = 1 }: PlayerBannerProps) => {
+export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, caption, align, scale = 1 }: PlayerBannerProps) => {
 	const colour = TEAM_INK[team];
 	const disc = 64 * scale;
 	const right = align === "right";
 	const stanceLabel = STANCE_LABEL[stance];
 	return (
-		<div style={{ display: "flex", flexDirection: right ? "row-reverse" : "row", alignItems: "center", gap: 14 * scale }}>
+		// Not acting → the whole banner recedes a little, in step with its corner vignette resting in black.
+		<motion.div
+			initial={false}
+			animate={{ opacity: active ? 1 : idleOpacity }}
+			transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+			style={{ display: "flex", flexDirection: right ? "row-reverse" : "row", alignItems: "center", gap: 14 * scale }}
+		>
 			<SealDisc kanji={TEAM_KANJI[team]} colour={colour} size={disc} active={active} />
 			<div style={{ display: "flex", flexDirection: "column", alignItems: right ? "flex-end" : "flex-start", gap: 4 * scale, color: INK }}>
 				<div style={{ position: "relative", fontWeight: 700, fontSize: 21 * scale, lineHeight: 1, letterSpacing: "0.16em" }}>
@@ -101,6 +109,6 @@ export const PlayerBanner = ({ team, damage, stance, active, caption, align, sca
 					</AnimatePresence>
 				</div>
 			</div>
-		</div>
+		</motion.div>
 	);
 };

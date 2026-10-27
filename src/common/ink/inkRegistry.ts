@@ -4,7 +4,10 @@
  * stroke per entry, tracking the element's on-screen rect every frame.
  */
 
-export type InkTone = "ink" | "red" | "blue" | "ghost";
+export type InkTone = "ink" | "red" | "blue" | "orange" | "blood" | "ghost";
+
+/** Flat CSS colour of each tone — the stand-in where the ink canvas can't run (no WebGPU/WebGL2). */
+export const INK_TONE_FALLBACK: Record<InkTone, string> = { ink: "#17120e", red: "#b73225", blue: "#2f6f86", orange: "#c9631a", blood: "#8a1610", ghost: "rgba(23, 18, 14, 0.34)" };
 
 export interface InkStrokeEntry {
 	id: number;
@@ -24,6 +27,13 @@ export interface InkStrokeEntry {
 	/** A two-option toggle drawn as ONE stroke: the active half takes its tone, the other half
 	 *  goes ghost (see InkSegmentedStroke). */
 	segment?: { left: InkTone; right: InkTone; active: 0 | 1 };
+	/** Screen rotation of the stroke (radians, counter-clockwise). The box is then measured UNrotated
+	 *  (offset size), so the element itself must not be CSS-rotated. Default 0. */
+	angle?: number;
+	/** Seconds to lay the stroke (default `INK.strokePour`) — a sword cut is a flick, not a drag. */
+	pour?: number;
+	/** Seconds for the stroke to lift away once `leaving` (default the screen-exit duration). */
+	lift?: number;
 }
 
 let entries: InkStrokeEntry[] = [];

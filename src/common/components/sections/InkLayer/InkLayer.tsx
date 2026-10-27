@@ -16,6 +16,8 @@ const TONE: Record<InkTone, { tint: string; amount: number; opacity: number }> =
 	ink: { tint: INK.inkColor, amount: 0, opacity: 1 },
 	red: { tint: "#b73225", amount: 1, opacity: 1 },
 	blue: { tint: "#2f6f86", amount: 1, opacity: 1 },
+	orange: { tint: "#c9631a", amount: 1, opacity: 1 },
+	blood: { tint: "#8a1610", amount: 1, opacity: 1 },
 	ghost: { tint: INK.inkColor, amount: 0, opacity: 0.34 },
 };
 
@@ -46,9 +48,13 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		const u = inkUniforms<StrokeUniforms>(m.material);
 		const r = e.el.getBoundingClientRect();
 		const margin = INK.strokeMargin;
-		const w = r.width + margin * 2;
-		const h = r.height + margin * 2;
+		// A rotated stroke: the rect is only an axis-aligned bound, so size it from the element's own
+		// (unrotated) box and turn the mesh instead. The centre is the same either way.
+		const angle = e.angle ?? 0;
+		const w = (angle ? e.el.offsetWidth : r.width) + margin * 2;
+		const h = (angle ? e.el.offsetHeight : r.height) + margin * 2;
 		m.position.set(r.left + r.width / 2 - size.width / 2, size.height / 2 - (r.top + r.height / 2), 0);
+		m.rotation.z = angle;
 		m.scale.set(w, h, 1);
 		u.size.value.set(w, h);
 
@@ -58,12 +64,12 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		const age = startedAt.current === null ? 0 : Math.max(0, clock.elapsedTime - startedAt.current - e.delay);
 		// The brush sets off at once and slows as it lands (ease-out): a slow start would leave the
 		// row empty for a beat, stalling the screen's stagger. The ink soaks in behind it.
-		const laid = easeOutCubic(phaseProgress(age, INK.strokePour));
+		const laid = easeOutCubic(phaseProgress(age, e.pour ?? INK.strokePour));
 		// Leaving: after its row's exit delay the brush runs back over the stroke (tip → head),
 		// lifting the ink as it goes, while the row itself fades — never a hard cut.
 		if (e.leaving && leftAt.current === null) leftAt.current = clock.elapsedTime;
 		if (!e.leaving) leftAt.current = null;
-		const lift = leftAt.current === null ? 0 : phaseProgress(clock.elapsedTime - leftAt.current - e.exitDelay, EXIT_DURATION);
+		const lift = leftAt.current === null ? 0 : phaseProgress(clock.elapsedTime - leftAt.current - e.exitDelay, e.lift ?? EXIT_DURATION);
 		u.pour.value = laid * (1 - lift * lift);
 		// Hover reaches the ends out and thickens a touch — eased exponentially (frame-rate
 		// independent), so it glides in and out instead of popping.

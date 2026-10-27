@@ -26,6 +26,11 @@ export const BATTLEGROUND = {
 	y: -0.7, // vertical placement (below the horizon, on the floor)
 	diamondTilt: 1.0, // rake the diamond markers onto the floor (radians) — match to the floor tilt
 	sharedOffset: 0.2, // lateral nudge each pawn gets when both share a space, so they stay readable
+	// Narrow landscape windows: the resting played cards hug the lateral viewport edges, so a full-width
+	// line would put the end pawns under them. The line shrinks so its ends stay `edgeClear` (world x)
+	// inside the viewport edge — card column + the pawn's half-width — never below `minLineScale`.
+	edgeClear: 1.45,
+	minLineScale: 0.68,
 	// Portrait: the vertical duel line, raked onto the floor, with pawns/markers to its sides.
 	baseY: 0.66, // world-Y centre of the vertical line
 	laneOffset: 0.5, // lateral (x) offset of a pawn/marker from the line — bottom team right (+), top left (−)
@@ -97,9 +102,21 @@ export const GAME_HUD = {
 	scale: 1, // landscape size multiplier for banners + round marker
 	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
 	handoffDelayMs: 650, // after a confirm, let the cards flip face-down before the veil inks in
-	hitLagMs: 450, // a life seal breaks this long after the reveal, once the blade has landed
-	splashScale: 1, // size multiplier for the hit ink splash
-	splashSeconds: 1.6, // how long the splash lingers before it fades
+	introHudDelay: 0.1, // duel opening: s after both samurai have stood up before the HUD animates in
+	introTurnDelay: 0.7, // s after the HUD starts before red's first turn begins (the hand rises)
+	hitLagMs: 950, // a life seal breaks this long after the reveal, once the blade has landed
+	splashSeconds: 0.9, // how long the screen-edge ink wash of a landed hit lingers
+	hitInk: "#8a1610", // the spilled ink of a landed blow — blood red (the screen-edge wash)
+	idleOpacity: 0.6, // a banner whose player is NOT acting fades to this, alongside its corner resting in black
+	// Corner vignette behind the banners (sections/HudVignette → atoms/CornerVignette): a gradual glow in
+	// each top corner, drawn in the 3D scene under the cards — it glows in the team colour while that
+	// player is acting, otherwise rests in black.
+	vignetteShade: "#0c0a09", // resting tone (sumi black)
+	vignetteShadeOpacity: 0.5, // alpha of the resting shade at the corner
+	vignetteGlowOpacity: 0.65, // alpha of the team-colour glow at the corner
+	vignetteWidth: 0.66, // extent across, as a fraction of the viewport width
+	vignetteHeight: 0.31, // extent down, as a fraction of the viewport height
+	vignetteDrift: 4, // seconds for one slow breath of the vignette
 } as const;
 
 // --- Sumi ink (TSL shader) ---
@@ -168,19 +185,20 @@ export const PAWN = {
 // feet, each figure lies back flat on the floor until the duel starts, then is raised slowly and
 // gracefully — like a figure in a paper theatre lifted by hand — and eased back into place. Single source for the "Paper Cutout" Leva folder.
 export const PAPER_CUTOUT = {
-	lieAngle: -1.45, // radians the figure lies back on the floor (hinged at the feet) before the duel
+	lieAngle: -1.4, // radians the figure lies back on the floor (hinged at the feet) before the duel
 	standDur: 1.2, // seconds for the whole stand-up: the slow lift + the soft settle
 	liftShare: 0.74, // share of standDur spent lifting off the floor (the rest is the settle)
 	overshoot: 0.08, // radians the cut-out drifts PAST vertical before easing back — barely there
 	revealDelay: 0.05, // red starts standing this long after the veil has OPENED (ink/veilSignal)
 	stagger: 0.35, // blue stands this long after red
-	rimScale: 1.035, // paper rim: the silhouette scaled up behind the coloured one
-	rimColor: "#f4eee0", // the cut paper's cream
-	edgeOffsetX: 0.012, // offset of the sheet-thickness shadow (world units)
-	edgeOffsetY: -0.014,
-	edgeOpacity: 0.28,
-	shadowOpacity: 0.24, // contact shadow at the feet once standing
-	shadowWidth: 0.62, // × the sprite height
+	rimScale: 1.015, // paper rim: the silhouette scaled up behind the coloured one
+	rimColor: "#ffffff", // the cut paper's white rim
+	rimOffsetY: 0.001, // shifts the rim up (world units): thicker over the head/blades, thinner under the feet
+	edgeOffsetX: 0.007, // offset of the sheet-thickness shadow from the RIM outline (world units)
+	edgeOffsetY: 0.002, // positive = the dark sheet peeks out ABOVE the rim
+	edgeOpacity: 0.55,
+	shadowOpacity: 0.4, // contact shadow at the feet once standing
+	shadowWidth: 0.63, // × the sprite height
 	shadowHeight: 0.09, // world units
 } as const;
 
@@ -549,11 +567,19 @@ export interface LandingZoneConfig {
 /** Half-width of the battlefield line (outermost board spaces). */
 export const BATTLEFIELD_HALF_WIDTH = spaceToX(BOARD_SPACES - 1); // 1.5
 
+/**
+ * Landscape line scale for a visible viewport width: 1 on wide windows, shrinking so the line ends
+ * stay `BATTLEGROUND.edgeClear` inside the lateral edges (clear of the played cards), floored at
+ * `minLineScale`. Multiply `spaceToX` by it for every landscape position along the line.
+ */
+export const landscapeLineScale = (viewportWidth: number): number =>
+	Math.min(1, Math.max(BATTLEGROUND.minLineScale, (viewportWidth / 2 - BATTLEGROUND.edgeClear) / BATTLEFIELD_HALF_WIDTH));
+
 /** Which lateral edge a team's corner/cards hug: red = left (−x), blue = right (+x). */
 const teamEdgeSign = (team: Team): number => (team === "red" ? -1 : 1);
 
-/** X of a team's battleline origin — the end of the line where its pawn starts. */
-const teamOriginX = (team: Team): number => spaceToX(team === "red" ? RED_START : BLUE_START);
+/** X of a team's battleline origin — the end of the line where its pawn starts (scaled with the line). */
+const teamOriginX = (team: Team, viewportWidth: number): number => spaceToX(team === "red" ? RED_START : BLUE_START) * landscapeLineScale(viewportWidth);
 
 /** The role a played card plays in the current round, which drives where it sits. */
 export type PlayedMode = "rest" | "action" | "toHand" | "setAside";
@@ -712,7 +738,7 @@ export const playedCardTransform = (
 		case "setAside":
 			// Laid flat near the battleline on the team's side (just outside its end of the line).
 			return {
-				position: [teamOriginX(team) + sign * cfg.setAsideInset, cfg.setAsideY, cfg.setAsideZ],
+				position: [teamOriginX(team, viewport.width) + sign * cfg.setAsideInset, cfg.setAsideY, cfg.setAsideZ],
 				rotationZ: cfg.setAsideRotZ,
 				rotationX: -cfg.setAsideTilt,
 				scale: cfg.setAsideScale,

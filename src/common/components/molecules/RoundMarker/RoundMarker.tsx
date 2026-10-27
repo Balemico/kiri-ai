@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { INK, kanjiNumeral } from "../../../hudPalette";
+import { ENSO, ENSO_HEAD } from "../../../enso";
 
 export interface RoundMarkerProps {
 	round: number;
@@ -10,7 +11,8 @@ export interface RoundMarkerProps {
 }
 
 /**
- * The round number as a kanji numeral (一, 二, 三…) inside an ensō — the open zen brush circle.
+ * The round number as a kanji numeral (一, 二, 三…) inside an ensō — the open zen brush circle, a real
+ * brush gesture (heavy head, thinning arc, dry broken tail — geometry in `enso.ts`).
  * Each new round re-draws the circle and stamps the numeral in, so the round change is felt.
  */
 export const RoundMarker = ({ round, caption, scale = 1 }: RoundMarkerProps) => {
@@ -22,25 +24,39 @@ export const RoundMarker = ({ round, caption, scale = 1 }: RoundMarkerProps) => 
 			<div style={{ position: "relative", width: size, height: size }}>
 				<svg viewBox="0 0 100 100" width={size} height={size} style={{ position: "absolute", inset: 0, overflow: "visible" }} aria-hidden>
 					<defs>
-						<filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
-							<feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="7" />
-							<feDisplacementMap in="SourceGraphic" scale="4" />
+						{/* Fine paper-tooth roughness on the brush edges. */}
+						<filter id={`${filterId}-edge`} x="-20%" y="-20%" width="140%" height="140%">
+							<feTurbulence type="fractalNoise" baseFrequency="0.35" numOctaves="2" seed="7" />
+							<feDisplacementMap in="SourceGraphic" scale="1.6" />
 						</filter>
+						<filter id={`${filterId}-bleed`} x="-20%" y="-20%" width="140%" height="140%">
+							<feGaussianBlur stdDeviation="1.4" />
+						</filter>
+						{/* Keyed by round: a fresh ensō is brushed on every round — the mask runs along the
+						    gesture's spine, uncovering the brush mark in the order it was painted. */}
+						<mask id={`${filterId}-draw`} maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+							<motion.path
+								key={round}
+								d={ENSO.spine}
+								fill="none"
+								stroke="#fff"
+								strokeWidth={30}
+								initial={{ pathLength: 0 }}
+								animate={{ pathLength: 1 }}
+								transition={{ duration: 0.9, ease: [0.45, 0, 0.2, 1] }}
+							/>
+						</mask>
 					</defs>
-					{/* Keyed by round: a fresh circle is brushed on every round. Starts bottom-left and
-					    stops short of closing — the gap is what makes it an ensō. */}
-					<motion.path
-						key={round}
-						d="M30 82 A 40 40 0 1 1 64 87"
-						fill="none"
-						stroke={INK}
-						strokeWidth={5.5}
-						strokeLinecap="round"
-						filter={`url(#${filterId})`}
-						initial={{ pathLength: 0, opacity: 0.85 }}
-						animate={{ pathLength: 1, opacity: 0.85 }}
-						transition={{ duration: 0.9, ease: [0.45, 0, 0.2, 1] }}
-					/>
+					<g mask={`url(#${filterId}-draw)`} fill={INK}>
+						<path d={ENSO.wash} opacity={0.13} filter={`url(#${filterId}-bleed)`} />
+						<g filter={`url(#${filterId}-edge)`} opacity={0.9}>
+							<path d={ENSO.body} />
+							<circle cx={ENSO_HEAD.cx} cy={ENSO_HEAD.cy} r={ENSO_HEAD.r} />
+							{ENSO.strands.map((s, i) => (
+								<path key={i} d={s.d} fill="none" stroke={INK} strokeWidth={s.width} strokeLinecap="round" />
+							))}
+						</g>
+					</g>
 				</svg>
 				<AnimatePresence mode="popLayout" initial={false}>
 					<motion.span

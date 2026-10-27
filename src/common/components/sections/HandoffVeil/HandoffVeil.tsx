@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useGame } from "../../../state";
+import { handoffSignal, handoffTurnKey } from "../../../state/handoffSignal";
 import { useSession } from "../../../net";
 import { useLagged } from "../../../hooks/useLagged";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
@@ -21,14 +22,19 @@ export const HandoffVeil = () => {
 	const { state } = useGame();
 	const { mode, viewerTeam } = useSession();
 	const { handoffDelayMs } = useGameHudControls();
-	const [dismissed, setDismissed] = useState<string | null>(null);
+	// The dismissed key lives in a shared store so the HUD can hold its turn highlight until the tap.
+	const dismissed = useSyncExternalStore(handoffSignal.subscribe, handoffSignal.dismissed);
+	const setDismissed = handoffSignal.dismiss;
 	// A game can end in round 1 — forget the last dismissal at game-over so the rematch's "1-blue"
-	// hand-over still shows. Adjusted during render ("state from props"), not in an effect.
-	if (state.phase === "game-over" && dismissed !== null) setDismissed(null);
+	// hand-over still shows (an external store, so reset in an effect, never during render).
+	const over = state.phase === "game-over";
+	useEffect(() => {
+		if (over) handoffSignal.dismiss(null);
+	}, [over]);
+	// The store outlives the duel: forget the dismissal on leaving, so a new game starts clean.
+	useEffect(() => () => handoffSignal.dismiss(null), []);
 
-	const placing = state.phase === "place" && !state.confirmed[viewerTeam];
-	const opening = state.round === 1 && viewerTeam === "red";
-	const turnKey = mode === "local" && placing && !opening ? `${state.round}-${viewerTeam}` : null;
+	const turnKey = handoffTurnKey(state, mode === "local", viewerTeam);
 	const settledKey = useLagged(turnKey, handoffDelayMs);
 	const show = turnKey !== null && settledKey === turnKey && dismissed !== turnKey;
 

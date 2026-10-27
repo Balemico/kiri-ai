@@ -1,0 +1,1 @@
+export { CornerVignette } from "./CornerVignette";

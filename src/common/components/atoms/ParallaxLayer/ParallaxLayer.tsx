@@ -24,10 +24,12 @@ export interface ParallaxLayerProps {
 	lerp?: number;
 	/** Fired once when the material exists — lets a parent drive opacity (intro paint-on). */
 	onMaterial?: (mat: THREE.MeshBasicMaterial) => void;
+	/** Optional alpha map (multiplies the PNG's own alpha) — e.g. a soft fade on the bottom edge. */
+	alphaMap?: THREE.Texture;
 }
 
 /** One full-frame painting layer that eases toward a pointer- + drift-driven offset. */
-export const ParallaxLayer = ({ url, depth, phase, z, renderOrder, width, height, centerY, centerX = 0, parallaxX, parallaxY, driftAmp, driftSpeed, lerp = 0.06, onMaterial }: ParallaxLayerProps) => {
+export const ParallaxLayer = ({ url, depth, phase, z, renderOrder, width, height, centerY, centerX = 0, parallaxX, parallaxY, driftAmp, driftSpeed, lerp = 0.06, onMaterial, alphaMap }: ParallaxLayerProps) => {
 	const ref = useRef<THREE.Mesh>(null);
 	const notified = useRef(false);
 	// Configure colour space in the load callback (outside render) so the painted colours stay true.
@@ -57,7 +59,7 @@ export const ParallaxLayer = ({ url, depth, phase, z, renderOrder, width, height
 	return (
 		<mesh ref={ref} position={[centerX, centerY, z]} renderOrder={renderOrder}>
 			<planeGeometry args={[width, height]} />
-			<meshBasicMaterial ref={materialRef} map={texture} transparent toneMapped={false} depthWrite={false} />
+			<meshBasicMaterial ref={materialRef} map={texture} alphaMap={alphaMap} transparent toneMapped={false} depthWrite={false} />
 		</mesh>
 	);
 };
