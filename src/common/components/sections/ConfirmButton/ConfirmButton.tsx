@@ -3,9 +3,7 @@ import { Typography } from "../../atoms";
 import { useGame, canConfirm } from "../../../state";
 import { useSession } from "../../../net";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
-
-// Classic vermillion of a hanko (name seal) — reads as "Japanese" without being a team colour.
-const SEAL = "#b73225";
+import { SEAL } from "../../../hudPalette";
 
 interface Action {
 	/** Kanji shown inside the hanko seal. */
@@ -19,7 +17,7 @@ interface Action {
 /**
  * Elegant sumi-e action control, fixed bottom-right. While a player is placing it shows CONFIRM
  * (decision kanji 決) only ONCE both cards are down (hidden until the selection is complete); on
- * game-over it becomes NEW GAME locally (renewal kanji 新) or MENU online (return kanji 戻). During
+ * game-over it becomes NUOVA PARTITA locally (renewal kanji 新) or MENU online (return kanji 戻). During
  * the timed reveal sequence — and, online, after you've confirmed — it stays hidden. Breathes when armed.
  */
 export const ConfirmButton = () => {
@@ -33,11 +31,11 @@ export const ConfirmButton = () => {
 
 	const config: Action | null =
 		placing && canConfirm(state, viewerTeam)
-			? { kanji: "決", label: "CONFIRM", onClick: () => dispatch({ type: "CONFIRM_SELECTION" }), enabled: true }
+			? { kanji: "決", label: "CONFERMA", onClick: () => dispatch({ type: "CONFIRM_SELECTION" }), enabled: true }
 			: over
 				? mode === "online"
 					? { kanji: "戻", label: "MENU", onClick: () => leave(), enabled: true }
-					: { kanji: "新", label: "NEW GAME", onClick: () => dispatch({ type: "RESET_GAME" }), enabled: true }
+					: { kanji: "新", label: "NUOVA PARTITA", onClick: () => dispatch({ type: "RESET_GAME" }), enabled: true }
 				: null;
 
 	return (

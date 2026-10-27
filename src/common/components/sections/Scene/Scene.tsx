@@ -9,6 +9,9 @@ import { LandingZones } from "../LandingZones";
 import { CardNameReveal } from "../CardNameReveal";
 import { ConfirmButton } from "../ConfirmButton";
 import { WinBanner } from "../WinBanner";
+import { GameHud } from "../GameHud";
+import { HandoffVeil } from "../HandoffVeil";
+import { StrikeSplash } from "../StrikeSplash";
 import { WaitingOverlay } from "../../../net";
 import { useSceneFrame } from "../../../hooks/useSceneFrame";
 import { useFloorControls } from "../../../hooks/useFloorControls";
@@ -135,7 +138,16 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 	return (
 		<>
 			<Leva collapsed hidden={import.meta.env.PROD || coarse} />
-			{showInterface && <ConfirmButton />}
+			{showInterface && (
+				<>
+					<GameHud />
+					<ConfirmButton />
+				</>
+			)}
+			{/* Ink splash on a landed hit / flash on a clash — feedback, so shown with the interface off too. */}
+			<StrikeSplash />
+			{/* Pass & play: covers the table while the device changes hands (no-op online). */}
+			<HandoffVeil />
 			{/* Online: "waiting for opponent" pill after you've confirmed (no-op in pass & play). */}
 			<WaitingOverlay />
 			{/* Victory title — shown on game-over regardless of the interface toggle. */}

@@ -1,7 +1,21 @@
 import { useControls } from "leva";
 import { RESOLUTION, type ResolutionConfig } from "../layout";
+import type { ActionResolution, Team } from "../game";
 
 export type ResolutionControls = ResolutionConfig;
+
+/** Per-pawn movement delays for a resolution: the lower-priority mover waits `moveStagger`. */
+export const moveDelays = (resolution: ActionResolution, c: ResolutionConfig): Record<Team, number> => {
+	const order = resolution.movement.order;
+	return { red: order === "blue-first" ? c.moveStagger : 0, blue: order === "red-first" ? c.moveStagger : 0 };
+};
+
+/** Seconds from the reveal to the strike landing: movement beats first, then `attackGap`. */
+export const attackBeat = (resolution: ActionResolution, c: ResolutionConfig): number => {
+	const moved = resolution.red.moved || resolution.blue.moved;
+	const d = moveDelays(resolution, c);
+	return (moved ? Math.max(d.red, d.blue) + c.moveDur : 0) + c.attackGap;
+};
 
 /**
  * Live-tunable staging of an action's resolution, in its own collapsed Leva folder. The movement

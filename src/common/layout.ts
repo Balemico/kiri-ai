@@ -88,6 +88,19 @@ export const WIN_BANNER = {
 	testTeam: "red" as Team, // Leva: which team's victory to preview
 } as const;
 
+// --- In-game HUD ---
+// The DOM overlay drawn over the duel: the two player banners (life seals + stance), the round
+// marker, the pass-the-device veil (pass & play) and the ink splash on a landed hit.
+export const GAME_HUD = {
+	inset: 22, // px from the screen edges to the banners / round marker
+	scale: 1, // landscape size multiplier for banners + round marker
+	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
+	handoffDelayMs: 650, // after a confirm, let the cards flip face-down before the veil inks in
+	hitLagMs: 450, // a life seal breaks this long after the reveal, once the blade has landed
+	splashScale: 1, // size multiplier for the hit ink splash
+	splashSeconds: 1.6, // how long the splash lingers before it fades
+} as const;
+
 // The samurai pawns are flat billboard sprites (white silhouettes in public/images/characters,
 // tinted per team). One PNG per stance: heaven = sword raised high, earth = sword forward.
 // `frames` holds metrics measured from each PNG's alpha so the figure is anchored by its BODY

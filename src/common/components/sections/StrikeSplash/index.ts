@@ -1,0 +1,1 @@
+export { StrikeSplash } from "./StrikeSplash";

@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Html } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { motion } from "motion/react";
-import { BoardLine, Pawn, ClashEffect } from "../../atoms";
+import { BoardLine, Pawn, ClashEffect, InkSplash } from "../../atoms";
 import { useGame } from "../../../state";
 import { useSession } from "../../../net";
 import { spaceToX, type Stance, type Team } from "../../../game";
@@ -12,7 +12,9 @@ import { useBottomTeam } from "../../../hooks/useBottomTeam";
 import { usePawnControls } from "../../../hooks/usePawnControls";
 import { useSlashControls } from "../../../hooks/useSlashControls";
 import { useClashControls } from "../../../hooks/useClashControls";
-import { useResolutionControls } from "../../../hooks/useResolutionControls";
+import { attackBeat, moveDelays, useResolutionControls } from "../../../hooks/useResolutionControls";
+import { useGameHudControls } from "../../../hooks/useGameHudControls";
+import { SEAL } from "../../../hudPalette";
 
 /** The battlefield line with both samurai pawns, positioned by the "Battleground" controls. */
 export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_FRAME, floorTilt = 0 }: { orientation?: Orientation; frame?: SceneFrame; floorTilt?: number }) => {
@@ -29,6 +31,7 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	const playClash = useCallback(() => setClashTick((t) => t + 1), []);
 	const clash = useClashControls(playClash);
 	const res = useResolutionControls();
+	const hud = useGameHudControls();
 	// The active (pulsing) marker shows only while placing — highlighting the viewer's own pawn (the
 	// colour this device plays). Once both are ready, through the reveal and round end, no marker pulses.
 	const isPlacing = state.phase === "place";
@@ -75,12 +78,10 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	// `attackGap` after movement settles. Equal priority (or a single mover) → no stagger.
 	const resolution = state.lastResolution;
 	const isReveal = state.phase === "reveal-first" || state.phase === "reveal-second";
-	const order = isReveal ? resolution?.movement.order ?? "simultaneous" : "simultaneous";
-	const redDelay = order === "blue-first" ? res.moveStagger : 0;
-	const blueDelay = order === "red-first" ? res.moveStagger : 0;
-	const anyMoved = isReveal && !!(resolution?.red.moved || resolution?.blue.moved);
-	const movementSpan = anyMoved ? Math.max(redDelay, blueDelay) + res.moveDur : 0;
-	const attackDelay = isReveal ? movementSpan + res.attackGap : 0;
+	const delays = isReveal && resolution ? moveDelays(resolution, res) : { red: 0, blue: 0 };
+	const redDelay = delays.red;
+	const blueDelay = delays.blue;
+	const attackDelay = isReveal && resolution ? attackBeat(resolution, res) : 0;
 
 	// On a parry the X crosses at the midpoint between the pawns, struck at the attack beat. The Leva
 	// "Play clash" button previews it (clashTick) regardless of phase, played immediately.
@@ -98,15 +99,15 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 		: [(redLine + blueLine) / 2, bg.y + pawn.height * 0.45, pawn.z + 0.1];
 
 	// Per-pawn combat callout, shown at the attack beat: a successful Counterattack reads
-	// "Counterattack!" (orange); attacking from a stance the card doesn't allow reads "Feint!" (black).
+	// "Contrattacco!" (orange); attacking from a stance the card doesn't allow reads "Finta!" (black).
 	// (An in-stance attack that only misses on range is not flagged.) Stays through game-over (a winning
 	// counter skips straight past the reveal phase).
 	const resolved = isReveal || state.phase === "game-over";
 	const calloutFor = (team: Team): { text: string; color: string } | null => {
 		if (!resolved || !resolution) return null;
 		const o = resolution[team];
-		if (o.countered) return { text: "Counterattack!", color: "#e6812c" };
-		if (o.wrongStance) return { text: "Feint!", color: "#111111" };
+		if (o.countered) return { text: "Contrattacco!", color: "#e6812c" };
+		if (o.wrongStance) return { text: "Finta!", color: "#111111" };
 		return null;
 	};
 	// A pawn's callout floats above its head: landscape at a fixed height over the line, portrait above
@@ -126,6 +127,22 @@ export const Battlefield = ({ orientation = "landscape", frame = DEFAULT_SCENE_F
 	return (
 		<group position={[bg.x, 0, 0]}>
 			<BoardLine y={pawnBaseY} length={portrait ? lineLength : undefined} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} />
+			{/* Vermilion ink bursts on a pawn the moment a blow lands on it (not on a clash: no damage). */}
+			{(["red", "blue"] as Team[]).map((team) => {
+				if (!resolved || !resolution || resolution.clash || !resolution[team === "red" ? "blue" : "red"].hit) return null;
+				return (
+					<PawnSplash
+						key={`${state.round}-${resolution.slot}-${team}`}
+						x={calloutX(team)}
+						y={calloutYOf(team) - 0.2 - pawn.height * 0.45}
+						z={calloutZOf(team)}
+						seed={state.round * 13 + (resolution.slot === "first" ? 1 : 5) + (team === "red" ? 0 : 3)}
+						delay={attackDelay}
+						scale={hud.splashScale}
+						seconds={hud.splashSeconds}
+					/>
+				);
+			})}
 			{(["red", "blue"] as Team[]).map((team) => {
 				const callout = calloutFor(team);
 				if (!callout) return null;
@@ -211,7 +228,7 @@ interface PawnCalloutProps {
 	delay: number;
 }
 
-/** A combat title (Feint! / Counterattack!) that pops in above a pawn at the moment of the strike. */
+/** A combat title (Finta! / Contrattacco!) that pops in above a pawn at the moment of the strike. */
 const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
 	<Html position={[x, y, z]} style={{ pointerEvents: "none" }}>
 		{/* Static wrapper bottom-centres the title over the pawn's head; motion owns the pop-in transform. */}
@@ -237,3 +254,34 @@ const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
 		</div>
 	</Html>
 );
+
+interface PawnSplashProps {
+	x: number;
+	y: number;
+	z: number;
+	seed: number;
+	/** Seconds to wait — the attack beat, so the ink flies as the blade lands. */
+	delay: number;
+	scale: number;
+	/** How long the splash lingers before drying out. */
+	seconds: number;
+}
+
+/** A landed blow: a seeded vermilion ink burst over the struck pawn, which then dries out. */
+const PawnSplash = ({ x, y, z, seed, delay, scale, seconds }: PawnSplashProps) => {
+	const size = `min(${(34 * scale).toFixed(1)}vmin, ${Math.round(360 * scale)}px)`;
+	return (
+		<Html position={[x, y, z]} style={{ pointerEvents: "none" }}>
+			<div style={{ width: size, height: size, transform: "translate(-50%, -50%)" }}>
+				<motion.div
+					initial={{ opacity: 0, scale: 0.3, rotate: (seed * 47) % 360 }}
+					animate={{ opacity: [0, 0.85, 0.75, 0], scale: [0.3, 1.06, 1, 1] }}
+					transition={{ duration: seconds, delay, times: [0, 0.07, 0.55, 1], ease: "easeOut" }}
+					style={{ width: "100%", height: "100%" }}
+				>
+					<InkSplash color={SEAL} seed={seed} size={1} style={{ width: "100%", height: "100%" }} />
+				</motion.div>
+			</div>
+		</Html>
+	);
+};
