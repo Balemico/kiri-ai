@@ -93,6 +93,7 @@ export const WIN_BANNER = {
 // marker, the pass-the-device veil (pass & play) and the ink splash on a landed hit.
 export const GAME_HUD = {
 	inset: 22, // px from the screen edges to the banners / round marker
+	bannerHeight: 116, // px a player banner occupies at scale 1 (disc / name, stance, seals, caption slot) — measured
 	scale: 1, // landscape size multiplier for banners + round marker
 	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
 	handoffDelayMs: 650, // after a confirm, let the cards flip face-down before the veil inks in
@@ -463,6 +464,8 @@ export const PLAYED_CARDS = {
 	// corner instead (only empty scenery up there, so it clears at any width).
 	restTopWidth: 4.8, // viewport width under which the resting pair moves from the bottom to the top corner
 	restTopMargin: 0.7, // gap from the top viewport edge down to the upper (first) resting card when lifted
+	restBelowHud: 0.36, // …or, if the HUD's banners reach lower, this far below them (card centre)
+	restTopScale: 0.8, // the lifted pair is a little smaller (and its gap tighter), to fit between the HUD and the swords
 	// Action: the revealed card rises landscape (horizontal) up to mid-page on its team's side, read
 	// during its action.
 	actionScale: 1.0,
@@ -560,7 +563,21 @@ export interface PlayedViewport {
 	height: number;
 	bottom: number;
 	centerY: number;
+	/** World height reserved at the TOP for the DOM HUD (player banners) — cards lifted to the top
+	 *  corner sit below it. 0 = none. */
+	topReserve?: number;
 }
+
+/** The played-card viewport for a frame viewport, reserving the HUD's top band (`GAME_HUD`, in CSS
+ *  px) converted to world units for a canvas `canvasHeightPx` tall — the HUD is DOM, the cards 3D,
+ *  so neither knows the other's size without this. */
+export const playedViewport = (viewport: { width: number; height: number; bottom: number; centerY: number }, canvasHeightPx: number): PlayedViewport => ({
+	width: viewport.width,
+	height: viewport.height,
+	bottom: viewport.bottom,
+	centerY: viewport.centerY,
+	topReserve: canvasHeightPx > 0 ? ((GAME_HUD.inset + GAME_HUD.bannerHeight * GAME_HUD.scale) / canvasHeightPx) * viewport.height : 0,
+});
 
 /** Portrait played-card layout knobs (the column of committed + set-aside cards at the team's side). */
 export interface PlayedPortrait {
@@ -589,6 +606,8 @@ export interface PlayedCardConfig {
 	restZ: number;
 	restTopWidth: number;
 	restTopMargin: number;
+	restBelowHud: number;
+	restTopScale: number;
 	actionScale: number;
 	actionTilt: number;
 	actionEdgeMargin: number;
@@ -703,16 +722,28 @@ export const playedCardTransform = (
 			// first card outermost (above the second). On a WIDE viewport the lateral edge sits clear of the
 			// central battleline/set-aside, so the pair rests in the bottom corner; as the viewport NARROWS
 			// the edge marches inward over them, so once the width drops below `restTopWidth` the pair lifts
-			// to the TOP corner instead (empty scenery up there → it clears at any width).
+			// to the TOP corner instead (empty scenery up there → it clears at any width), below the HUD's
+			// player banners (`topReserve`).
 			const isFirst = slot === "first";
 			const crowded = viewport.width < cfg.restTopWidth;
-			const y = crowded
-				? viewport.centerY + viewport.height / 2 - cfg.restTopMargin - (isFirst ? 0 : cfg.restGap)
-				: viewport.bottom + cfg.restY + (isFirst ? cfg.restGap : 0);
+			if (crowded) {
+				// Lifted to the top corner: the pair stays STACKED (first above second) just under the HUD's
+				// banners, a touch smaller and closer together so it fits between the banners and the
+				// samurai's raised swords. Where the band is too short a sword tip may brush the lower card
+				// — acceptable: the pawn draws over the (face-down) resting cards, hiding nothing.
+				const k = cfg.restTopScale;
+				const firstY = viewport.centerY + viewport.height / 2 - Math.max(cfg.restTopMargin, (viewport.topReserve ?? 0) + cfg.restBelowHud);
+				return {
+					position: [edgeX(cfg.restEdgeMargin), isFirst ? firstY : firstY - cfg.restGap * k, cfg.restZ],
+					rotationZ: -Math.PI / 2,
+					rotationX: 0,
+					scale: cfg.restScale * k,
+				};
+			}
 			return {
 				// Same z for both cards: a z difference would parallax-shift their apparent x (they sit
 				// near the frustum edge) and break the vertical alignment.
-				position: [edgeX(cfg.restEdgeMargin), y, cfg.restZ],
+				position: [edgeX(cfg.restEdgeMargin), viewport.bottom + cfg.restY + (isFirst ? cfg.restGap : 0), cfg.restZ],
 				rotationZ: -Math.PI / 2, // landscape (fixed)
 				rotationX: 0,
 				scale: cfg.restScale,

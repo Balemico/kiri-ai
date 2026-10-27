@@ -12,7 +12,7 @@ import {
 	DEFAULT_SCENE_FRAME,
 	type Orientation,
 	type PlayedMode,
-	type SceneFrame,
+	type SceneFrame, playedViewport
 } from "../../../layout";
 import { usePlayedCardControls } from "../../../hooks/usePlayedCardControls";
 import { useCardNameControls } from "../../../hooks/useCardNameControls";
@@ -61,7 +61,7 @@ export const CardNameReveal = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lan
 
 	const portrait = orientation === "portrait";
 	const viewport = frameViewport(frame, size.width / size.height);
-	const vp = { width: viewport.width, height: viewport.height, bottom: viewport.bottom, centerY: viewport.centerY };
+	const vp = playedViewport(viewport, size.height);
 	// Portrait column placement, matching Hand, so the label rides the real card.
 	const pp = portrait
 		? { bottomTeam, scaleFrac: played.playedScale, gap: played.playedGap, edge: played.playedEdge, setAsideScale: played.playedSetAside, setAsideOffset: played.playedSetAsideOffset, centerY: viewport.centerY + played.playedCenter }

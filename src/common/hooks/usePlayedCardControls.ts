@@ -23,6 +23,8 @@ const landscape = () => ({
 	restGap: { value: PLAYED_CARDS.restGap, min: 0, max: 1.5, step: 0.02 },
 	restTopWidth: { value: PLAYED_CARDS.restTopWidth, min: 2, max: 8, step: 0.1 },
 	restTopMargin: { value: PLAYED_CARDS.restTopMargin, min: 0, max: 2, step: 0.02 },
+	restBelowHud: { value: PLAYED_CARDS.restBelowHud, min: 0, max: 2, step: 0.02, label: "rest below HUD" },
+	restTopScale: { value: PLAYED_CARDS.restTopScale, min: 0.5, max: 1.2, step: 0.01, label: "lifted pair scale" },
 	actionScale: { value: PLAYED_CARDS.actionScale, min: 0.4, max: 2, step: 0.02 },
 	actionTilt: { value: PLAYED_CARDS.actionTilt, min: 0, max: 1.57, step: 0.01 },
 	actionEdgeMargin: { value: PLAYED_CARDS.actionEdgeMargin, min: 0, max: 2.5, step: 0.02 },

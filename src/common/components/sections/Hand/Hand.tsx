@@ -22,7 +22,7 @@ import {
 	type FanConfig,
 	type CardEntry,
 	type PlayedMode,
-	type Orientation,
+	type Orientation, playedViewport
 } from "../../../layout";
 import { useFanControls } from "../../../hooks/useFanControls";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
@@ -223,7 +223,7 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	// Played-card context — computed here (before the fan render) because the drop-zone geometry below
 	// needs it. The turn player (bottom team) sits on the LEFT, opponent right; lagged so played cards
 	// cover in place on CONFIRM before the column swaps sides with the view.
-	const playedVp = { width: viewport.width, height: viewport.height, bottom: viewport.bottom, centerY: viewport.centerY };
+	const playedVp = playedViewport(viewport, size.height);
 	const bottomTeam = useBottomTeam(viewerTeam);
 	const playedPortrait = portrait
 		? { bottomTeam, scaleFrac: played.playedScale, gap: played.playedGap, edge: played.playedEdge, setAsideScale: played.playedSetAside, setAsideOffset: played.playedSetAsideOffset, centerY: viewport.centerY + played.playedCenter }
