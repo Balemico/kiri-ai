@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
-import { LifeSeal, SealDisc } from "../../atoms";
+import { LifeSeal, SealDisc, StanceDiamonds } from "../../atoms";
 import { MAX_HITS, type Stance, type Team } from "../../../game";
-import { INK, STANCE_LABEL, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
+import { INK, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
+import { GAME_HUD } from "../../../layout";
 
 export interface PlayerBannerProps {
 	team: Team;
@@ -32,7 +33,6 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 	const disc = 64 * scale;
 	const right = align === "right";
 	const row = right ? "row-reverse" : "row";
-	const stanceLabel = STANCE_LABEL[stance];
 
 	// Brushed underline, painted in from the disc side while this player acts.
 	const underline = (
@@ -44,7 +44,7 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 				position: "absolute",
 				left: -2,
 				right: -6,
-				bottom: -5 * scale,
+				bottom: (compact ? -9 : -5) * scale,
 				height: 4 * scale,
 				borderRadius: "40% 60% 55% 45%",
 				background: colour,
@@ -53,23 +53,11 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 		/>
 	);
 
-	const stanceKanji = (
-		<AnimatePresence mode="popLayout" initial={false}>
-			<motion.span
-				key={stance}
-				initial={{ opacity: 0, y: -6 }}
-				animate={{ opacity: 1, y: 0 }}
-				exit={{ opacity: 0, y: 6 }}
-				transition={{ duration: 0.3 }}
-				style={{ fontFamily: "var(--font-display)", fontSize: 17 * scale, letterSpacing: 0 }}
-			>
-				{stanceLabel.kanji}
-			</motion.span>
-		</AnimatePresence>
-	);
+	// The stance as the cards print it: 天 / 地 on team-coloured diamonds, the one taken at full strength.
+	const stanceMark = <StanceDiamonds stance={stance} colour={colour} size={(compact ? GAME_HUD.stanceDiamondCompact : GAME_HUD.stanceDiamond) * scale} />;
 
 	// Lives are lost from the outside in, so the seal nearest the disc is the last one.
-	const seals = Array.from({ length: MAX_HITS }, (_, i) => <LifeSeal key={i} broken={i >= MAX_HITS - damage} size={24 * scale} tilt={i % 2 ? 3 : -4} />);
+	const seals = Array.from({ length: MAX_HITS }, (_, i) => <LifeSeal key={i} broken={i >= MAX_HITS - damage} size={(compact ? GAME_HUD.lifeSealSizeCompact : GAME_HUD.lifeSealSize) * scale} tilt={i % 2 ? 3 : -4} />);
 
 	return (
 		// Not acting → the whole banner recedes a little, in step with its corner vignette resting in black.
@@ -77,14 +65,18 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 			initial={false}
 			animate={{ opacity: active ? 1 : idleOpacity }}
 			transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-			style={{ display: "flex", flexDirection: row, alignItems: "center", gap: 14 * scale }}
+			style={{ display: "flex", flexDirection: row, alignItems: "flex-start", gap: 14 * scale }}
 		>
-			<SealDisc kanji={TEAM_KANJI[team]} colour={colour} size={disc} active={active} />
-			<div style={{ display: "flex", flexDirection: "column", alignItems: right ? "flex-end" : "flex-start", gap: 4 * scale, color: INK }}>
+			{/* The avatar column: the team disc, the stance diamonds stacked under it as on the cards. */}
+			<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: GAME_HUD.stanceGap * scale }}>
+				<SealDisc kanji={TEAM_KANJI[team]} colour={colour} size={disc} active={active} />
+				{stanceMark}
+			</div>
+			{/* Text column, centred on the disc (not on the taller avatar column). */}
+			<div style={{ position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: right ? "flex-end" : "flex-start", minHeight: disc, gap: 4 * scale, color: INK }}>
 				{compact ? (
-					// One row: stance kanji + life seals, underlined while this player acts.
-					<div style={{ position: "relative", display: "flex", flexDirection: row, alignItems: "center", gap: 7 * scale }}>
-						<span style={{ display: "inline-flex", opacity: 0.72 }}>{stanceKanji}</span>
+					// One row: the life seals, underlined while this player acts.
+					<div style={{ position: "relative", display: "flex", flexDirection: row, alignItems: "center", gap: 5 * scale }}>
 						{seals}
 						{underline}
 					</div>
@@ -94,15 +86,18 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 							{TEAM_NAME[team]}
 							{underline}
 						</div>
-						<div style={{ display: "flex", flexDirection: row, alignItems: "baseline", gap: 6 * scale, fontSize: 12 * scale, letterSpacing: "0.18em", opacity: 0.72, marginTop: 4 * scale }}>
-							{stanceKanji}
-							<span>{stanceLabel.label}</span>
-						</div>
-						<div style={{ display: "flex", flexDirection: row, gap: 7 * scale, marginTop: 2 * scale }}>{seals}</div>
+						<div style={{ display: "flex", flexDirection: row, gap: 7 * scale, marginTop: 6 * scale }}>{seals}</div>
 					</>
 				)}
-				{/* Fixed-height slot so the banner doesn't jump when the caption comes and goes. */}
-				<div style={{ height: 20 * scale, marginTop: (compact ? 6 : 4) * scale }}>
+				{/* Fixed-height slot so the banner doesn't jump when the caption comes and goes. Compact hangs
+				    it BELOW the row (out of flow), so the one row stays centred on the disc. */}
+				<div
+					style={
+						compact
+							? { position: "absolute", top: "100%", [right ? "right" : "left"]: 0, height: 20 * scale, marginTop: 12 * scale }
+							: { height: 20 * scale, marginTop: 4 * scale }
+					}
+				>
 					<AnimatePresence mode="wait">
 						{caption && (
 							<motion.span
@@ -117,7 +112,7 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 									border: `1px solid ${colour}`,
 									borderRadius: 3,
 									color: colour,
-									fontSize: 10 * scale,
+									fontSize: Math.max(9, 10 * scale),
 									lineHeight: 1.3,
 									letterSpacing: "0.2em",
 									whiteSpace: "nowrap",

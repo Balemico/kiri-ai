@@ -19,6 +19,15 @@ export interface PaperCutoutControls {
 	shadowHeight: number;
 	swayAngle: number;
 	swayDur: number;
+	/** The permanent sword cut on a struck figure: a thin triangular notch — fractions of its height (see pawnCut.ts). */
+	cutHeight: number;
+	/** Radians below horizontal: from above on the outer side, down into the body. */
+	cutAngle: number;
+	cutLength: number;
+	cutWidth: number;
+	cutRim: number;
+	/** The killing blow widens the same notch this much. */
+	cutDeath: number;
 }
 
 /** Live-tunable paper cut-out look + stand-up entrance, in its own collapsed Leva folder. "Play
@@ -47,6 +56,12 @@ export const usePaperCutoutControls = (onReplay: () => void, onFall: () => void)
 			shadowHeight: { value: PAPER_CUTOUT.shadowHeight, min: 0.01, max: 0.4, step: 0.005, label: "shadow height" },
 			swayAngle: { value: PAPER_CUTOUT.swayAngle, min: 0, max: 1, step: 0.01, label: "hit sway (rad)" },
 			swayDur: { value: PAPER_CUTOUT.swayDur, min: 0.2, max: 3, step: 0.05, label: "hit sway (s)" },
+			cutHeight: { value: PAPER_CUTOUT.cutHeight, min: 0.1, max: 0.9, step: 0.01, label: "cut height" },
+			cutAngle: { value: PAPER_CUTOUT.cutAngle, min: 0, max: 1.5, step: 0.01, label: "cut angle (rad)" },
+			cutLength: { value: PAPER_CUTOUT.cutLength, min: 0.1, max: 1.2, step: 0.01, label: "cut length" },
+			cutWidth: { value: PAPER_CUTOUT.cutWidth, min: 0.005, max: 0.25, step: 0.002, label: "cut width" },
+			cutRim: { value: PAPER_CUTOUT.cutRim, min: 0, max: 0.05, step: 0.001, label: "cut rim" },
+			cutDeath: { value: PAPER_CUTOUT.cutDeath, min: 1, max: 4, step: 0.05, label: "cut on death ×" },
 		},
 		{ collapsed: true },
 	);

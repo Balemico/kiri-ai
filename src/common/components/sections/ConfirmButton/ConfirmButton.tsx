@@ -5,6 +5,7 @@ import { useGame, canConfirm } from "../../../state";
 import { useSession } from "../../../net";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { useVictoryShown } from "../../../state/victoryReveal";
+import { useQuitMenuOpen } from "../../../state/quitMenu";
 
 interface Action {
 	label: string;
@@ -52,9 +53,12 @@ export const ConfirmButton = () => {
 	// The end-of-duel action comes in with the victory screen, after the loser has fallen.
 	const victoryShown = useVictoryShown();
 	const over = state.phase === "game-over" && victoryShown;
+	// Stepped aside while the "abandon the duel?" dialog is up — its own strokes take the stage.
+	const menuOpen = useQuitMenuOpen();
 
-	const config: Action | null =
-		placing && canConfirm(state, viewerTeam)
+	const config: Action | null = menuOpen
+		? null
+		: placing && canConfirm(state, viewerTeam)
 			? { label: "CONFERMA", onClick: () => dispatch({ type: "CONFIRM_SELECTION" }) }
 			: over
 				? mode === "online"

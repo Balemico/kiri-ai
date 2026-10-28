@@ -57,6 +57,16 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		m.rotation.z = angle;
 		m.scale.set(w, h, 1);
 		u.size.value.set(w, h);
+		// Droplets land only where they fit whole: inside the quad AND on screen (P runs from the
+		// quad's bottom-left, y up). A rotated quad keeps just its own box.
+		const cx = r.left + r.width / 2;
+		const cy = r.top + r.height / 2;
+		if (angle) u.dropBox.value.set(0, 0, w, h);
+		else {
+			const x0 = cx - w / 2;
+			const yBottom = cy + h / 2;
+			u.dropBox.value.set(Math.max(0, -x0), Math.max(0, yBottom - size.height), Math.min(w, size.width - x0), Math.min(h, yBottom));
+		}
 
 		if (!e.visible) startedAt.current = null;
 		else if (startedAt.current === null) startedAt.current = clock.elapsedTime;

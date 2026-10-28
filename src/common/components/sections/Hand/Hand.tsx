@@ -337,7 +337,8 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 		const footW = land ? CARD_HEIGHT : CARD_WIDTH;
 		const vert = land ? CARD_WIDTH : CARD_HEIGHT; // upright (un-foreshortened) vertical extent
 		const footH = vert * Math.cos(tilt);
-		if (mode === "setAside") {
+		// Portrait raises the set-aside card like a committed one (toward the centre), so it shares their zone below.
+		if (mode === "setAside" && !portrait) {
 			if (!raised) return { w: footW, h: footH, y: 0 };
 			// Grows upward to follow the lifted, flattened card (zone is in the card-scaled group).
 			const liftLocal = played.raiseLift / scale;
@@ -374,7 +375,10 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 		const towardCenter = bx <= 0 ? 1 : -1;
 		let target: CardTransform = { ...base, position: [bx, by, bz] };
 		if (raised) {
-			target = isSetAside
+			// Landscape lifts the set-aside card off the floor; portrait (where it sits at the screen edge, under
+			// the committed column) slides it toward the centre like the committed cards — lifting it there
+			// only pushed it up into the column above.
+			target = isSetAside && !portrait
 				? { ...base, position: [bx, by + played.raiseLift, bz], rotationX: 0, scale: base.scale * played.raiseScale }
 				: { ...base, position: [bx + towardCenter * played.raiseShift, by, bz], scale: base.scale * played.raiseScale };
 		}

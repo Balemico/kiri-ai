@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useLayoutEffect, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import { gsap } from "gsap";
 import * as THREE from "three";
 import type { Stance, Team } from "../../../game";
@@ -6,6 +7,7 @@ import { PAPER_CUTOUT, PAWN, SLASH, RESOLUTION, rakeLine } from "../../../layout
 import { useCharacterTexture, makeCharacterMaterial } from "../../../hooks/useCharacterTextures";
 import type { SlashControls } from "../../../hooks/useSlashControls";
 import type { PaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
+import { cutOf, syncCutLayer, withCut } from "../../../pawnCut";
 
 // Tints applied to the white silhouette (multiply), matched to the duel-card palette.
 const COLORS: Record<Team, string> = { red: "#cf463f", blue: "#4a8aa0" };
@@ -22,19 +24,32 @@ const STANCES: Stance[] = ["heaven", "earth"];
 let shadowTexture: THREE.CanvasTexture | null = null;
 const contactShadow = (): THREE.CanvasTexture => {
 	if (shadowTexture) return shadowTexture;
+	const W = 256;
+	const H = 64;
 	const c = document.createElement("canvas");
-	c.width = 128;
-	c.height = 32;
+	c.width = W;
+	c.height = H;
 	const g = c.getContext("2d")!;
-	const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-	grad.addColorStop(0, "rgba(0,0,0,1)");
-	grad.addColorStop(0.45, "rgba(0,0,0,0.55)");
-	grad.addColorStop(1, "rgba(0,0,0,0)");
-	// Squash the round gradient into a flat ellipse filling the 128×32 canvas.
-	g.setTransform(1, 0, 0, 0.25, 0, 0);
-	g.fillStyle = grad;
-	g.fillRect(0, 0, 128, 128);
+	// One gaussian blob (exp(-k·r²), sampled into many stops so no ring/knee shows), radius `r`
+	// as a fraction of the half-width, peak alpha `a`.
+	const blob = (r: number, a: number, k: number) => {
+		const R = (W / 2) * r;
+		const grad = g.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, R);
+		for (let i = 0; i <= 16; i++) {
+			const t = i / 16;
+			// Normalised so the curve reaches exactly 0 at the rim (no clipped edge).
+			const v = (Math.exp(-k * t * t) - Math.exp(-k)) / (1 - Math.exp(-k));
+			grad.addColorStop(t, `rgba(0,0,0,${(a * v).toFixed(4)})`);
+		}
+		g.fillStyle = grad;
+		g.fillRect(0, 0, W, W);
+	};
+	// Squash the round gradients into a flat ellipse filling the W×H canvas.
+	g.setTransform(1, 0, 0, H / W, 0, 0);
+	blob(1, 0.55, 3); // wide, faint penumbra
+	blob(0.55, 0.6, 4); // denser core right under the feet
 	shadowTexture = new THREE.CanvasTexture(c);
+	shadowTexture.colorSpace = THREE.SRGBColorSpace;
 	return shadowTexture;
 };
 
@@ -169,14 +184,15 @@ export const Pawn = ({
 
 	const texHeaven = useCharacterTexture(team, "heaven");
 	const texEarth = useCharacterTexture(team, "earth");
-	const matHeaven = useMemo(() => makeCharacterMaterial(texHeaven), [texHeaven]);
-	const matEarth = useMemo(() => makeCharacterMaterial(texEarth), [texEarth]);
+	// Every paper layer is cut-aware (pawnCut.ts): once struck, the figure is drawn sliced in two.
+	const matHeaven = useMemo(() => withCut(makeCharacterMaterial(texHeaven)), [texHeaven]);
+	const matEarth = useMemo(() => withCut(makeCharacterMaterial(texEarth)), [texEarth]);
 	const materials = useMemo(() => ({ heaven: matHeaven, earth: matEarth }), [matHeaven, matEarth]);
 	useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
 	// Paper layers behind the coloured silhouette: a cream rim (the cut paper's margin) and a faint
 	// dark offset copy (the sheet's thickness lifting off the background).
-	const rimMats = useMemo(() => ({ heaven: makeCharacterMaterial(texHeaven), earth: makeCharacterMaterial(texEarth) }), [texHeaven, texEarth]);
-	const edgeMats = useMemo(() => ({ heaven: makeCharacterMaterial(texHeaven), earth: makeCharacterMaterial(texEarth) }), [texHeaven, texEarth]);
+	const rimMats = useMemo(() => ({ heaven: withCut(makeCharacterMaterial(texHeaven)), earth: withCut(makeCharacterMaterial(texEarth)) }), [texHeaven, texEarth]);
+	const edgeMats = useMemo(() => ({ heaven: withCut(makeCharacterMaterial(texHeaven)), earth: withCut(makeCharacterMaterial(texEarth)) }), [texHeaven, texEarth]);
 	useEffect(() => () => STANCES.forEach((st) => rimMats[st].dispose()), [rimMats]);
 	useEffect(() => () => STANCES.forEach((st) => edgeMats[st].dispose()), [edgeMats]);
 	const shadowMat = useMemo(
@@ -448,6 +464,40 @@ export const Pawn = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [standTick]);
 
+	// The permanent cut (pawnCut.ts): at the blow a thin triangular notch is carved into the figure and
+	// stays, in both stances. It comes from ABOVE on the figure's OUTER side (its back, away from the
+	// opponent) and runs down into the body at `cutAngle`. The killing blow widens the same notch.
+	const cut = useRef({ amount: damage >= 2 ? paper.cutDeath : damage >= 1 ? 1 : 0 });
+	const openCut = (to: number, delay: number) => {
+		gsap.to(cut.current, { amount: to, duration: 0.35, delay, ease: "power3.out", overwrite: true });
+	};
+	// Keep every layer's cut in sync each frame (layer transforms + the live Leva look are cheap to copy).
+	useFrame(() => {
+		const { amount } = cut.current;
+		const full = paper.cutLength * height;
+		// Figure space is pre-mirror with the figure facing +x (the source art), so the outer side is −x for
+		// both teams and both layouts. Base → tip runs toward the front and DOWN, `cutAngle` below horizontal.
+		const tx = Math.cos(paper.cutAngle);
+		const ty = -Math.sin(paper.cutAngle);
+		STANCES.forEach((st) => {
+			[edgeRefs[st], rimRefs[st], meshRefs[st]].forEach((ref, layer) => {
+				const mesh = ref.current;
+				const u = mesh && cutOf(mesh.material);
+				if (!mesh || !u) return;
+				syncCutLayer(mesh);
+				u.on.value = amount > 0.001 ? 1 : 0;
+				u.point.value.set(0, height * paper.cutHeight);
+				u.dir.value.set(tx, ty);
+				// The wide base sits OUTSIDE the figure, high on its back (it enters from the edge already open);
+				// the tip stops at the body column, mid-figure — a notch, never a split. Carved from the base, the tip running in as it opens.
+				u.start.value = -full * 0.92;
+				u.length.value = full * Math.min(amount, 1);
+				// The coloured silhouette (layer 2) gets the wider notch → a line of paper rim along the cut.
+				u.halfWidth.value = ((paper.cutWidth * amount + (layer === 2 ? paper.cutRim : 0)) * height) / 2;
+			});
+		});
+	});
+
 	// Hit sway: the struck cut-out totters on its feet BACK and forth (toward the floor it lies on and
 	// back — as if about to fall), then settles upright in a few damped swings. Its own group inside the
 	// hinge, so it composes with (never cancels) the lie/stand/fall tweens on the hinge itself.
@@ -488,11 +538,16 @@ export const Pawn = ({
 		if (hitTick === prevHitTick.current) return;
 		prevHitTick.current = hitTick;
 		sway(0);
+		// Preview the cut too, then mend it (only on a figure that isn't cut for real).
+		if (cut.current.amount === 0) {
+			openCut(1, 0);
+			gsap.to(cut.current, { amount: 0, duration: 0.3, delay: 2.4, ease: "power2.in" });
+		}
 		// sway reads refs + the live controls.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hitTick]);
 
-	// Hit reaction (when this pawn takes a point): a horizontal shake + white flash, a sway on its feet,
+	// Hit reaction (when this pawn takes a point): a horizontal shake + black (sumi) flash, a sway on its feet,
 	// and a yellow sword-cut that sweeps across the figure — echoing the slash on the cards.
 	useEffect(() => {
 		if (damage > prevDamage.current) {
@@ -508,12 +563,15 @@ export const Pawn = ({
 					.to(g.position, { x: 0, duration: 0.08, ease: "power2.out" });
 			}
 			const target = new THREE.Color(tintFor(team, damage));
-			const flash = { r: target.r, g: target.g, b: target.b, duration: 0.6, delay: attackDelay, ease: "power2.out" };
+			const ink = new THREE.Color(PAWN.hitFlash);
+			// immediateRender off: the silhouette keeps its tint until the blow actually lands (the delay).
+			const flash = { r: target.r, g: target.g, b: target.b, duration: 0.6, delay: attackDelay, ease: "power2.out", immediateRender: false };
 			STANCES.forEach((s) => {
 				const color = matOf(s)?.color;
-				if (color) gsap.fromTo(color, { r: 1, g: 1, b: 1 }, { ...flash });
+				if (color) gsap.fromTo(color, { r: ink.r, g: ink.g, b: ink.b }, { ...flash });
 			});
 			gsap.delayedCall(attackDelay, playSlash); // yellow sword-cut over the struck pawn, after movement
+			openCut(damage >= 2 ? paper.cutDeath : 1, attackDelay);
 		}
 		prevDamage.current = damage;
 		// matOf reads stable refs; not a dependency.

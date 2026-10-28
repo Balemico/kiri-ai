@@ -10,6 +10,7 @@ import { CardNameReveal } from "../CardNameReveal";
 import { ConfirmButton } from "../ConfirmButton";
 import { InkLayer } from "../InkLayer";
 import { WinBanner } from "../WinBanner";
+import { QuitDialog } from "../QuitDialog";
 import { GameHud } from "../GameHud";
 import { HudVignette } from "../HudVignette";
 import { HandoffVeil } from "../HandoffVeil";
@@ -172,6 +173,8 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 					{/* Sumi strokes of the action button: over the duel canvas, under its label (1500). */}
 					<InkLayer zIndex={1450} />
 					<ConfirmButton />
+					{/* "Abandon the duel?" — opened from the round ensō in the HUD. */}
+					<QuitDialog />
 				</>
 			)}
 			{/* Ink splash on a landed hit / flash on a clash — feedback, so shown with the interface off too. */}

@@ -5,9 +5,9 @@ import { ENSO, ENSO_HEAD } from "../../../enso";
 
 export interface RoundMarkerProps {
 	round: number;
-	/** One-line phase caption under the numeral; null hides it. */
-	caption?: string | null;
 	scale?: number;
+	/** Makes the ensō the in-duel menu button (a small "MENU" hint under it); absent = inert. */
+	onMenu?: () => void;
 }
 
 /**
@@ -15,13 +15,29 @@ export interface RoundMarkerProps {
  * brush gesture (heavy head, thinning arc, dry broken tail — geometry in `enso.ts`).
  * Each new round re-draws the circle and stamps the numeral in, so the round change is felt.
  */
-export const RoundMarker = ({ round, caption, scale = 1 }: RoundMarkerProps) => {
+export const RoundMarker = ({ round, scale = 1, onMenu }: RoundMarkerProps) => {
 	const filterId = useId().replace(/:/g, "");
 	const size = 76 * scale;
+	// The ensō + its MENU hint form one tap target (the HUD itself lets pointers through).
+	const menuTarget = onMenu
+		? {
+				role: "button",
+				tabIndex: 0,
+				"aria-label": "Menu",
+				onClick: onMenu,
+				onKeyDown: (e: React.KeyboardEvent) => {
+					if (e.key === "Enter" || e.key === " ") onMenu();
+				},
+			}
+		: {};
 	return (
-		<div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 * scale, color: INK }}>
-			<span style={{ fontSize: 10 * scale, letterSpacing: "0.32em", opacity: 0.6, paddingLeft: "0.32em" }}>ROUND</span>
-			<div style={{ position: "relative", width: size, height: size }}>
+		<div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: INK }}>
+			<motion.div
+				{...menuTarget}
+				whileHover={onMenu ? { scale: 1.05 } : undefined}
+				whileTap={onMenu ? { scale: 0.94 } : undefined}
+				style={{ position: "relative", width: size, height: size, cursor: onMenu ? "pointer" : undefined, pointerEvents: onMenu ? "auto" : "none", outline: "none", WebkitTapHighlightColor: "transparent" }}
+			>
 				<svg viewBox="0 0 100 100" width={size} height={size} style={{ position: "absolute", inset: 0, overflow: "visible" }} aria-hidden>
 					<defs>
 						{/* Fine paper-tooth roughness on the brush edges. */}
@@ -71,30 +87,34 @@ export const RoundMarker = ({ round, caption, scale = 1 }: RoundMarkerProps) => 
 							display: "grid",
 							placeItems: "center",
 							fontFamily: "var(--font-display)",
-							fontSize: size * (round >= 10 ? 0.36 : 0.46),
+							fontSize: size * (round >= 10 ? 0.3 : 0.38),
 							lineHeight: 1,
 						}}
 					>
 						{kanjiNumeral(round)}
 					</motion.span>
 				</AnimatePresence>
-			</div>
-			<div style={{ height: 16 * scale }}>
-				<AnimatePresence mode="wait">
-					{caption && (
-						<motion.span
-							key={caption}
-							initial={{ opacity: 0, y: -4 }}
-							animate={{ opacity: 0.7, y: 0 }}
-							exit={{ opacity: 0, y: 4 }}
-							transition={{ duration: 0.3 }}
-							style={{ display: "block", fontSize: 11 * scale, letterSpacing: "0.22em", whiteSpace: "nowrap" }}
-						>
-							{caption}
-						</motion.span>
-					)}
-				</AnimatePresence>
-			</div>
+			</motion.div>
+			{/* The hint that the ensō opens the menu (never below 9px, or it turns into a smudge). */}
+			{onMenu && (
+				<span
+					onClick={onMenu}
+					style={{
+						marginTop: 4 * scale,
+						paddingLeft: "0.28em",
+						fontSize: Math.max(9, 9 * scale),
+						fontWeight: 600,
+						letterSpacing: "0.28em",
+						lineHeight: 1,
+						opacity: 0.55,
+						whiteSpace: "nowrap",
+						cursor: "pointer",
+						pointerEvents: "auto",
+					}}
+				>
+					MENU
+				</span>
+			)}
 		</div>
 	);
 };

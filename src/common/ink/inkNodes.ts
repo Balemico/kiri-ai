@@ -1,4 +1,4 @@
-import { Color, Vector2 } from "three";
+import { Color, Vector2, Vector4 } from "three";
 import { MeshBasicNodeMaterial, type Node } from "three/webgpu";
 import {
 	Fn,
@@ -104,6 +104,10 @@ interface BrushSpec {
 	 *  full; no wash, no spray (cheaper — several stack on every pixel). Tapers less
 	 *  (`VEIL_TIP_TAPER`) so its tail still covers. */
 	cover: boolean;
+	/** Box (px, in P space: `xy` min corner, `zw` max corner) a droplet must fit in WHOLE — the quad
+	 *  the stroke is drawn on, cut to the visible screen: a drop crossing either edge is never flung
+	 *  (otherwise that edge slices it in half). */
+	bounds?: N;
 }
 
 /** Flung droplets on an anisotropic cell grid in stroke space (cells stretched along the gesture). */
@@ -128,7 +132,17 @@ const droplets = (x: N, y: N, s: N, zs: N, n: N, b: BrushSpec, cellAlong: number
 	const radius = mix(float(rMin), float(rMax), pow(r3, 3)).mul(b.dropScale);
 	const elong = mix(float(1.2), float(2.6), r1);
 	const dd = length(f.sub(centre).mul(vec2(cl, cw)).div(vec2(elong, 1)));
-	const drop = smoothstep(radius, radius.mul(0.55), dd).mul(exists);
+	// Whole drops only: one that would cross the quad's edge isn't flung at all.
+	let fits: N = float(1);
+	if (b.bounds) {
+		const local = cell.add(centre).mul(vec2(cl, cw));
+		const at = b.centre.add(b.dir.mul(local.x)).add(vec2(b.dir.y.negate(), b.dir.x).mul(local.y));
+		const reach = radius.mul(elong).add(1);
+		const lo = step(b.bounds.xy.add(reach), at);
+		const hi = step(at, b.bounds.zw.sub(reach));
+		fits = lo.x.mul(lo.y).mul(hi.x).mul(hi.y);
+	}
+	const drop = smoothstep(radius, radius.mul(0.55), dd).mul(exists).mul(fits);
 	// A drop exists only once the brush has passed and flung it.
 	return drop.mul(step(s, b.front.sub(0.08)));
 };
@@ -256,6 +270,8 @@ type U<T> = ShaderNodeObject<Node> & { value: T };
 export interface StrokeUniforms {
 	/** Plane size in px (button box + margin on every side). */
 	size: U<Vector2>;
+	/** Where a droplet may land whole (P space, xy min → zw max): the quad ∩ the visible screen. */
+	dropBox: U<Vector4>;
 	margin: U<number>;
 	/** 0 → 1: the brush slashes left → right (and flings its spray at the end). */
 	pour: U<number>;
@@ -283,6 +299,7 @@ export interface StrokeUniforms {
 export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: StrokeUniforms } => {
 	const u = {
 		size: uniform(new Vector2(1, 1)),
+		dropBox: uniform(new Vector4(0, 0, 1, 1)),
 		margin: num(INK.strokeMargin),
 		pour: num(0),
 		hover: num(0),
@@ -329,11 +346,14 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		wildness: 0.35,
 		fineSpray: true,
 		cover: false,
+		bounds: u.dropBox,
 	});
 	// Hover deepens the wash WHERE IT ALREADY IS (multiply) — adding to it would tint the whole plane.
 	// A coloured wash reads as a pastel glow, not diluted ink: tinted strokes keep only a trace.
 	const washTone = float(1).sub(u.tintAmount.mul(0.8));
-	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)).mul(washTone), drops);
+	// The wash's bleed can reach the quad's edge: feather it out there instead of a hard cut.
+	const edgeFade = smoothstep(0, 14, P.x).mul(smoothstep(0, 14, u.size.x.sub(P.x))).mul(smoothstep(0, 14, P.y)).mul(smoothstep(0, 14, u.size.y.sub(P.y)));
+	const alpha = union(ink, wash.mul(u.hover.mul(0.8).add(1)).mul(washTone).mul(edgeFade), drops);
 	const material = baseMaterial();
 	// Split stroke seam, behaving like the stroke's own frayed ends: the lit colour reaches into
 	// the other half along the bristles (streaks of uneven length), on a wide soft feather that

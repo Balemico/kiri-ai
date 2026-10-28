@@ -12,4 +12,5 @@ export * from "./InkLayer";
 export * from "./GameHud";
 export * from "./HudVignette";
 export * from "./HandoffVeil";
+export * from "./QuitDialog";
 export * from "./StrikeSplash";

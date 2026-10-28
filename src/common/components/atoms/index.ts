@@ -4,6 +4,7 @@ export * from "./ClashEffect";
 export * from "./LifeSeal";
 export * from "./InkSplash";
 export * from "./SealDisc";
+export * from "./StanceDiamonds";
 export * from "./CardModel";
 export * from "./FitCamera";
 export * from "./ParallaxLayer";

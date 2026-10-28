@@ -1,13 +1,15 @@
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { PlayerBanner, RoundMarker } from "../../molecules";
 import { useGame } from "../../../state";
 import { useActingTeams } from "../../../hooks/useActingTeams";
 import { useDuelIntroReached } from "../../../state/duelIntro";
 import { useHitPreviewTick } from "../../../state/hitPreview";
+import { quitMenu } from "../../../state/quitMenu";
 import { useSession } from "../../../net";
 import { useLagged } from "../../../hooks/useLagged";
 import { useIsPortrait } from "../../../hooks/useIsPortrait";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
+import { INK } from "../../../hudPalette";
 import { MAX_HITS, type GameState, type Team, type TurnPhase } from "../../../game";
 
 /** Leva "▶ Play hit": how long the previewed broken seal stays cracked before it mends (ms). */
@@ -61,6 +63,8 @@ export const GameHud = () => {
 	const redStance = useLagged(state.red.stance, hud.hitLagMs);
 	const blueStance = useLagged(state.blue.stance, hud.hitLagMs);
 
+	const caption = PHASE_CAPTION[state.phase];
+
 	// Both orientations: red top-left, blue top-right, flanking the round marker.
 	const banner = (team: Team, damage: number, stance: typeof redStance) => (
 		<PlayerBanner
@@ -97,9 +101,42 @@ export const GameHud = () => {
 				}}
 			>
 				<div style={{ justifySelf: "start" }}>{banner("red", redDamage, redStance)}</div>
-				<RoundMarker round={state.round} caption={portrait ? null : PHASE_CAPTION[state.phase]} scale={scale} />
+				{/* The ensō doubles as the menu button ("abandon the duel?") — live once the HUD is in. */}
+				<RoundMarker round={state.round} scale={scale} onMenu={hudIn ? quitMenu.open : undefined} />
 				<div style={{ justifySelf: "end" }}>{banner("blue", blueDamage, blueStance)}</div>
 			</motion.div>
+			{/* Landscape: the phase caption floats on its own, down toward the middle of the page — apart
+			    from the ensō, so the top bar stays just banners + round. Portrait drops it. */}
+			{!portrait && (
+				<div
+					style={{
+						position: "fixed",
+						top: `${(hud.phaseCaptionTop * 100).toFixed(1)}vh`,
+						left: 0,
+						right: 0,
+						display: "flex",
+						justifyContent: "center",
+						pointerEvents: "none",
+						userSelect: "none",
+						zIndex: 1200,
+					}}
+				>
+					<AnimatePresence mode="wait">
+						{hudIn && caption && (
+							<motion.span
+								key={caption}
+								initial={{ opacity: 0, y: -6, filter: "blur(3px)" }}
+								animate={{ opacity: 0.75, y: 0, filter: "blur(0px)" }}
+								exit={{ opacity: 0, y: 6, filter: "blur(3px)" }}
+								transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+								style={{ color: INK, fontSize: 13 * scale, letterSpacing: "0.26em", paddingLeft: "0.26em", whiteSpace: "nowrap" }}
+							>
+								{caption}
+							</motion.span>
+						)}
+					</AnimatePresence>
+				</div>
+			)}
 		</>
 	);
 };

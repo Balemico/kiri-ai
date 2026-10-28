@@ -36,7 +36,7 @@ export const BATTLEGROUND = {
 	laneOffset: 0.34, // lateral (x) offset of a pawn/marker from the line — bottom team right (+), top left (−)
 	pawnLift: -0.04, // extra world-Y nudge of the pawns only, to seat their feet on the diamonds
 	thickness: 1, // fine-tune multiplier on the (auto, line-proportional) marker/diamond/line-width size — same in both orientations; 1 = the natural proportion
-	handReserve: 0.24, // fraction of the viewport HEIGHT kept for the hand at the bottom; the line fills the rest
+	handReserve: 0.3, // fraction of the viewport HEIGHT kept for the hand at the bottom; the line fills the rest
 	hudReserve: 0.02, // fraction of the viewport HEIGHT kept for the DOM HUD at the top — the top pawn's HEAD stays below it
 	margin: 0.04, // extra breathing room (fraction of the viewport HEIGHT) kept free, so the line never fills edge-to-edge
 	pawnScale: 0.72, // portrait samurai size vs landscape — smaller, so a pawn doesn't cover the card slots beside the line
@@ -110,8 +110,13 @@ export const WIN_BANNER = {
 // marker, the pass-the-device veil (pass & play) and the ink splash on a landed hit.
 export const GAME_HUD = {
 	inset: 22, // px from the screen edges to the banners / round marker
-	bannerHeight: 116, // px a player banner occupies at scale 1 (disc / name, stance, seals, caption slot) — measured
-	bannerHeightCompact: 70, // px the COMPACT (portrait) banner occupies at scale 1 (disc / one stance+seals row, caption slot)
+	bannerHeight: 134, // px a player banner occupies at scale 1 (disc + stance diamonds column / name, seals, caption slot)
+	bannerHeightCompact: 126, // px the COMPACT (portrait) banner occupies at scale 1 (disc + stance diamonds column / seals row + caption slot)
+	lifeSealSize: 32, // px of one 命 life seal at scale 1 (landscape banner)
+	lifeSealSizeCompact: 36, // px of one life seal at scale 1 in the COMPACT (portrait) banner — its one row carries the seals
+	stanceDiamond: 28, // px (tip to tip) of one 天/地 stance diamond at scale 1 (landscape banner) — the cards' stance mark
+	stanceDiamondCompact: 24, // px of one stance diamond at scale 1 in the COMPACT (portrait) banner
+	stanceGap: 12, // px between the disc and the stance diamonds under it, at scale 1 — clears the active disc's breathing halo (~0.15 × disc)
 	scale: 1, // landscape size multiplier for banners + round marker
 	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
 	handoffDelayMs: 650, // after a confirm, let the cards flip face-down before the veil inks in
@@ -120,6 +125,7 @@ export const GAME_HUD = {
 	hitLagMs: 950, // a life seal breaks this long after the reveal, once the blade has landed
 	splashSeconds: 0.9, // how long the screen-edge ink wash of a landed hit lingers
 	hitInk: "#8a1610", // the spilled ink of a landed blow — blood red (the screen-edge wash)
+	phaseCaptionTop: 0.21, // landscape: the phase caption (SCELTA DELLE CARTE…) floats apart from the ensō, this fraction of the viewport height down
 	idleOpacity: 0.6, // a banner whose player is NOT acting fades to this, alongside its corner resting in black
 	// Corner vignette behind the banners (sections/HudVignette → atoms/CornerVignette): a gradual glow in
 	// each top corner, drawn in the 3D scene under the cards — it glows in the team colour while that
@@ -189,6 +195,7 @@ export const PAWN = {
 	height: 1.0, // world height of the sprite (board line → top of frame)
 	yLift: 0.11, // nudge the feet relative to the board line
 	z: -0.2, // just in front of the board line
+	hitFlash: "#0b0908", // the struck silhouette flashes this (sumi black) at the blow, then eases back to its tint
 	// Draw order: pawns sit ABOVE the played cards + their landing zones (renderOrder ~127) but BELOW the
 	// hand fan (see HAND_RENDER_BIAS), so the figures aren't hidden by the committed cards while the hand
 	// still stays on top of everything. Slash/clash effects are bumped to stay above the pawn. (Pairs with
@@ -231,6 +238,13 @@ export const PAPER_CUTOUT = {
 	shadowHeight: 0.09, // world units
 	swayAngle: 0.35, // radians the struck cut-out totters BACK on its feet when hit (as if about to fall)
 	swayDur: 1.1, // seconds for the damped back-and-forth to settle upright
+	// The permanent sword cut on a struck figure (pawnCut.ts): a thin triangular notch — fractions of its height.
+	cutHeight: 0.57, // where the notch's middle crosses the body column, up from the feet
+	cutAngle: 0.82, // radians below horizontal: the notch comes from ABOVE on the outer side (the back) and runs down into the body
+	cutLength: 0.8, // base → tip (the base lies outside the figure, the tip stops mid-body)
+	cutWidth: 0.15, // across the base (outside the figure — the notch is narrower where it enters the edge)
+	cutRim: 0.014, // extra width on the coloured silhouette only → a line of white paper rim along the cut
+	cutDeath: 1.7, // the killing blow widens the same notch this much
 } as const;
 
 // Yellow sword-cut wedge shown over a pawn that takes a hit (echoes the card slash). A bold
