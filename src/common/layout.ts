@@ -111,11 +111,11 @@ export const WIN_BANNER = {
 export const GAME_HUD = {
 	inset: 22, // px from the screen edges to the banners / round marker
 	bannerHeight: 134, // px a player banner occupies at scale 1 (disc + stance diamonds column / name, seals, caption slot)
-	bannerHeightCompact: 126, // px the COMPACT (portrait) banner occupies at scale 1 (disc + stance diamonds column / seals row + caption slot)
+	bannerHeightCompact: 146, // px the COMPACT (portrait) banner occupies at scale 1 (disc + stance diamonds column / seals row + caption slot)
 	lifeSealSize: 32, // px of one 命 life seal at scale 1 (landscape banner)
-	lifeSealSizeCompact: 36, // px of one life seal at scale 1 in the COMPACT (portrait) banner — its one row carries the seals
+	lifeSealSizeCompact: 32, // px of one life seal at scale 1 in the COMPACT (portrait) banner — its one row carries the seals
 	stanceDiamond: 28, // px (tip to tip) of one 天/地 stance diamond at scale 1 (landscape banner) — the cards' stance mark
-	stanceDiamondCompact: 24, // px of one stance diamond at scale 1 in the COMPACT (portrait) banner
+	stanceDiamondCompact: 34, // px of one stance diamond at scale 1 in the COMPACT (portrait) banner — bigger than landscape: at portraitScale its kanji must still read (~11 px)
 	stanceGap: 12, // px between the disc and the stance diamonds under it, at scale 1 — clears the active disc's breathing halo (~0.15 × disc)
 	scale: 1, // landscape size multiplier for banners + round marker
 	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
