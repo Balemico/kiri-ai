@@ -1,2 +1,5 @@
+# Crawling is allowed ON PURPOSE: crawlers must fetch the pages to see the `noindex`
+# (meta tag in index.html + X-Robots-Tag header in vercel.json). A `Disallow: /` here
+# would hide that rule from them and still let the bare URL be indexed from external links.
 User-agent: *
-Disallow: /
+Allow: /
