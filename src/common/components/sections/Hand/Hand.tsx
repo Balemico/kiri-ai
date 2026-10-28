@@ -163,7 +163,8 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	const count = handViews.length;
 	const targetScale = portrait ? (ctrl.cardScale * viewport.height) / CARD_HEIGHT : ctrl.baseScale;
 	const targetStep = portrait && ctrl.baseScale > 0 ? targetScale * (ctrl.cardStep / ctrl.baseScale) : ctrl.cardStep;
-	const { spread, scale } = fitHandFan(count, viewport.width * 0.92, targetStep, targetScale);
+	// Portrait: a full hand overlaps more before it shrinks (minStep) — the cards stay big enough to read.
+	const { spread, scale } = fitHandFan(count, viewport.width * 0.92, targetStep, targetScale, portrait ? ctrl.minStep : undefined);
 	// hoverScale is an ABSOLUTE scale; ctrl.hoverScale is calibrated against ctrl.baseScale, so apply it
 	// as a RATIO to the actual fitted base — otherwise in portrait (where the base is the much larger
 	// proportional scale) a hovered card would end up SMALLER than its resting size.
@@ -234,7 +235,7 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	const playedVp = playedViewport(viewport, size.height);
 	const bottomTeam = useBottomTeam(viewerTeam);
 	const playedPortrait = portrait
-		? { bottomTeam, scaleFrac: played.playedScale, gap: played.playedGap, edge: played.playedEdge, setAsideScale: played.playedSetAside, setAsideOffset: played.playedSetAsideOffset, centerY: viewport.centerY + played.playedCenter }
+		? { bottomTeam, scaleFrac: played.playedScale, gap: played.playedGap, edge: played.playedEdge, setAsideScale: played.playedSetAside, setAsideOffset: played.playedSetAsideOffset, centerY: viewport.centerY + played.playedCenter, tilt: played.playedTilt }
 		: undefined;
 
 	// --- Touch drag-and-drop (portrait) ---
@@ -378,7 +379,7 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 		if (isSetAside) item.renderBias = -100;
 		if (canRaise) {
 			// Stationary flat hover zone at the resting position (a little forward so it's pickable).
-			item.hitAnchor = { position: [bx, by, bz + 0.12], rotationZ: 0, scale: base.scale };
+			item.hitAnchor = { position: [bx, by, bz + 0.12], rotationZ: 0, rotationY: base.rotationY, scale: base.scale };
 			item.hit = playedHitZone(raised, base, mode, view.slot);
 		}
 		otherItems.push(item);

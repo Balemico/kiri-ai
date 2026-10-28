@@ -63,6 +63,7 @@ export const LandingZones = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lands
 		setAsideScale: played.playedSetAside,
 		setAsideOffset: played.playedSetAsideOffset,
 		centerY: viewport.centerY + played.playedCenter,
+		tilt: played.playedTilt,
 	};
 
 	// Every column spot for both teams is ALWAYS rendered; `active` (the spot is empty) drives a smooth
@@ -92,7 +93,7 @@ export const LandingZones = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lands
 						? zone.usedRed
 						: zone.usedBlue;
 				return (
-					<group key={`${team}-${mode}-${slot}`} position={[x, y, z]}>
+					<group key={`${team}-${mode}-${slot}`} position={[x, y, z]} rotation={[0, t.rotationY ?? 0, 0]}>
 						<LandingZone
 							width={w}
 							height={h}

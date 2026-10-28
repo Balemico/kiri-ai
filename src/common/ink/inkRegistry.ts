@@ -25,8 +25,8 @@ export interface InkStrokeEntry {
 	leaving: boolean;
 	exitDelay: number;
 	/** A two-option toggle drawn as ONE stroke: the active half takes its tone, the other half
-	 *  goes ghost (see InkSegmentedStroke). */
-	segment?: { left: InkTone; right: InkTone; active: 0 | 1 };
+	 *  goes ghost (see InkSegmentedStroke). `both` lights BOTH halves, each in its tone (a split caption). */
+	segment?: { left: InkTone; right: InkTone; active: 0 | 1; both?: boolean };
 	/** Screen rotation of the stroke (radians, counter-clockwise). The box is then measured UNrotated
 	 *  (offset size), so the element itself must not be CSS-rotated. Default 0. */
 	angle?: number;

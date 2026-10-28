@@ -6,7 +6,7 @@ import { BoardLine, Pawn, ClashEffect } from "../../atoms";
 import { useGame } from "../../../state";
 import { useSession } from "../../../net";
 import { spaceToX, type Stance, type Team } from "../../../game";
-import { frameViewport, landscapeLineScale, lineCoord, BATTLEFIELD_HALF_WIDTH, portraitLateralSign, portraitLineLength, rakeLine, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
+import { frameViewport, landscapeLineScale, lineCoord, BATTLEFIELD_HALF_WIDTH, portraitLateralSign, portraitLineBand, rakeLine, PAWN, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
 import { useBattlegroundControls } from "../../../hooks/useBattlegroundControls";
 import { useBottomTeam } from "../../../hooks/useBottomTeam";
 import { usePawnControls } from "../../../hooks/usePawnControls";
@@ -17,6 +17,7 @@ import { useGameHudControls } from "../../../hooks/useGameHudControls";
 import { usePaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
 import { useDuelIntroDriver } from "../../../hooks/useDuelIntroDriver";
 import { useDuelIntroReached } from "../../../state/duelIntro";
+import { useHitPreviewTick } from "../../../state/hitPreview";
 
 /** The battlefield line with both samurai pawns, positioned by the "Battleground" controls. */
 export const Battlefield = ({
@@ -48,7 +49,12 @@ export const Battlefield = ({
 	// Paper cut-out look + stand-up entrance; the Leva "play stand-up" bumps standTick to replay it.
 	const [standTick, setStandTick] = useState(0);
 	const replayStand = useCallback(() => setStandTick((t) => t + 1), []);
-	const cutout = usePaperCutoutControls(replayStand);
+	// …and "play fall" bumps fallTick to preview the defeat fall on blue.
+	const [fallTick, setFallTick] = useState(0);
+	const replayFall = useCallback(() => setFallTick((t) => t + 1), []);
+	const cutout = usePaperCutoutControls(replayStand, replayFall);
+	// Leva "Game HUD → ▶ Play hit" also sways blue (the struck side of that preview).
+	const hitTick = useHitPreviewTick();
 	// Duel opening: the HUD, then the first turn, follow once the second samurai is fully up.
 	useDuelIntroDriver(standUp, cutout.revealDelay + cutout.stagger + cutout.standDur, hud.introHudDelay, hud.introTurnDelay);
 	const turnOpen = useDuelIntroReached("turn");
@@ -66,7 +72,6 @@ export const Battlefield = ({
 	// place first and the view inverts only afterwards.
 	const bottomTeam = useBottomTeam(viewerTeam);
 	const axis = portrait ? "y" : "x";
-	const pawnBaseY = portrait ? bg.baseY : bg.y;
 	// The line fills the viewport height minus the hand reserve at the bottom (compensated for the
 	// rake so its on-screen vertical span matches), so it grows/shrinks with the window.
 	const size = useThree((s) => s.size);
@@ -76,7 +81,21 @@ export const Battlefield = ({
 	const { height: viewportHeight, width: viewportWidth } = frameViewport(frame, size.width / size.height);
 	// Landscape: the line narrows on narrow windows so its end pawns clear the edge-hugging played cards.
 	const lineScale = portrait ? 1 : landscapeLineScale(viewportWidth);
-	const lineLength = portrait ? portraitLineLength(viewportHeight, bg.handReserve, bg.margin, floorTilt) : BATTLEFIELD_HALF_WIDTH * 2 * lineScale;
+	// Portrait samurai are smaller (they flank the line between the card slots).
+	const pawnHeight = portrait ? pawn.height * bg.pawnScale : pawn.height;
+	// Portrait: the line lives in the band between the HUD (top, clearing the top samurai's head) and
+	// the hand (bottom) — its length AND centre both derive from it.
+	const band = portrait
+		? portraitLineBand(frameViewport(frame, size.width / size.height), {
+				handReserve: bg.handReserve,
+				hudReserve: bg.hudReserve,
+				margin: bg.margin,
+				pawnHeight: pawnHeight * Math.max(PAWN.frames.heaven.scale, PAWN.frames.earth.scale),
+				tilt: floorTilt,
+			})
+		: null;
+	const pawnBaseY = band ? band.centerY + bg.lineNudge : bg.y;
+	const lineLength = band ? band.length : BATTLEFIELD_HALF_WIDTH * 2 * lineScale;
 	const markerScale = (viewportHeight / MARKER_REF_HEIGHT) * bg.thickness;
 	// Each pawn's coordinate ALONG the line (world-x landscape, world-y portrait).
 	const redLine = portrait ? lineCoord(state.red.space, bottomTeam, lineLength) : spaceToX(state.red.space) * lineScale;
@@ -95,6 +114,9 @@ export const Battlefield = ({
 	const blueLateral = portrait ? portraitLateralSign("blue", bottomTeam) * bg.laneOffset : 0;
 	const lineOf = (team: Team) => (team === "red" ? redLinePos : blueLinePos);
 	const lateralOf = (team: Team) => (team === "red" ? redLateral : blueLateral);
+	// Which cut-out paints over the other where they overlap: portrait = the nearer (bottom) one,
+	// landscape = red. A struck figure drops behind while it sways (inside Pawn).
+	const stackOf = (team: Team) => (team === (portrait ? bottomTeam : "red") ? PAWN.stack.front : PAWN.stack.back);
 
 	// Staged resolution: while revealing, play the movement priority beats before the attack. The
 	// higher-priority pawn slides first; the lower-priority one waits `moveStagger`; the strike lands
@@ -105,6 +127,10 @@ export const Battlefield = ({
 	const redDelay = delays.red;
 	const blueDelay = delays.blue;
 	const attackDelay = isReveal && resolution ? attackBeat(resolution, res) : 0;
+	// Landscape: the defeated samurai falls back flat like paper (its stand-up in reverse), once the
+	// killing blow has landed. Portrait hides the board under the victory screen anyway.
+	const fallDelay = (resolution ? attackBeat(resolution, res) : 0) + 0.8;
+	const fallenOf = (team: Team) => !portrait && state.phase === "game-over" && state.winner !== null && state.winner !== team;
 
 	// On a parry the X crosses at the midpoint between the pawns, struck at the attack beat. The Leva
 	// "Play clash" button previews it (clashTick) regardless of phase, played immediately.
@@ -136,7 +162,7 @@ export const Battlefield = ({
 	// A pawn's callout floats above its head: landscape at a fixed height over the line, portrait above
 	// each pawn at its own raked line position + lateral side.
 	const calloutX = (team: Team) => (portrait ? lateralOf(team) : lineOf(team));
-	const calloutYOf = (team: Team) => (portrait ? rakeLine(lineOf(team), portraitTilt, pawnBaseY).y + bg.pawnLift + pawn.height + 0.2 : bg.y + pawn.height + 0.2);
+	const calloutYOf = (team: Team) => (portrait ? rakeLine(lineOf(team), portraitTilt, pawnBaseY).y + bg.pawnLift + pawnHeight + 0.2 : bg.y + pawn.height + 0.2);
 	const calloutZOf = (team: Team) => (portrait ? rakeLine(lineOf(team), portraitTilt, pawnBaseY).z + pawn.z : pawn.z);
 
 	// Kesa/Zan-Tetsu attack in their stance and only flip afterwards. So during the strike the pawn must
@@ -149,7 +175,7 @@ export const Battlefield = ({
 
 	return (
 		<group position={[bg.x, 0, 0]}>
-			<BoardLine y={pawnBaseY} length={lineLength} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} />
+			<BoardLine y={pawnBaseY} length={lineLength} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={portrait ? bg.spikeScale : 1} />
 			{(["red", "blue"] as Team[]).map((team) => {
 				const callout = calloutFor(team);
 				if (!callout) return null;
@@ -175,8 +201,10 @@ export const Battlefield = ({
 				team="red"
 				stance={state.red.stance}
 				damage={state.red.damage}
-				baseY={pawnBaseY}
-				height={pawn.height}
+				// Portrait: the root stands on the raked line (lineY); the figure's own base is the root.
+				lineY={pawnBaseY}
+				baseY={portrait ? 0 : pawnBaseY}
+				height={pawnHeight}
 				yLift={pawn.yLift}
 				z={pawn.z}
 				slash={slash}
@@ -188,6 +216,9 @@ export const Battlefield = ({
 				stanceDelay={stanceDelay("red")}
 				cutout={cutout}
 				standing={standUp}
+				fallen={fallenOf("red")}
+				stack={stackOf("red")}
+				fallDelay={fallDelay}
 				standDelay={cutout.revealDelay}
 				standTick={standTick}
 			/>
@@ -201,8 +232,10 @@ export const Battlefield = ({
 				team="blue"
 				stance={state.blue.stance}
 				damage={state.blue.damage}
-				baseY={pawnBaseY}
-				height={pawn.height}
+				// Portrait: the root stands on the raked line (lineY); the figure's own base is the root.
+				lineY={pawnBaseY}
+				baseY={portrait ? 0 : pawnBaseY}
+				height={pawnHeight}
 				yLift={pawn.yLift}
 				z={pawn.z}
 				slash={slash}
@@ -214,6 +247,11 @@ export const Battlefield = ({
 				stanceDelay={stanceDelay("blue")}
 				cutout={cutout}
 				standing={standUp}
+				fallen={fallenOf("blue")}
+				stack={stackOf("blue")}
+				fallTick={fallTick}
+				hitTick={hitTick}
+				fallDelay={fallDelay}
 				standDelay={cutout.revealDelay + cutout.stagger}
 				standTick={standTick}
 			/>
@@ -245,7 +283,9 @@ interface PawnCalloutProps {
 
 /** A combat title (Finta! / Contrattacco!) that pops in above a pawn at the moment of the strike. */
 const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
-	<Html position={[x, y, z]} style={{ pointerEvents: "none" }}>
+	// zIndexRange: drei's default stacks Html above EVERY overlay — keep the callout over the HUD (1200)
+	// but under the victory veil (1400), so a final "Finta!" never pokes through the result screen.
+	<Html position={[x, y, z]} zIndexRange={[1300, 1300]} style={{ pointerEvents: "none" }}>
 		{/* Static wrapper bottom-centres the title over the pawn's head; motion owns the pop-in transform. */}
 		<div style={{ transform: "translate(-50%, -100%)" }}>
 			<motion.div

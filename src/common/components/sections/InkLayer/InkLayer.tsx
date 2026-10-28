@@ -86,6 +86,7 @@ const StrokeMesh = ({ entry }: { entry: InkStrokeEntry }) => {
 		if (seg) {
 			u.segLeft.value.set(TONE[seg.left].tint);
 			u.segRight.value.set(TONE[seg.right].tint);
+			u.segBoth.value = seg.both ? 1 : 0;
 			segActive.current += (seg.active - segActive.current) * (1 - Math.exp(-dt * 6));
 			u.segActive.value = segActive.current;
 		}

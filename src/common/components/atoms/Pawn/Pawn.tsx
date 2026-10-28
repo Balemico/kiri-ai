@@ -62,6 +62,8 @@ export interface PawnProps {
 	stance: Stance;
 	damage: 0 | 1 | 2;
 	baseY: number;
+	/** Portrait: world-Y centre of the raked line the pawn moves along (see `rakeLine`). */
+	lineY?: number;
 	baseZ?: number;
 	/** Sprite metrics (from the "Pawn" Leva folder); default to the layout constants. */
 	height?: number;
@@ -90,7 +92,20 @@ export interface PawnProps {
 	standDelay?: number;
 	/** Bumping this lays the figure back down and replays the spring-up (Leva "play stand-up"). */
 	standTick?: number;
+	/** True = defeated: the cut-out falls back flat onto the floor — the stand-up played in reverse. */
+	fallen?: boolean;
+	/** Seconds before the fall starts (lets the killing blow land first). */
+	fallDelay?: number;
+	/** Bumping this previews the fall, then raises the figure again (Leva "play fall"). */
+	fallTick?: number;
+	/** Bumping this replays the hit sway right away (Leva "Game HUD → ▶ Play hit"). */
+	hitTick?: number;
+	/** Draw-band bias (`PAWN.stack`): higher = this whole cut-out paints over the other one. */
+	stack?: number;
 }
+
+/** renderOrder of one cut-out layer (0 edge, 1 rim, 2 silhouette) inside its stack band. */
+const layerOrder = (layer: number, stack: number): number => PAWN.renderOrder - 1 + stack + layer * 0.1;
 
 /** Geometry of one stance sprite, anchored by body column + feet so it stands on the board line. */
 const frameLayout = (stance: Stance, height: number, baseY: number, yLift: number) => {
@@ -114,6 +129,7 @@ export const Pawn = ({
 	stance,
 	damage,
 	baseY,
+	lineY = 0,
 	baseZ = 0,
 	height = PAWN.height,
 	yLift = PAWN.yLift,
@@ -129,6 +145,11 @@ export const Pawn = ({
 	standing = true,
 	standDelay = 0,
 	standTick = 0,
+	fallen = false,
+	fallDelay = 0,
+	fallTick = 0,
+	hitTick = 0,
+	stack = PAWN.stack.front,
 }: PawnProps) => {
 	const cfg: SlashControls = slash ?? SLASH;
 	const paper: PaperCutoutControls = cutout ?? PAPER_CUTOUT;
@@ -138,6 +159,7 @@ export const Pawn = ({
 	const slashRef = useRef<THREE.Mesh>(null);
 	const growRef = useRef<THREE.Group>(null); // pivot group scaled to "grow" the wedge from its tip
 	const hingeRef = useRef<THREE.Group>(null); // pivot at the feet: the cut-out lies down / stands up here
+	const swayRef = useRef<THREE.Group>(null); // also at the feet: the hit sway (back and forth)
 	const shadowRef = useRef<THREE.Mesh>(null);
 	const rimRefs = { heaven: useRef<THREE.Mesh>(null), earth: useRef<THREE.Mesh>(null) };
 	const edgeRefs = { heaven: useRef<THREE.Mesh>(null), earth: useRef<THREE.Mesh>(null) };
@@ -307,12 +329,12 @@ export const Pawn = ({
 		if (rootRef.current && !initialized.current) {
 			if (axis === "x") rootRef.current.position.set(linePos, 0, 0);
 			else {
-				const { y, z } = rakeLine(linePos, tilt);
+				const { y, z } = rakeLine(linePos, tilt, lineY);
 				rootRef.current.position.set(lateral, y + lift, z);
 			}
 			initialized.current = true;
 		}
-	}, [linePos, lateral, lift, axis, tilt]);
+	}, [linePos, lateral, lift, axis, tilt, lineY]);
 
 	const prevMoveKey = useRef(moveKey);
 	const prevAxis = useRef(axis);
@@ -334,10 +356,10 @@ export const Pawn = ({
 		if (axis === "x") {
 			gsap.to(root.position, { x: linePos, y: 0, z: 0, duration, delay, ease: "power2.out", overwrite: true });
 		} else {
-			const { y, z } = rakeLine(linePos, tilt);
+			const { y, z } = rakeLine(linePos, tilt, lineY);
 			gsap.to(root.position, { x: lateral, y: y + lift, z, duration, delay, ease: "power2.out", overwrite: true });
 		}
-	}, [linePos, moveKey, lateral, lift, axis, tilt, moveDelay, moveDur]);
+	}, [linePos, moveKey, lateral, lift, axis, tilt, lineY, moveDelay, moveDur]);
 
 	// Entrance — the paper cut-out stands up: hinged at the feet, it lies back flat on the floor
 	// (`lieAngle`) until `standing`, then is raised slowly, like a paper-theatre figure, while its
@@ -381,6 +403,42 @@ export const Pawn = ({
 		// standUp reads refs + the live controls.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [standing]);
+	// Defeat — the stand-up in reverse: the soft settle undone (a drift just past vertical), then the
+	// long sine-eased fall back flat onto the floor, the contact shadow fading with it. A new duel
+	// (fallen → false) raises the figure again.
+	const fallDown = (delay: number) => {
+		const h = hingeRef.current;
+		if (!h) return;
+		const lift = paper.standDur * paper.liftShare;
+		gsap.killTweensOf(h.rotation);
+		gsap
+			.timeline({ delay })
+			.to(h.rotation, { x: paper.overshoot, duration: paper.standDur - lift, ease: "sine.inOut" })
+			.to(h.rotation, { x: paper.lieAngle, duration: lift, ease: "sine.inOut" });
+		const sm = shadowMatOf();
+		if (sm) gsap.to(sm, { opacity: 0, duration: lift, delay: delay + (paper.standDur - lift), ease: "sine.inOut", overwrite: true });
+	};
+	const wasFallen = useRef(fallen);
+	useEffect(() => {
+		if (fallen === wasFallen.current) return;
+		wasFallen.current = fallen;
+		if (fallen) fallDown(fallDelay);
+		else standUp(0);
+		// fallDown/standUp read refs + the live controls.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [fallen]);
+	// Leva "play fall": fall now, lie a beat, then stand back up so it can be replayed.
+	const prevFallTick = useRef(fallTick);
+	useEffect(() => {
+		if (fallTick === prevFallTick.current) return;
+		prevFallTick.current = fallTick;
+		fallDown(0);
+		const back = gsap.delayedCall(paper.standDur + 1.2, () => standUp(0));
+		return () => {
+			back.kill();
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [fallTick]);
 	const prevStandTick = useRef(standTick);
 	useEffect(() => {
 		if (standTick === prevStandTick.current) return;
@@ -390,10 +448,55 @@ export const Pawn = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [standTick]);
 
-	// Hit reaction (when this pawn takes a point): a horizontal shake + white flash, and a yellow
-	// sword-cut that sweeps across the figure — echoing the slash on the cards. Translation + opacity.
+	// Hit sway: the struck cut-out totters on its feet BACK and forth (toward the floor it lies on and
+	// back — as if about to fall), then settles upright in a few damped swings. Its own group inside the
+	// hinge, so it composes with (never cancels) the lie/stand/fall tweens on the hinge itself.
+	// While it totters the figure is drawn BEHIND the other one (its stack band dropped to `swaying`), then
+	// back to its resting band once upright — so a close pair never cuts through each other.
+	const applyStack = (bias: number) =>
+		STANCES.forEach((st) => {
+			[edgeRefs[st], rimRefs[st], meshRefs[st]].forEach((ref, layer) => {
+				if (ref.current) ref.current.renderOrder = layerOrder(layer, bias);
+			});
+		});
+	const stackRef = useRef(stack);
+	useLayoutEffect(() => {
+		stackRef.current = stack;
+		applyStack(stack);
+		// applyStack reads stable refs.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [stack]);
+	const swayTl = useRef<gsap.core.Timeline | null>(null);
+	useEffect(() => () => void swayTl.current?.kill(), []);
+	const sway = (delay: number) => {
+		const s = swayRef.current;
+		if (!s) return;
+		const a = -paper.swayAngle; // same sign as lieAngle = tipping backward
+		const d = paper.swayDur;
+		swayTl.current?.kill();
+		swayTl.current = gsap
+			.timeline({ delay })
+			.call(() => applyStack(PAWN.stack.swaying))
+			.to(s.rotation, { x: a, duration: d * 0.18, ease: "power2.out" })
+			.to(s.rotation, { x: -a * 0.5, duration: d * 0.3, ease: "sine.inOut" })
+			.to(s.rotation, { x: a * 0.2, duration: d * 0.26, ease: "sine.inOut" })
+			.to(s.rotation, { x: 0, duration: d * 0.26, ease: "sine.out" })
+			.call(() => applyStack(stackRef.current));
+	};
+	const prevHitTick = useRef(hitTick);
+	useEffect(() => {
+		if (hitTick === prevHitTick.current) return;
+		prevHitTick.current = hitTick;
+		sway(0);
+		// sway reads refs + the live controls.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [hitTick]);
+
+	// Hit reaction (when this pawn takes a point): a horizontal shake + white flash, a sway on its feet,
+	// and a yellow sword-cut that sweeps across the figure — echoing the slash on the cards.
 	useEffect(() => {
 		if (damage > prevDamage.current) {
+			sway(attackDelay);
 			const g = reactRef.current;
 			if (g) {
 				// `delay` holds the strike back until the movement beats have settled (attacks land last).
@@ -435,6 +538,7 @@ export const Pawn = ({
 				</mesh>
 				{/* Hinge at the feet: the whole cut-out rotates about the floor line (lie down / stand up). */}
 				<group ref={hingeRef} position={[0, baseY + yLift, baseZ + z]}>
+					<group ref={swayRef}>
 					<group scale={[mirror, 1, 1]}>
 						{STANCES.map((s, i) => {
 							const { worldW, worldH, offsetX, centerY } = frameLayout(s, height, baseY, yLift);
@@ -451,20 +555,21 @@ export const Pawn = ({
 										position={[offsetX - paper.edgeOffsetX,y + paper.rimOffsetY + paper.edgeOffsetY, zi - 0.006]}
 										scale={[paper.rimScale, paper.rimScale, 1]}
 										material={edgeMats[s]}
-										renderOrder={PAWN.renderOrder - 2}
+										renderOrder={layerOrder(0, stack)}
 									>
 										<planeGeometry args={[worldW, worldH]} />
 									</mesh>
 									{/* Paper rim: the silhouette scaled up in cream — the cut-out's margin. */}
-									<mesh ref={rimRefs[s]} position={[offsetX, y + paper.rimOffsetY, zi - 0.003]} scale={[paper.rimScale, paper.rimScale, 1]} material={rimMats[s]} renderOrder={PAWN.renderOrder - 1}>
+									<mesh ref={rimRefs[s]} position={[offsetX, y + paper.rimOffsetY, zi - 0.003]} scale={[paper.rimScale, paper.rimScale, 1]} material={rimMats[s]} renderOrder={layerOrder(1, stack)}>
 										<planeGeometry args={[worldW, worldH]} />
 									</mesh>
-									<mesh ref={meshRefs[s]} position={[offsetX, y, zi]} material={materials[s]} renderOrder={PAWN.renderOrder}>
+									<mesh ref={meshRefs[s]} position={[offsetX, y, zi]} material={materials[s]} renderOrder={layerOrder(2, stack)}>
 										<planeGeometry args={[worldW, worldH]} />
 									</mesh>
 								</group>
 							);
 						})}
+					</group>
 					</group>
 				</group>
 			</group>

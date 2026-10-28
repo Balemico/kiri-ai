@@ -32,12 +32,15 @@ export const BATTLEGROUND = {
 	edgeClear: 1.45,
 	minLineScale: 0.68,
 	// Portrait: the vertical duel line, raked onto the floor, with pawns/markers to its sides.
-	baseY: 0.66, // world-Y centre of the vertical line
-	laneOffset: 0.5, // lateral (x) offset of a pawn/marker from the line — bottom team right (+), top left (−)
-	pawnLift: -0.7, // extra world-Y nudge of the pawns only, to seat their feet on the diamonds
+	lineNudge: 0, // world-Y nudge of the vertical line's centre from the middle of its free band (see portraitLineBand)
+	laneOffset: 0.34, // lateral (x) offset of a pawn/marker from the line — bottom team right (+), top left (−)
+	pawnLift: -0.04, // extra world-Y nudge of the pawns only, to seat their feet on the diamonds
 	thickness: 1, // fine-tune multiplier on the (auto, line-proportional) marker/diamond/line-width size — same in both orientations; 1 = the natural proportion
-	handReserve: 0.38, // fraction of the viewport HEIGHT kept for the hand at the bottom; the line fills the rest
-	margin: 0.06, // extra breathing room (fraction of the viewport HEIGHT) kept free, so the line never fills edge-to-edge
+	handReserve: 0.24, // fraction of the viewport HEIGHT kept for the hand at the bottom; the line fills the rest
+	hudReserve: 0.02, // fraction of the viewport HEIGHT kept for the DOM HUD at the top — the top pawn's HEAD stays below it
+	margin: 0.04, // extra breathing room (fraction of the viewport HEIGHT) kept free, so the line never fills edge-to-edge
+	pawnScale: 0.72, // portrait samurai size vs landscape — smaller, so a pawn doesn't cover the card slots beside the line
+	spikeScale: 0.6, // portrait size of the coloured team spike (the diamond and line keep markerScale)
 } as const;
 
 /** Viewport orientation — selected at runtime (portrait = window taller than wide). */
@@ -66,18 +69,26 @@ export const lineCoord = (space: number, bottomTeam: Team, lineLength: number = 
  * camera at +z). The upright pieces (pawns, marker diamonds) are placed at this (y, z); the floor
  * supplies the ground, this puts the line + pawns on it. `baseZ` is the board's own z plane.
  */
-export const rakeLine = (t: number, tilt: number, baseY: number = BATTLEGROUND.baseY, baseZ = 0): { y: number; z: number } => ({
+export const rakeLine = (t: number, tilt: number, baseY = 0, baseZ = 0): { y: number; z: number } => ({
 	y: baseY + t * Math.cos(tilt),
 	z: baseZ - t * Math.sin(tilt),
 });
 
 /**
- * Portrait line length: the line fills the viewport HEIGHT minus the hand reserve at the bottom and a
- * breathing `margin` (both fractions of the visible height). Divided by cos(tilt) so that AFTER the
- * rake the line's vertical (world-Y) span equals (1 − handReserve − margin) of the visible height.
+ * Portrait: the band the vertical duel line may occupy, and so its length + centre. The visible
+ * height loses the hand reserve at the bottom, the DOM HUD reserve at the top, AND the standing
+ * pawn's height below the HUD (the top samurai's head must clear the banners, not just its feet),
+ * plus a breathing `margin` split between the two ends. `length` is divided by cos(tilt) so that
+ * AFTER the rake the line's vertical (world-Y) span equals the band; `centerY` is the band's middle.
  */
-export const portraitLineLength = (viewportHeight: number, handReserve: number, margin: number, tilt: number): number =>
-	(viewportHeight * Math.max(0, 1 - handReserve - margin)) / Math.cos(tilt);
+export const portraitLineBand = (
+	vp: { bottom: number; height: number },
+	r: { handReserve: number; hudReserve: number; margin: number; pawnHeight: number; tilt: number },
+): { length: number; centerY: number } => {
+	const top = vp.bottom + vp.height * (1 - r.hudReserve - r.margin / 2) - r.pawnHeight;
+	const bottom = vp.bottom + vp.height * (r.handReserve + r.margin / 2);
+	return { length: Math.max(0, top - bottom) / Math.cos(r.tilt), centerY: (top + bottom) / 2 };
+};
 
 // --- Victory banner ---
 // The "RED/BLUE WINS" title overlay shown on game-over: a brush stroke sweeps in, then the
@@ -99,6 +110,7 @@ export const WIN_BANNER = {
 export const GAME_HUD = {
 	inset: 22, // px from the screen edges to the banners / round marker
 	bannerHeight: 116, // px a player banner occupies at scale 1 (disc / name, stance, seals, caption slot) — measured
+	bannerHeightCompact: 70, // px the COMPACT (portrait) banner occupies at scale 1 (disc / one stance+seals row, caption slot)
 	scale: 1, // landscape size multiplier for banners + round marker
 	portraitScale: 0.74, // portrait size multiplier (the top strip is narrow)
 	handoffDelayMs: 650, // after a confirm, let the cards flip face-down before the veil inks in
@@ -114,10 +126,19 @@ export const GAME_HUD = {
 	vignetteShade: "#0c0a09", // resting tone (sumi black)
 	vignetteShadeOpacity: 0.5, // alpha of the resting shade at the corner
 	vignetteGlowOpacity: 0.65, // alpha of the team-colour glow at the corner
+	vignetteRed: "#ff0015", // glow tone of the red corner (brighter than TEAM_INK.red — the edge vignette shades it down)
+	vignetteBlue: "#36d0ff", // glow tone of the blue corner (brighter than TEAM_INK.blue — the edge vignette shades it down)
 	vignetteIdleGlowOpacity: 0.25, // ONLINE: an idle corner keeps its team colour at this fainter alpha instead of resting in black
-	vignetteWidth: 0.66, // extent across, as a fraction of the viewport width
-	vignetteHeight: 0.31, // extent down, as a fraction of the viewport height
+	vignetteWidth: 0.46, // extent across, as a fraction of the viewport width
+	vignetteHeight: 0.17, // extent down, as a fraction of the viewport height
+	vignetteWidthPortrait: 0.5, // portrait: narrower, so the two corners don't merge across the screen
+	vignetteHeightPortrait: 0.16, // portrait: just behind the compact banners, not down over the board
 	vignetteDrift: 4, // seconds for one slow breath of the vignette
+	// Dark edge vignette over the WHOLE screen (atoms/ScreenVignette, in `vignetteShade`): clear centre,
+	// deepening toward every edge and all four corners — drawn OVER the corner glows, so it shades the
+	// acting team's colour down too.
+	edgeVignetteOpacity: 0.45, // alpha in the corners (edges get about half, the centre none)
+	edgeVignetteOpacityPortrait: 0.2, // portrait (mobile): lighter — the tall screen puts the board close to the edges
 } as const;
 
 // --- Sumi ink (TSL shader) ---
@@ -172,6 +193,12 @@ export const PAWN = {
 	// still stays on top of everything. Slash/clash effects are bumped to stay above the pawn. (Pairs with
 	// depthTest:false on the sprite material.)
 	renderOrder: 135,
+	// Each cut-out draws its layers (edge → rim → silhouette, 0.1 apart) in its OWN band above
+	// renderOrder − 1, offset by a stack bias, so two overlapping figures stack as whole sheets instead of
+	// interleaving their layers. `front` / `back` = the two figures at rest (landscape: red over blue;
+	// portrait: the nearer, bottom team over the far one); `swaying` = a struck figure while it totters
+	// back, sent behind the other so it never cuts through it.
+	stack: { front: 0.8, back: 0.4, swaying: 0 },
 	frames: {
 		// aspect = imgW/imgH; bodyCol = leg-mass x (0..1 from left); feetRow = lowest opaque row (0..1 from top).
 		// `scale` multiplies `height` per stance: the earth pose reads bigger (wide stance + extended sword),
@@ -201,6 +228,8 @@ export const PAPER_CUTOUT = {
 	shadowOpacity: 0.4, // contact shadow at the feet once standing
 	shadowWidth: 0.63, // × the sprite height
 	shadowHeight: 0.09, // world units
+	swayAngle: 0.35, // radians the struck cut-out totters BACK on its feet when hit (as if about to fall)
+	swayDur: 1.1, // seconds for the damped back-and-forth to settle upright
 } as const;
 
 // Yellow sword-cut wedge shown over a pawn that takes a hit (echoes the card slash). A bold
@@ -454,10 +483,16 @@ export const CARD_FACE_HEIGHT = 0.086 * 7; // ≈ 0.602
 // `fontScale` and clamped to [minFontPx, maxFontPx]; `gap` is how far (world units) above the card's
 // top edge it sits. Single source for the "Card Name" Leva folder.
 export const CARD_NAME = {
-	fontScale: 0.92, // fraction of the card's on-screen width the label line aims to fill
+	// Landscape: the name is the revealed card's cartouche — a stroke exactly as wide as the card,
+	// hung under its BOTTOM edge (above it sits the column's still-covered card).
+	fontScale: 0.78, // fraction of the card's on-screen width the lettering fills (the rest = stroke tips)
 	maxFontPx: 24, // hard cap, so it never gets huge on wide screens
 	minFontPx: 8, // floor, so it stays legible on tiny screens
-	gap: 0.05, // world-units gap between the card's top edge and the label
+	gap: 0.04, // world-units gap between the card's bottom edge and the stroke
+	// Portrait: the turned card columns hug the edges, so a label above each card would be clipped —
+	// both names go on ONE split stroke at the bottom instead (left half = left column's card).
+	portraitBottom: 0.75, // world units from the visible bottom up to the row's centre
+	portraitWidth: 0.92, // row width as a fraction of the screen width
 } as const;
 
 /** Structural shape shared by CARD_NAME and its live-tunable Leva controls. */
@@ -466,6 +501,8 @@ export interface CardNameConfig {
 	maxFontPx: number;
 	minFontPx: number;
 	gap: number;
+	portraitBottom: number;
+	portraitWidth: number;
 }
 
 // --- Played cards (committed pair + set-aside) ---
@@ -520,7 +557,8 @@ export const PLAYED_CARDS = {
 	// Portrait: a vertical COLUMN of upright cards at each team's side (turn player left, opponent right).
 	playedScale: 0.24, // played-card height as a fraction of the viewport HEIGHT
 	playedGap: -0.4, // world-Y gap between stacked cards in the column (negative = overlap)
-	playedEdge: 0.1, // gap from the lateral viewport edge to the card's OUTER edge (keeps it inside)
+	playedEdge: 0.05, // gap from the lateral viewport edge to the card FACE's outer edge (≈ attached to the edge)
+	playedTilt: 0.6, // radians each column turns toward the centre (about Y): outer edge toward the viewer, inner edge receding toward the line
 	playedSetAside: 0.8, // relative scale of the set-aside card (below the committed pair)
 	playedSetAsideOffset: -0.2, // extra world-Y nudge of the set-aside card only
 	playedCenter: 0, // world-Y offset of the column centre from the viewport centre
@@ -630,6 +668,8 @@ export interface PlayedPortrait {
 	setAsideOffset: number;
 	/** World-Y centre the column is anchored around. */
 	centerY: number;
+	/** Radians each column turns toward the centre about Y (outer edge near, inner edge far); 0 = square on. */
+	tilt?: number;
 }
 
 /** Structural shape shared by PLAYED_CARDS and its live-tunable Leva controls. */
@@ -664,6 +704,7 @@ export interface PlayedCardConfig {
 	playedScale: number;
 	playedGap: number;
 	playedEdge: number;
+	playedTilt: number;
 	playedSetAside: number;
 	playedSetAsideOffset: number;
 	playedCenter: number;
@@ -696,7 +737,12 @@ export const playedCardTransform = (
 		const cardH = CARD_HEIGHT * scale;
 		// `edge` is the gap from the viewport edge to the card's OUTER edge, so the card always stays
 		// inside (account for its half-width). Negative `edge` lets it bleed off the edge on purpose.
-		const x = side * (viewport.width / 2 - pp.edge - (CARD_WIDTH * scale) / 2);
+		// Turn toward the centre about Y: the outer edge comes toward the viewer, the inner edge recedes
+		// toward the battleline (left column +, right column −).
+		const lean = -side * (pp.tilt ?? 0);
+		// Sized by the visible FACE (the card model's footprint is wider than its painted face), narrowed
+		// by the turn (cos) so the outer edge still meets the viewport edge.
+		const x = side * (viewport.width / 2 - pp.edge - (CARD_FACE_WIDTH * scale * Math.cos(lean)) / 2);
 		const step = cardH + pp.gap; // centre-to-centre of two full cards touching with `gap`
 		switch (mode) {
 			case "toHand":
@@ -713,6 +759,7 @@ export const playedCardTransform = (
 				return {
 					position: [x, pp.centerY - (cardH / 2 + pp.gap + saH / 2) + pp.setAsideOffset, cfg.restZ],
 					rotationZ: 0,
+					rotationY: lean,
 					rotationX: 0,
 					scale: scale * pp.setAsideScale,
 				};
@@ -723,7 +770,7 @@ export const playedCardTransform = (
 				// First on top, second at the column centre. A revealed card (action) stays exactly on its
 				// resting spot — it just flips face-up in place, it does NOT move.
 				const y = slot === "first" ? pp.centerY + step : pp.centerY;
-				return { position: [x, y, cfg.restZ], rotationZ: 0, rotationX: 0, scale };
+				return { position: [x, y, cfg.restZ], rotationZ: 0, rotationX: 0, rotationY: lean, scale };
 			}
 		}
 	}
@@ -887,7 +934,7 @@ export const DEFAULT_FAN: FanConfig = {
 	fanHeight: -0.8,
 	entryStagger: 0.1,
 	hoverReleaseMs: 140,
-	cardScale: 0.37, // portrait
+	cardScale: 0.46, // portrait
 };
 
 // Invisible hover hit area for a hand card, anchored at the card's RESTING position (it does NOT
@@ -921,7 +968,11 @@ export const TOUCH_HINT = {
 
 // Portrait sits the fan low so the cards' bottom edges tuck slightly BELOW the viewport (they read as a
 // hand held at the bottom of the screen). It's the fan-folder default for the Portrait sub-folder.
-export const PORTRAIT_FAN_HEIGHT_OFFSET = 0.5;
+export const PORTRAIT_FAN_HEIGHT_OFFSET = 0.3;
+
+// Portrait: before a full hand would shrink to fit the narrow screen, its cards overlap more — down
+// to this step per unit of card scale (each card's top-left name still shows). Hand Fan → Portrait → minStep.
+export const PORTRAIT_FAN_MIN_STEP = 0.16;
 
 // Touch drag-and-drop (portrait): slide a finger across the fan to browse-select, then lift a card off the
 // hand — it's selected as soon as it clears the fan (no need to reach a landing zone; a zone only lets you
@@ -938,6 +989,8 @@ export interface CardTransform {
 	rotationZ: number;
 	/** Tilt about X — used to lay played cards back onto the floor (0 = facing the camera). */
 	rotationX?: number;
+	/** Turn about Y — portrait card columns turn their inner edge away toward the battleline. */
+	rotationY?: number;
 	scale: number;
 }
 
@@ -996,10 +1049,22 @@ export interface HandFanFit {
  * Size the fan so it never exceeds `available` world width: the cards keep their
  * natural step until the whole fan would overflow, then step *and* card size
  * shrink together (uniform scale-down) so every card stays inside the viewport.
+ * With `minStepRatio` (step per unit of card scale) the cards first OVERLAP more — the step
+ * tightens down to that ratio at full size — and only shrink once even that would overflow.
  */
-export const fitHandFan = (count: number, available: number, step: number, baseScale: number): HandFanFit => {
-	const naturalSpread = step * Math.max(count - 1, 0);
+export const fitHandFan = (count: number, available: number, step: number, baseScale: number, minStepRatio?: number): HandFanFit => {
+	const gaps = Math.max(count - 1, 0);
+	const naturalSpread = step * gaps;
 	const footprint = naturalSpread + CARD_WIDTH * baseScale; // outer edge to outer edge
-	const fit = footprint > available && footprint > 0 ? available / footprint : 1;
+	if (footprint <= available || footprint <= 0) return { spread: naturalSpread, scale: baseScale };
+	if (minStepRatio !== undefined && gaps > 0) {
+		// Tighter overlap at full size, if it fits without going below the minimum step.
+		const tightStep = (available - CARD_WIDTH * baseScale) / gaps;
+		if (tightStep >= minStepRatio * baseScale) return { spread: tightStep * gaps, scale: baseScale };
+		// Otherwise the minimum overlap, with the cards scaled down just enough to fit.
+		const scale = Math.min(baseScale, available / (minStepRatio * gaps + CARD_WIDTH));
+		return { spread: minStepRatio * scale * gaps, scale };
+	}
+	const fit = available / footprint;
 	return { spread: naturalSpread * fit, scale: baseScale * fit };
 };

@@ -8,12 +8,15 @@ export interface BattlegroundControls {
 	diamondTilt: number;
 	sharedOffset: number;
 	// Portrait
-	baseY: number;
+	lineNudge: number;
 	laneOffset: number;
 	pawnLift: number;
 	thickness: number;
 	handReserve: number;
+	hudReserve: number;
 	margin: number;
+	pawnScale: number;
+	spikeScale: number;
 }
 
 const x = () => ({ x: { value: BATTLEGROUND.x, min: -3, max: 3, step: 0.02 } });
@@ -33,12 +36,15 @@ const landscape = () => ({
 // Portrait: the vertical raked line, with pawns/markers to its sides (rake comes from the floor tilt).
 const portrait = () => ({
 	...x(),
-	baseY: { value: BATTLEGROUND.baseY, min: -2, max: 2, step: 0.02 },
+	lineNudge: { value: BATTLEGROUND.lineNudge, min: -1.5, max: 1.5, step: 0.02, label: "line nudge" },
 	laneOffset: { value: BATTLEGROUND.laneOffset, min: 0, max: 1.5, step: 0.02 },
 	pawnLift: { value: BATTLEGROUND.pawnLift, min: -1.5, max: 1.5, step: 0.02 },
 	...thickness(),
 	handReserve: { value: BATTLEGROUND.handReserve, min: 0, max: 0.8, step: 0.01 },
+	hudReserve: { value: BATTLEGROUND.hudReserve, min: 0, max: 0.4, step: 0.01, label: "HUD reserve" },
 	margin: { value: BATTLEGROUND.margin, min: 0, max: 0.4, step: 0.01 },
+	pawnScale: { value: BATTLEGROUND.pawnScale, min: 0.3, max: 1.5, step: 0.02, label: "pawn scale" },
+	spikeScale: { value: BATTLEGROUND.spikeScale, min: 0.2, max: 1.5, step: 0.05, label: "spike scale" },
 });
 
 /** Battleground (board + pawns) geometry, in a "Battleground" folder with Landscape / Portrait sub-folders. */

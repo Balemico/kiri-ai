@@ -52,24 +52,49 @@ export const AppRoot = () => {
 		return () => window.clearTimeout(t);
 	}, [showGame, sceneReady]);
 
+	// Local rematch ("NUOVA PARTITA"): replay the entrance instead of resetting in place. The veil is
+	// re-armed (covering drops for a beat), slashes in again, and on full cover the engine + scene are
+	// remounted fresh (`match` in the key) — so the new duel opens exactly like the first: approach,
+	// samurai standing up, HUD, hand. Reduced motion: just the remount.
+	const [match, setMatch] = useState(0);
+	const [rematch, setRematch] = useState<"idle" | "rearm" | "cover">("idle");
+	const requestRematch = () => {
+		if (rematch !== "idle") return;
+		if (reduced) {
+			setMatch((m) => m + 1);
+			return;
+		}
+		setRematch("rearm");
+		// One committed frame with the veil idle re-arms it; the timer callback then starts the cover.
+		window.setTimeout(() => setRematch("cover"), 60);
+	};
+	const onVeilCovered = () => {
+		if (rematch === "cover") {
+			setMatch((m) => m + 1);
+			setSceneReady(false);
+			setForceRelease(false);
+			setRematch("idle");
+		} else if (playingRef.current) setCovered(true);
+	};
+
 	const config: EngineConfig = { firstPlayer: "red", ...(mode === "online" && specials ? { specials } : {}) };
 	return (
 		<>
 			{!showGame && <Lobby />}
 			{showGame && (
 				// Remount the engine per session so a new game never inherits stale state.
-				<GameProvider key={`${mode}-${roomKeyword ?? "local"}`} config={config}>
+				<GameProvider key={`${mode}-${roomKeyword ?? "local"}-${match}`} config={config} onRematch={requestRematch}>
 					<Scene entrance={reduced ? "none" : "fly"} onReady={() => setSceneReady(true)} />
 				</GameProvider>
 			)}
 			{/* Guarded on the LIVE session (ref): see the leave-during-cover race note above. */}
 			{!reduced && (
 				<InkTransition
-					covering={playing}
-					release={sceneReady || forceRelease}
-					onCovered={() => {
-						if (playingRef.current) setCovered(true);
-					}}
+					covering={playing && rematch !== "rearm"}
+					// Held during a rematch: the OLD scene is still "ready" while the veil covers it, and a
+					// release seen at the moment of cover would start drying over the old duel.
+					release={(sceneReady || forceRelease) && rematch === "idle"}
+					onCovered={onVeilCovered}
 				/>
 			)}
 		</>

@@ -17,15 +17,19 @@ export interface PaperCutoutControls {
 	shadowOpacity: number;
 	shadowWidth: number;
 	shadowHeight: number;
+	swayAngle: number;
+	swayDur: number;
 }
 
 /** Live-tunable paper cut-out look + stand-up entrance, in its own collapsed Leva folder. "Play
- *  stand-up" lays both samurai back down and replays the spring-up. */
-export const usePaperCutoutControls = (onReplay: () => void): PaperCutoutControls =>
+ *  stand-up" lays both samurai back down and replays the spring-up; "play fall" previews the defeat
+ *  fall (the stand-up in reverse) on blue, which then stands back up. */
+export const usePaperCutoutControls = (onReplay: () => void, onFall: () => void): PaperCutoutControls =>
 	useControls(
 		"Paper Cutout",
 		{
 			"play stand-up": button(() => onReplay()),
+			"play fall": button(() => onFall()),
 			lieAngle: { value: PAPER_CUTOUT.lieAngle, min: -1.57, max: 0, step: 0.01, label: "lie angle" },
 			standDur: { value: PAPER_CUTOUT.standDur, min: 0.3, max: 6, step: 0.05, label: "stand (s)" },
 			liftShare: { value: PAPER_CUTOUT.liftShare, min: 0.1, max: 0.9, step: 0.01, label: "lift share" },
@@ -41,6 +45,8 @@ export const usePaperCutoutControls = (onReplay: () => void): PaperCutoutControl
 			shadowOpacity: { value: PAPER_CUTOUT.shadowOpacity, min: 0, max: 1, step: 0.01, label: "shadow" },
 			shadowWidth: { value: PAPER_CUTOUT.shadowWidth, min: 0.1, max: 1.5, step: 0.01, label: "shadow width" },
 			shadowHeight: { value: PAPER_CUTOUT.shadowHeight, min: 0.01, max: 0.4, step: 0.005, label: "shadow height" },
+			swayAngle: { value: PAPER_CUTOUT.swayAngle, min: 0, max: 1, step: 0.01, label: "hit sway (rad)" },
+			swayDur: { value: PAPER_CUTOUT.swayDur, min: 0.2, max: 3, step: 0.05, label: "hit sway (s)" },
 		},
 		{ collapsed: true },
 	);

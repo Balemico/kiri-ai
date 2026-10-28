@@ -268,6 +268,8 @@ export interface StrokeUniforms {
 	 *  goes ghost-grey; `segActive` slides 0 (left half lit) → 1 (right half lit). */
 	segOn: U<number>;
 	segActive: U<number>;
+	/** 1 = BOTH halves lit, each in its own colour (a split caption, not a toggle). */
+	segBoth: U<number>;
 	segLeft: U<Color>;
 	segRight: U<Color>;
 	opacity: U<number>;
@@ -289,6 +291,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 		tintAmount: num(0),
 		segOn: num(0),
 		segActive: num(0),
+		segBoth: num(0),
 		segLeft: uniform(new Color(INK.inkColor)),
 		segRight: uniform(new Color(INK.inkColor)),
 		opacity: num(1),
@@ -338,14 +341,15 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	// chosen colour invades it rather than stopping at the middle.
 	const seamFray = bristle.sub(0.5).mul(0.26);
 	const seamDrift = mx_noise_float(vec3(across.mul(1.3), time.mul(INK_LOOK.drift), u.seed.add(61.3))).mul(0.06);
-	const seamLean = mix(float(0.06), float(-0.06), u.segActive);
+	// Both halves lit: no lean — the seam sits in the middle.
+	const seamLean = mix(float(0.06), float(-0.06), u.segActive).mul(float(1).sub(u.segBoth));
 	const rightHalf = smoothstep(0.4, 0.6, along.add(seamFray).add(seamDrift).sub(seamLean));
 	// Each half lights with ITS option's colour: on a switch the old half drains while the new
 	// one fills — never a blend of the two team colours (that reads as muddy purple).
 	const litLeft = float(1).sub(rightHalf).mul(float(1).sub(u.segActive));
 	const litRight = rightHalf.mul(u.segActive);
-	const lit = litLeft.add(litRight);
-	const segColour = mix(u.segLeft, u.segRight, litRight.div(max(lit, 0.001)));
+	const lit = max(litLeft.add(litRight), u.segBoth);
+	const segColour = mix(u.segLeft, u.segRight, mix(litRight.div(max(litLeft.add(litRight), 0.001)), rightHalf, u.segBoth));
 	const baseColour = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
 	material.colorNode = mix(baseColour, segColour, lit.mul(u.segOn));
 	// The unlit half dims to the ghost tone.

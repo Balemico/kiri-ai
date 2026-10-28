@@ -55,6 +55,7 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 	const [x, y, z] = target.position;
 
 	const rotX = target.rotationX ?? 0;
+	const rotY = target.rotationY ?? 0;
 
 	useLayoutEffect(() => {
 		const g = ref.current;
@@ -68,18 +69,18 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 				// Mount at the card's last fan transform, then slide down/out to the target.
 				const f = leaving.from;
 				g.position.set(f.position[0], f.position[1], f.position[2]);
-				g.rotation.set(f.rotationX ?? 0, 0, f.rotationZ);
+				g.rotation.set(f.rotationX ?? 0, f.rotationY ?? 0, f.rotationZ);
 				g.scale.setScalar(f.scale);
 				gsap.to(g.position, { x, y, z, duration: 0.5, ease: "power2.in", overwrite: true });
-				gsap.to(g.rotation, { x: rotX, z: target.rotationZ, duration: 0.5, ease: "power2.in", overwrite: true });
+				gsap.to(g.rotation, { x: rotX, y: rotY, z: target.rotationZ, duration: 0.5, ease: "power2.in", overwrite: true });
 				gsap.to(g.scale, { x: target.scale, y: target.scale, z: target.scale, duration: 0.5, ease: "power2.in", overwrite: true });
 			} else if (initial) {
 				// Start off-screen below, slightly tilted and shrunk, then rise and settle.
 				g.position.set(x, initial.fromY, z);
-				g.rotation.set(rotX, 0, target.rotationZ * 0.5);
+				g.rotation.set(rotX, rotY, target.rotationZ * 0.5);
 				g.scale.setScalar(target.scale * 0.85);
 				gsap.to(g.position, { x, y, z, duration: 0.7, delay: initial.delay, ease: "back.out(1.05)", overwrite: true });
-				gsap.to(g.rotation, { x: rotX, z: target.rotationZ, duration: 0.75, delay: initial.delay, ease: "power3.out", overwrite: true });
+				gsap.to(g.rotation, { x: rotX, y: rotY, z: target.rotationZ, duration: 0.75, delay: initial.delay, ease: "power3.out", overwrite: true });
 				gsap.to(g.scale, {
 					x: target.scale,
 					y: target.scale,
@@ -91,16 +92,16 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 				});
 			} else {
 				g.position.set(x, y, z);
-				g.rotation.set(rotX, 0, target.rotationZ);
+				g.rotation.set(rotX, rotY, target.rotationZ);
 				g.scale.setScalar(target.scale);
 			}
 			return;
 		}
 
 		gsap.to(g.position, { x, y, z, duration: 0.5, ease: "power2.out", overwrite: true });
-		gsap.to(g.rotation, { x: rotX, z: target.rotationZ, duration: 0.5, ease: "power2.out", overwrite: true });
+		gsap.to(g.rotation, { x: rotX, y: rotY, z: target.rotationZ, duration: 0.5, ease: "power2.out", overwrite: true });
 		gsap.to(g.scale, { x: target.scale, y: target.scale, z: target.scale, duration: 0.3, ease: "power2.out", overwrite: true });
-	}, [x, y, z, target.rotationZ, target.scale, rotX]);
+	}, [x, y, z, target.rotationZ, target.scale, rotX, rotY]);
 
 	// Cards are the topmost UI: they must sit above the scenery AND the floor, even when the
 	// floor is pushed in front of them in z. Make every card mesh ignore depth and draw last,
@@ -186,7 +187,7 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 			    there is no hover: the zone carries no handlers so a tap can't pre-lift the card before its
 			    own tap-to-arm runs in Hand. */}
 			{hitAnchor && hit && !coarse && (
-				<group position={hitAnchor.position} rotation={[hitAnchor.rotationX ?? 0, 0, hitAnchor.rotationZ]} scale={hitAnchor.scale} userData={{ eventPriority: renderBias }}>
+				<group position={hitAnchor.position} rotation={[hitAnchor.rotationX ?? 0, hitAnchor.rotationY ?? 0, hitAnchor.rotationZ]} scale={hitAnchor.scale} userData={{ eventPriority: renderBias }}>
 					<mesh
 						position={[0, hit.y, -0.1]}
 						material={HOVER_HIT_MATERIAL}

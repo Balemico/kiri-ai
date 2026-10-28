@@ -38,7 +38,7 @@ export const WaitingOverlay = () => {
 					transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
 					style={{
 						position: "fixed",
-						top: hud.inset + GAME_HUD.bannerHeight * scale + GAP_BELOW_BANNER,
+						top: hud.inset + (portrait ? GAME_HUD.bannerHeightCompact : GAME_HUD.bannerHeight) * scale + GAP_BELOW_BANNER,
 						// Same side + inset as the opponent's banner. No `transform` string: Motion owns it here.
 						...(left ? { left: hud.inset } : { right: hud.inset }),
 						zIndex: 1800,

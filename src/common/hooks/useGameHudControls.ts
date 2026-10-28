@@ -27,14 +27,24 @@ export interface GameHudControls {
 	vignetteShadeOpacity: number;
 	/** Alpha of the acting team's colour glow at the corner. */
 	vignetteGlowOpacity: number;
+	/** Glow tone of the red / blue corner. */
+	vignetteRed: string;
+	vignetteBlue: string;
 	/** Online: alpha an idle corner keeps in its team colour (instead of resting in black). */
 	vignetteIdleGlowOpacity: number;
 	/** Vignette extent across, as a fraction of the viewport width. */
 	vignetteWidth: number;
 	/** Vignette extent down, as a fraction of the viewport height. */
 	vignetteHeight: number;
+	/** Portrait vignette extent across / down. */
+	vignetteWidthPortrait: number;
+	vignetteHeightPortrait: number;
 	/** Seconds for one slow breath of the vignette. */
 	vignetteDrift: number;
+	/** Alpha of the full-screen dark edge vignette in the corners (0 = off). */
+	edgeVignetteOpacity: number;
+	/** Portrait alpha of the edge vignette. */
+	edgeVignetteOpacityPortrait: number;
 }
 
 /** Live-tunable in-game HUD, in its own collapsed Leva folder (with a button replaying a landed hit). */
@@ -55,10 +65,16 @@ export const useGameHudControls = (): GameHudControls =>
 			vignetteShade: { value: GAME_HUD.vignetteShade, label: "vignette shade" },
 			vignetteShadeOpacity: { value: GAME_HUD.vignetteShadeOpacity, min: 0, max: 1, step: 0.05, label: "shade opacity" },
 			vignetteGlowOpacity: { value: GAME_HUD.vignetteGlowOpacity, min: 0, max: 1, step: 0.05, label: "glow opacity" },
+			vignetteRed: { value: GAME_HUD.vignetteRed, label: "vignette red" },
+			vignetteBlue: { value: GAME_HUD.vignetteBlue, label: "vignette blue" },
 			vignetteIdleGlowOpacity: { value: GAME_HUD.vignetteIdleGlowOpacity, min: 0, max: 1, step: 0.05, label: "online idle glow" },
 			vignetteWidth: { value: GAME_HUD.vignetteWidth, min: 0.1, max: 1, step: 0.01, label: "vignette width" },
 			vignetteHeight: { value: GAME_HUD.vignetteHeight, min: 0.1, max: 1, step: 0.01, label: "vignette height" },
+			vignetteWidthPortrait: { value: GAME_HUD.vignetteWidthPortrait, min: 0.1, max: 1, step: 0.01, label: "vignette width (portrait)" },
+			vignetteHeightPortrait: { value: GAME_HUD.vignetteHeightPortrait, min: 0.05, max: 1, step: 0.01, label: "vignette height (portrait)" },
 			vignetteDrift: { value: GAME_HUD.vignetteDrift, min: 2, max: 30, step: 0.5, label: "vignette breath (s)" },
+			edgeVignetteOpacity: { value: GAME_HUD.edgeVignetteOpacity, min: 0, max: 1, step: 0.05, label: "edge vignette" },
+			edgeVignetteOpacityPortrait: { value: GAME_HUD.edgeVignetteOpacityPortrait, min: 0, max: 1, step: 0.05, label: "edge vignette (portrait)" },
 		},
 		{ collapsed: true },
 	);

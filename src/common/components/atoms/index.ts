@@ -14,6 +14,7 @@ export * from "./Typography";
 export * from "./InkBrush";
 export * from "./Mist";
 export * from "./CornerVignette";
+export * from "./ScreenVignette";
 export * from "./FallingLeaves";
 export * from "./InkStrokeButton";
 export * from "./InkStrokeLabel";

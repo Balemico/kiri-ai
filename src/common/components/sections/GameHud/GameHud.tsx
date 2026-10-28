@@ -72,6 +72,7 @@ export const GameHud = () => {
 			caption={captionFor(state, team, local, viewerTeam)}
 			align={team === "blue" ? "right" : "left"}
 			scale={scale}
+			compact={portrait}
 		/>
 	);
 

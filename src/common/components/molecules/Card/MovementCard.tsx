@@ -50,7 +50,7 @@ const newOverlayMaterial = (half: Side) => {
 /** A movement card with two selectable faces (top / bottom). */
 export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnplace }: MovementCardProps) => {
 	const { nodes } = useGLTF("/models/card.glb");
-	const { frontMaterial, backMaterial } = useCardTextures(view.team, view.cardId);
+	const { frontMaterial, backMaterial } = useCardTextures(view.team, view.cardId, view.location !== "hand");
 	const flipRef = useCardFlip(view.faceUp);
 
 	const [hoveredSide, setHoveredSide] = useState<Side | null>(null);

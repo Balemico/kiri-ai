@@ -43,6 +43,7 @@ const portrait = () => ({
 	playedScale: { value: PLAYED_CARDS.playedScale, min: 0.05, max: 0.5, step: 0.01 },
 	playedGap: { value: PLAYED_CARDS.playedGap, min: -1.5, max: 1, step: 0.01 },
 	playedEdge: { value: PLAYED_CARDS.playedEdge, min: -1, max: 2, step: 0.02 },
+	playedTilt: { value: PLAYED_CARDS.playedTilt, min: -1, max: 1, step: 0.01, label: "turn to centre" },
 	playedSetAside: { value: PLAYED_CARDS.playedSetAside, min: 0.3, max: 1, step: 0.02 },
 	playedSetAsideOffset: { value: PLAYED_CARDS.playedSetAsideOffset, min: -2, max: 2, step: 0.02 },
 	playedCenter: { value: PLAYED_CARDS.playedCenter, min: -2, max: 2, step: 0.02 },

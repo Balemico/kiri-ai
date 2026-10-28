@@ -10,6 +10,9 @@ import { canConfirm } from "./selectors";
 export interface GameProviderProps {
 	children: ReactNode;
 	config?: EngineConfig;
+	/** Local rematch: called on RESET_GAME instead of resetting in place, so the app can replay the
+	 *  ink-veil entrance and remount a fresh duel under it (no pieces snapping back on screen). */
+	onRematch?: () => void;
 }
 
 /**
@@ -19,7 +22,7 @@ export interface GameProviderProps {
  *  - let the host drive + relay the reveal sequence (the guest applies what it receives).
  * The reducer itself stays pure and unaware of the network.
  */
-export const GameProvider = ({ children, config }: GameProviderProps) => {
+export const GameProvider = ({ children, config, onRematch }: GameProviderProps) => {
 	const [state, rawDispatch] = useReducer(reducer, config, createInitialState);
 	const session = useSession();
 	const { mode, viewerTeam, isHost, bindReceiver } = session;
@@ -57,12 +60,16 @@ export const GameProvider = ({ children, config }: GameProviderProps) => {
 					return;
 				case "RESET_GAME":
 					// Online has no shared reshuffle in v1 — a rematch drops both back to the menu.
-					if (mode === "local") rawDispatch(action);
-					else session.leave();
+					if (mode === "local") {
+						// A new duel opens on red's turn, like the first one.
+						session.resetActiveTeam();
+						if (onRematch) onRematch();
+						else rawDispatch(action);
+					} else session.leave();
 					return;
 			}
 		},
-		[state, mode, viewerTeam, isHost, session, rawDispatch]
+		[state, mode, viewerTeam, isHost, session, rawDispatch, onRematch]
 	);
 
 	const value = useMemo(() => ({ state, dispatch }), [state, dispatch]);

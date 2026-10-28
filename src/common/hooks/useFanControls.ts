@@ -1,4 +1,4 @@
-import { DEFAULT_FAN, PORTRAIT_FAN_HEIGHT_OFFSET, type Orientation } from "../layout";
+import { DEFAULT_FAN, PORTRAIT_FAN_HEIGHT_OFFSET, PORTRAIT_FAN_MIN_STEP, type Orientation } from "../layout";
 import { useOrientationFolder } from "./useOrientationFolder";
 
 export interface FanControls {
@@ -18,6 +18,8 @@ export interface FanControls {
 	hoverReleaseMs: number;
 	/** Portrait only: card height as a fraction of the viewport HEIGHT (proportional sizing). */
 	cardScale: number;
+	/** Portrait only: tightest step per unit of card scale before the cards shrink to fit the width. */
+	minStep?: number;
 }
 
 // Shared fan params (used in both orientations).
@@ -45,6 +47,7 @@ export const useFanControls = (orientation: Orientation = "landscape"): FanContr
 			// Portrait sits the fan a touch higher off the bottom than landscape.
 			fanHeightOffset: { value: PORTRAIT_FAN_HEIGHT_OFFSET, min: -1, max: 2, step: 0.05 },
 			cardScale: { value: DEFAULT_FAN.cardScale, min: 0.05, max: 0.6, step: 0.01 },
+			minStep: { value: PORTRAIT_FAN_MIN_STEP, min: 0.05, max: 0.6, step: 0.01, label: "min step" },
 		},
 		orientation,
 	);
