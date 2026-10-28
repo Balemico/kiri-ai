@@ -42,8 +42,25 @@ const LINE_HEIGHT = 1.15;
 const ROW_FIT = 0.8;
 const STROKE_SLACK_EM = ((LINE_HEIGHT + STROKE_PAD_Y_EM * 2) * (1 - INK.strokeHeight)) / 2;
 
-/** Estimated line width of `漢字 - romaji`, in ems: CJK glyphs are ~full-width, latin (romaji + " - ") ~half. */
-const labelWidthEm = (label: { ja: string; romaji: string }) => Array.from(label.ja).length * 1.05 + (label.romaji.length + 3) * 0.56;
+// The name reads kanji-first: the kanji carry the weight, the romaji follows smaller and spaced out
+// (no " - " separator — the size step alone tells the two apart).
+const KANJI_EM = 1.3;
+const ROMAJI_EM = 0.7;
+const ROMAJI_TRACK_EM = 0.1;
+const ROMAJI_GAP_EM = 0.45;
+
+/** Estimated line width of the name, in ems: CJK glyphs are ~full-width, latin ~half (+ its tracking). */
+const labelWidthEm = (label: { ja: string; romaji: string }) =>
+	Array.from(label.ja).length * 1.05 * KANJI_EM + ROMAJI_GAP_EM + label.romaji.length * (0.56 + ROMAJI_TRACK_EM) * ROMAJI_EM;
+
+/** The name's lettering. The bigger kanji keep the container's line box (scaled line-height), so the
+ *  stroke's height doesn't change with the size step. */
+const nameText = (label: { ja: string; romaji: string }) => (
+	<>
+		<span style={{ fontSize: `${KANJI_EM}em`, lineHeight: LINE_HEIGHT / KANJI_EM }}>{label.ja}</span>
+		<span style={{ fontSize: `${ROMAJI_EM}em`, letterSpacing: `${ROMAJI_TRACK_EM}em`, marginLeft: `${ROMAJI_GAP_EM / ROMAJI_EM}em`, opacity: 0.92 }}>{label.romaji}</span>
+	</>
+);
 
 export interface CardNameRevealProps {
 	/** Same scene framing the played cards use, so the label tracks the card on any aspect. */
@@ -96,7 +113,7 @@ export const CardNameReveal = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lan
 	const nameOf = (team: Team) => {
 		const placed = state[team].placed[slot];
 		const label = placed ? getCardLabel(placed.cardId, placed.side) : null;
-		return placed && label ? { team, text: `${label.ja} - ${label.romaji}`, widthEm: labelWidthEm(label), tone: isSpecial(placed.cardId) ? SPECIAL_TONE : TEAM_TONE[team] } : null;
+		return placed && label ? { team, label, widthEm: labelWidthEm(label), tone: isSpecial(placed.cardId) ? SPECIAL_TONE : TEAM_TONE[team] } : null;
 	};
 
 	if (portrait) {
@@ -140,7 +157,7 @@ export const CardNameReveal = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lan
 						>
 							{shown.map((h) => (
 								<span key={h.team} style={{ textAlign: "center" }}>
-									{h.text}
+									{nameText(h.label)}
 								</span>
 							))}
 						</InkStrokeLabel>
@@ -203,7 +220,7 @@ export const CardNameReveal = ({ frame = DEFAULT_SCENE_FRAME, orientation = "lan
 									// Exactly the card's width (border-box, no side padding): a band under the card, never overhanging it.
 									style={{ boxSizing: "border-box", width: cardPx, padding: `${STROKE_PAD_Y_EM + TEXT_DROP_EM}em 0 ${STROKE_PAD_Y_EM - TEXT_DROP_EM}em`, marginTop: `-${STROKE_SLACK_EM}em` }}
 								>
-									{label.ja} - {label.romaji}
+									{nameText(label)}
 								</InkStrokeLabel>
 							</motion.div>
 						</div>

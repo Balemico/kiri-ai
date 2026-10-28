@@ -343,7 +343,14 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const seamDrift = mx_noise_float(vec3(across.mul(1.3), time.mul(INK_LOOK.drift), u.seed.add(61.3))).mul(0.06);
 	// Both halves lit: no lean — the seam sits in the middle.
 	const seamLean = mix(float(0.06), float(-0.06), u.segActive).mul(float(1).sub(u.segBoth));
-	const rightHalf = smoothstep(0.4, 0.6, along.add(seamFray).add(seamDrift).sub(seamLean));
+	const toggleRight = smoothstep(0.4, 0.6, along.add(seamFray).add(seamDrift).sub(seamLean));
+	// Split CAPTION (both lit): the toggle's wide feather would blend the two team colours into a muddy
+	// band — instead the halves meet on a crisp DIAGONAL cut (a sword stroke through the brush, `across`
+	// leans it), short bristle streaks interlocking across it, and a hairline of bare paper along the cut.
+	const cutD = along.sub(0.5).add(across.mul(0.022)).add(bristle.sub(0.5).mul(0.012));
+	const bothRight = smoothstep(-0.0015, 0.0015, cutD);
+	const rightHalf = mix(toggleRight, bothRight, u.segBoth);
+	const slit = smoothstep(0.0045, 0.0015, abs(cutD)).mul(u.segBoth).mul(u.segOn);
 	// Each half lights with ITS option's colour: on a switch the old half drains while the new
 	// one fills — never a blend of the two team colours (that reads as muddy purple).
 	const litLeft = float(1).sub(rightHalf).mul(float(1).sub(u.segActive));
@@ -353,7 +360,7 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const baseColour = mix(INK_LOOK.inkColor, u.tint, u.tintAmount);
 	material.colorNode = mix(baseColour, segColour, lit.mul(u.segOn));
 	// The unlit half dims to the ghost tone.
-	material.opacityNode = alpha.mul(u.opacity).mul(mix(float(1), float(0.34), float(1).sub(lit).mul(u.segOn)));
+	material.opacityNode = alpha.mul(u.opacity).mul(mix(float(1), float(0.34), float(1).sub(lit).mul(u.segOn))).mul(float(1).sub(slit));
 	material.userData.ink = u;
 	return { material, u };
 };
