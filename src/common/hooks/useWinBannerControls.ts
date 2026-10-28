@@ -17,6 +17,8 @@ export interface WinBannerControls {
 	letterStagger: number;
 	/** How long each letter takes to fade/rise in (seconds). */
 	letterDuration: number;
+	/** Pause after the loser has fallen flat, before the victory screen comes in (seconds). */
+	afterFall: number;
 }
 
 /** Live-tunable victory banner + ink shader, in its own collapsed Leva folder. */
@@ -31,6 +33,7 @@ export const useWinBannerControls = (): WinBannerControls =>
 			spreadSeconds: { value: WIN_BANNER.spreadSeconds, min: 0.3, max: 4, step: 0.1, label: "brush sweep (s)" },
 			letterStagger: { value: WIN_BANNER.letterStagger, min: 0, max: 0.3, step: 0.005, label: "letter stagger (s)" },
 			letterDuration: { value: WIN_BANNER.letterDuration, min: 0.05, max: 1.2, step: 0.05, label: "letter duration (s)" },
+			afterFall: { value: WIN_BANNER.afterFall, min: 0, max: 3, step: 0.05, label: "after fall (s)" },
 		},
 		{ collapsed: true },
 	);

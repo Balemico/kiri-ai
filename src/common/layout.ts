@@ -100,6 +100,7 @@ export const WIN_BANNER = {
 	spreadSeconds: 1.1, // time for the brush to sweep across, before the words appear
 	letterStagger: 0.06, // delay between each letter STARTING (< letterDuration → letters overlap)
 	letterDuration: 0.4, // how long each letter takes to fade/rise in
+	afterFall: 0.6, // pause after the loser has fallen flat, before the victory screen comes in (s)
 	testVictory: false, // Leva: show the banner without a real winner
 	testTeam: "red" as Team, // Leva: which team's victory to preview
 } as const;
@@ -326,7 +327,7 @@ export const FLOOR_PORTRAIT = {
 // painting by height into the (shorter) top half is what compresses the distances between the
 // elements, not their shapes. They share one size/position so the painting stays registered;
 // depth is differential pointer-parallax + a slow idle drift, NOT real z-separation. Unlit
-// (meshBasic) so the painted colours stay exact regardless of Lights.
+// (meshBasic) so the painted colours stay exact (the scene has no lights).
 export const STAGE = {
 	scale: 0.84,
 	lift: 0.25, // default upward nudge for the scenery cluster (per-layer `y` does the fine placing)
@@ -954,6 +955,9 @@ export const HAND_HOVER_HIT = {
 // the whole hand sits well ABOVE the pawns (PAWN.renderOrder) and everything else, regardless of how `fanZ`
 // is tuned. Committed / set-aside cards keep their own (lower) order, so pawns can still cover THOSE.
 export const HAND_RENDER_BIAS = 100;
+// Extra draw-order bias for the lifted (hovered / armed) fan card, so it always draws over the rest of
+// the hand — the fan's own z order (2 per card) would otherwise leave a left-hand card underneath.
+export const HAND_LIFTED_BIAS = 40;
 
 // Touch interaction affordance. With no hover, a tap LIFTS a card and a second tap CONFIRMS it — so a
 // lifted (armed) card gently "breathes" to signal it's waiting for that confirming second tap. The pulse

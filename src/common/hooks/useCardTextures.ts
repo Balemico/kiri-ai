@@ -21,12 +21,17 @@ export const cardImagePath = (team: Team, cardId: CardId): string => {
 const CARD_TEXTURE_PATHS = [...new Set([BACK_PATH, ...(["red", "blue"] as Team[]).flatMap((team) => CARD_DEFS.map((def) => cardImagePath(team, def.id)))])];
 CARD_TEXTURE_PATHS.forEach((path) => useLoader.preload(TextureLoader, path));
 
-const makeMaterial = (texture: THREE.Texture, flipY = false, unlit = false): THREE.Material => {
+// Every card is unlit: at the angles a card is seen on a phone (a lifted hand card low on the screen, the
+// portrait columns turned about Y by `playedTilt`) a glossy standard face mirrors the bright HDRI sky and
+// washes the art out. Unlit keeps the painted colours exact at any angle, like the scenery — and one
+// material kind means nothing is rebuilt when a card moves between hand and slot.
+const makeMaterial = (texture: THREE.Texture, flipY = false): THREE.Material => {
 	texture.colorSpace = THREE.SRGBColorSpace;
 	texture.flipY = flipY;
 	texture.needsUpdate = true;
-	const shared = {
+	return new THREE.MeshBasicMaterial({
 		map: texture,
+		toneMapped: false,
 		alphaMap: CARD_ALPHA_MAP, // rounded-corner cutout
 		alphaTest: 0.5, // hard cutout → no transparency sorting between overlapping cards
 		// Cards are the topmost UI and must draw over the scenery, floor AND pawns regardless of z.
@@ -35,22 +40,17 @@ const makeMaterial = (texture: THREE.Texture, flipY = false, unlit = false): THR
 		transparent: true,
 		depthTest: false,
 		depthWrite: false,
-	};
-	// Played cards are unlit: the portrait columns turn about Y (`playedTilt`), and at that angle the
-	// glossy standard face mirrors the bright HDRI sky and washes the art out. Unlit keeps the painted
-	// colours exact at any angle, like the scenery.
-	if (unlit) return new THREE.MeshBasicMaterial({ ...shared, toneMapped: false });
-	return new THREE.MeshStandardMaterial({ ...shared, roughness: 0.1, metalness: 0.0 });
+	});
 };
 
-/** Load front (card art) and back materials for a card. `unlit` = flat colours (played cards). */
-export const useCardTextures = (team: Team, cardId: CardId, unlit = false) => {
+/** Load front (card art) and back materials for a card. */
+export const useCardTextures = (team: Team, cardId: CardId) => {
 	const frontPath = cardImagePath(team, cardId);
 	const frontTexture = useLoader(TextureLoader, frontPath);
 	const backTexture = useLoader(TextureLoader, BACK_PATH);
 
-	const frontMaterial = useMemo(() => makeMaterial(frontTexture, false, unlit), [frontTexture, unlit]);
-	const backMaterial = useMemo(() => makeMaterial(backTexture, true, unlit), [backTexture, unlit]);
+	const frontMaterial = useMemo(() => makeMaterial(frontTexture, false), [frontTexture]);
+	const backMaterial = useMemo(() => makeMaterial(backTexture, true), [backTexture]);
 
 	// Free the per-card materials when the card unmounts or the material changes
 	// (the shared textures stay cached by useLoader and are not disposed here).

@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
-import { FitCamera, Lights, Floor, IntroFlight } from "../../atoms";
+import { FitCamera, Floor, IntroFlight } from "../../atoms";
 import { Battlefield } from "../Battlefield";
 import { Stage } from "../Stage";
 import { Hand } from "../Hand";
@@ -24,6 +24,7 @@ import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
 import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
 import { veilSignal } from "../../../ink/veilSignal";
 import { duelIntro } from "../../../state/duelIntro";
+import { victoryReveal } from "../../../state/victoryReveal";
 import { prioritizedEvents } from "../../../eventPriority";
 
 // The scene counts as ready once it renders this many consecutive smooth frames (< ~24 fps
@@ -93,7 +94,6 @@ const SceneContents = ({
 			{/* Paper fill behind everything — kept here (not only in Stage) so portrait, with the
 			    Stage hidden, still has the floor's far edge dissolve into paper rather than black. */}
 			<color attach="background" args={[PAPER]} />
-			<Lights />
 			{/* Single locked front view — no orbit; auto-fits the whole frame at any width. Yields the
 			    camera to IntroFlight for the duration of the approach. */}
 			<FitCamera frame={frame} enabled={!flying} />
@@ -154,7 +154,13 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 	useAutoReveal();
 	// The duel-opening stage outlives the duel (module store): rewind it on leaving, so the next duel
 	// opens with the samurai lying down again.
-	useEffect(() => () => duelIntro.reset(), []);
+	useEffect(
+		() => () => {
+			duelIntro.reset();
+			victoryReveal.reset();
+		},
+		[],
+	);
 	// The debug panel is for tuning on desktop — hide it in production and on touch (no room, no mouse).
 	const coarse = useCoarsePointer();
 	return (

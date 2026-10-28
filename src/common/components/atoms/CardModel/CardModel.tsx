@@ -28,9 +28,9 @@ export const CardModel = forwardRef<THREE.Group, CardModelProps>(
 		return (
 			<group position={position} rotation={rotation ?? [Math.PI / 2, 0, 0]} scale={scale ?? 7}>
 				<group ref={flipRef}>
-					<mesh castShadow receiveShadow geometry={geom("Cube_1")} material={frontMaterial} renderOrder={renderOrder} />
-					<mesh castShadow receiveShadow geometry={geom("Cube_2")} material={backMaterial} renderOrder={renderOrder} />
-					<mesh castShadow receiveShadow geometry={geom("Cube_3")} material={frontMaterial} renderOrder={renderOrder} />
+					<mesh geometry={geom("Cube_1")} material={frontMaterial} renderOrder={renderOrder} />
+					<mesh geometry={geom("Cube_2")} material={backMaterial} renderOrder={renderOrder} />
+					<mesh geometry={geom("Cube_3")} material={frontMaterial} renderOrder={renderOrder} />
 					{children}
 				</group>
 			</group>

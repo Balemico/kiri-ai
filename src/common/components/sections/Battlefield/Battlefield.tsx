@@ -16,6 +16,8 @@ import { attackBeat, moveDelays, useResolutionControls } from "../../../hooks/us
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
 import { usePaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
 import { useDuelIntroDriver } from "../../../hooks/useDuelIntroDriver";
+import { useVictoryRevealDriver } from "../../../hooks/useVictoryRevealDriver";
+import { useWinBannerControls } from "../../../hooks/useWinBannerControls";
 import { useDuelIntroReached } from "../../../state/duelIntro";
 import { useHitPreviewTick } from "../../../state/hitPreview";
 
@@ -46,6 +48,7 @@ export const Battlefield = ({
 	const clash = useClashControls(playClash);
 	const res = useResolutionControls();
 	const hud = useGameHudControls();
+	const win = useWinBannerControls();
 	// Paper cut-out look + stand-up entrance; the Leva "play stand-up" bumps standTick to replay it.
 	const [standTick, setStandTick] = useState(0);
 	const replayStand = useCallback(() => setStandTick((t) => t + 1), []);
@@ -127,10 +130,12 @@ export const Battlefield = ({
 	const redDelay = delays.red;
 	const blueDelay = delays.blue;
 	const attackDelay = isReveal && resolution ? attackBeat(resolution, res) : 0;
-	// Landscape: the defeated samurai falls back flat like paper (its stand-up in reverse), once the
-	// killing blow has landed. Portrait hides the board under the victory screen anyway.
+	// The defeated samurai falls back flat like paper (its stand-up in reverse), once the killing blow
+	// has landed; the victory screen waits for the fall to finish (useVictoryRevealDriver).
 	const fallDelay = (resolution ? attackBeat(resolution, res) : 0) + 0.8;
-	const fallenOf = (team: Team) => !portrait && state.phase === "game-over" && state.winner !== null && state.winner !== team;
+	const over = state.phase === "game-over" && state.winner !== null;
+	const fallenOf = (team: Team) => over && state.winner !== team;
+	useVictoryRevealDriver(over, fallDelay + cutout.standDur + win.afterFall);
 
 	// On a parry the X crosses at the midpoint between the pawns, struck at the attack beat. The Leva
 	// "Play clash" button previews it (clashTick) regardless of phase, played immediately.

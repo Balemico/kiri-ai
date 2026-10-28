@@ -15,6 +15,7 @@ import {
 	CARD_FACE_HEIGHT,
 	HAND_HOVER_HIT,
 	HAND_RENDER_BIAS,
+	HAND_LIFTED_BIAS,
 	TOUCH_HINT,
 	TOUCH_DRAG,
 	type SceneFrame,
@@ -127,6 +128,8 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 		setDrag(d);
 	};
 	const startRef = useRef<[number, number] | null>(null);
+	// Set only by a press that lands on the deselect plane (i.e. missed every card) — see `deselect`.
+	const missPress = useRef(false);
 	// The world region the locked camera shows, derived from the frame + aspect — correct
 	// on the first render (no dependency on R3F's camera-lagged cached viewport).
 	const viewport = frameViewport(frame, size.width / size.height);
@@ -294,8 +297,10 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 			hitAnchor: fanTransform(i, handViews.length, hovered, restFan),
 			hit: hitZone(i === hoveredIndex),
 			entry: { fromY: entryFromY, delay: i * ctrl.entryStagger },
-			// The hand is the top layer: bias it clear of the pawns (and everything) regardless of fan z.
-			renderBias: HAND_RENDER_BIAS,
+			// The hand is the top layer: bias it clear of the pawns (and everything) regardless of fan z. The
+			// lifted card draws over its neighbours too — its fan z alone would leave an edge card (blown up
+			// and clamped inward on touch) UNDER the rest of the hand.
+			renderBias: HAND_RENDER_BIAS + (i === hoveredIndex ? HAND_LIFTED_BIAS : 0),
 		};
 	});
 
@@ -476,6 +481,7 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	const startDrag = (view: CardView, side: Side | null) => (e: ThreeEvent<PointerEvent>) => {
 		if (!coarse) return;
 		e.stopPropagation();
+		missPress.current = false; // a card press is never a miss (see the deselect plane)
 		setCapture(e, true);
 		const p = project(e) ?? [0, 0];
 		startRef.current = p;
@@ -566,7 +572,12 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	// invisible plane BEHIND every card catches taps that miss a card; cards stopPropagation on tap, so
 	// this only fires on a true miss. Only mounted while something is armed, so it never interferes
 	// otherwise. (R3F disposes the inline material; the gotcha is only `new THREE.Material` via a prop.)
+	// The drag-wired cards (portrait) take the gesture on pointerdown/up and have no onClick to stop, so the
+	// browser's click after a tap on ANOTHER card would reach this plane too and drop the card that tap just
+	// armed. Only a press that started on the plane itself (cards stop pointerdown) counts as a miss (`missPress`).
 	const deselect = () => {
+		if (!missPress.current) return;
+		missPress.current = false;
 		cancelRelease();
 		setHoveredKey(null);
 	};
@@ -574,7 +585,13 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	return (
 		<group>
 			{coarse && hoveredKey && (
-				<mesh position={[0, viewport.centerY, -2]} onClick={deselect}>
+				<mesh
+					position={[0, viewport.centerY, -2]}
+					onPointerDown={() => {
+						missPress.current = true;
+					}}
+					onClick={deselect}
+				>
 					<planeGeometry args={[viewport.width * 3, viewport.height * 3]} />
 					<meshBasicMaterial transparent opacity={0} depthWrite={false} />
 				</mesh>

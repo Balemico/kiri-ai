@@ -21,7 +21,7 @@ const HIT_MATERIAL = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0
  * On touch, `drag` takes over the hit mesh (browse-select + drag-to-zone); the click is desktop-only. */
 export const RegularCard = ({ view, onClick, drag }: RegularCardProps) => {
 	const { nodes } = useGLTF("/models/card.glb");
-	const { frontMaterial, backMaterial } = useCardTextures(view.team, view.cardId, view.location !== "hand");
+	const { frontMaterial, backMaterial } = useCardTextures(view.team, view.cardId);
 	const flipRef = useCardFlip(view.faceUp);
 
 	return (

@@ -1,8 +1,10 @@
+import { useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { InkStrokeButton } from "../../atoms";
 import { useGame, canConfirm } from "../../../state";
 import { useSession } from "../../../net";
 import { useIsMobile } from "../../../hooks/useIsMobile";
+import { useVictoryShown } from "../../../state/victoryReveal";
 
 interface Action {
 	label: string;
@@ -11,6 +13,28 @@ interface Action {
 
 // Same footprint as a lobby menu stroke, so every button in the app reads as one family.
 const STROKE_WIDTH = "min(300px, 78vw)";
+
+/**
+ * The button takes taps only once its entrance has finished. On touch, the tap that places the second
+ * card is followed by the browser's click at the same spot — and CONFERMA mounts right under it (bottom
+ * centre, over the hand), so that stray click would confirm the turn on its own. Keyed per action, so
+ * every fresh mount starts disarmed.
+ */
+const ArmedAction = ({ action, style }: { action: Action; style: CSSProperties }) => {
+	const [armed, setArmed] = useState(false);
+	return (
+		<motion.div
+			initial={{ opacity: 0, y: 16 }}
+			animate={{ opacity: 1, y: 0 }}
+			exit={{ opacity: 0, y: 16 }}
+			transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+			onAnimationComplete={() => setArmed(true)}
+			style={{ ...style, pointerEvents: armed ? "auto" : "none" }}
+		>
+			<InkStrokeButton onClick={action.onClick}>{action.label}</InkStrokeButton>
+		</motion.div>
+	);
+};
 
 /**
  * The duel's action button — the same sumi brush stroke as every lobby button (`InkStrokeButton`,
@@ -25,7 +49,9 @@ export const ConfirmButton = () => {
 	const mobile = useIsMobile();
 
 	const placing = state.phase === "place" && !state.confirmed[viewerTeam];
-	const over = state.phase === "game-over";
+	// The end-of-duel action comes in with the victory screen, after the loser has fallen.
+	const victoryShown = useVictoryShown();
+	const over = state.phase === "game-over" && victoryShown;
 
 	const config: Action | null =
 		placing && canConfirm(state, viewerTeam)
@@ -39,12 +65,9 @@ export const ConfirmButton = () => {
 	return (
 		<AnimatePresence mode="wait">
 			{config && (
-				<motion.div
+				<ArmedAction
 					key={config.label}
-					initial={{ opacity: 0, y: 16 }}
-					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: 16 }}
-					transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+					action={config}
 					style={{
 						position: "fixed",
 						bottom: "clamp(16px, 3vh, 36px)",
@@ -53,9 +76,7 @@ export const ConfirmButton = () => {
 						// Mobile: centred along the bottom edge (thumb-reachable); desktop: pinned bottom-right.
 						...(mobile ? { left: "50%", marginLeft: `calc(${STROKE_WIDTH} / -2)` } : { right: "clamp(36px, 4vw, 64px)" }),
 					}}
-				>
-					<InkStrokeButton onClick={config.onClick}>{config.label}</InkStrokeButton>
-				</motion.div>
+				/>
 			)}
 		</AnimatePresence>
 	);

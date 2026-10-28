@@ -4,6 +4,7 @@ import { InkStrokeLabel, SealDisc } from "../../atoms";
 import { useGame } from "../../../state";
 import { useWinBannerControls } from "../../../hooks/useWinBannerControls";
 import { useIsPortrait } from "../../../hooks/useIsPortrait";
+import { useVictoryShown } from "../../../state/victoryReveal";
 import { INK, PAPER_LIGHT, SEAL, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
 import { MAX_HITS, type Stance } from "../../../game";
 import { characterImagePath } from "../../../hooks/useCharacterTextures";
@@ -18,9 +19,11 @@ export const WinBanner = () => {
 	const { state } = useGame();
 	const { testVictory, testTeam, offsetTop, fontScale, letterStagger, letterDuration } = useWinBannerControls();
 	const portrait = useIsPortrait();
+	// A real win waits for its closing beat: the blow lands, the loser falls, THEN the screen comes in.
+	const revealed = useVictoryShown();
 
 	// Real winner takes priority; the Leva toggle previews the banner without a win.
-	const winner = state.winner ?? (testVictory ? testTeam : null);
+	const winner = state.winner ? (revealed ? state.winner : null) : testVictory ? testTeam : null;
 	if (!winner) return null;
 
 	if (portrait) {

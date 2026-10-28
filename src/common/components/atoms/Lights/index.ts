@@ -1,1 +1,0 @@
-export { Lights } from "./Lights";

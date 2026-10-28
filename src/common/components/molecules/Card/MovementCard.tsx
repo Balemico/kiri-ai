@@ -50,7 +50,7 @@ const newOverlayMaterial = (half: Side) => {
 /** A movement card with two selectable faces (top / bottom). */
 export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnplace }: MovementCardProps) => {
 	const { nodes } = useGLTF("/models/card.glb");
-	const { frontMaterial, backMaterial } = useCardTextures(view.team, view.cardId, view.location !== "hand");
+	const { frontMaterial, backMaterial } = useCardTextures(view.team, view.cardId);
 	const flipRef = useCardFlip(view.faceUp);
 
 	const [hoveredSide, setHoveredSide] = useState<Side | null>(null);
@@ -162,11 +162,12 @@ export const MovementCard = ({ view, active, coarse, drag, onSelectSide, onUnpla
 			{dimPlane(-quarterHeight, topMat)}
 			{dimPlane(quarterHeight, bottomMat)}
 			{/* Touch affordance: a hairline along the seam (local Z=0) so the lifted card visibly reads as
-			    two pickable halves. Sits a hair above the face; depthTest off + last child = always on top. */}
+			    two pickable halves. A FLAT plane on the face, like the dims: a box (with depth testing off)
+			    drew its overlapping sides too and read as a thick two-tone bar across the card. */}
 			{showSeam && (
-				<mesh position={[0, 0.01, 0]}>
-					<boxGeometry args={[cardWidth * 0.84, 0.004, quarterHeight * 0.07]} />
-					<meshBasicMaterial color={0x1a1614} transparent opacity={0.5} depthTest={false} depthWrite={false} toneMapped={false} />
+				<mesh position={[0, faceY + 0.0006, 0]} rotation={[-Math.PI / 2, 0, 0]} userData={{ orderBump: 0.6 }} raycast={() => null}>
+					<planeGeometry args={[cardWidth * 0.84, quarterHeight * 0.03]} />
+					<meshBasicMaterial color={0x1a1614} transparent opacity={0.35} depthTest={false} depthWrite={false} toneMapped={false} />
 				</mesh>
 			)}
 		</CardModel>
