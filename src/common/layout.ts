@@ -869,9 +869,9 @@ export const playedCardTransform = (
 		// Sized by the visible FACE (the card model's footprint is wider than its painted face), narrowed
 		// by the turn (cos) so the outer edge still meets the viewport edge.
 		const x = side * (viewport.width / 2 - pp.edge - (CARD_FACE_WIDTH * scale * Math.cos(lean)) / 2);
-		// The top team advances DOWNWARD, so its cards are turned upside down (top = toward the opponent),
-		// as across a real table; the bottom team's stay upright.
-		const facing = team === pp.bottomTeam ? 0 : Math.PI;
+		// Both columns stay upright (readable), even though the top team advances downward — a deliberate
+		// choice on mobile over the table-accurate 180° turn.
+		const facing = 0;
 		const step = cardH + pp.gap; // centre-to-centre of two full cards touching with `gap`
 		switch (mode) {
 			case "toHand":
