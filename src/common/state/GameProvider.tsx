@@ -13,6 +13,9 @@ export interface GameProviderProps {
 	/** Local rematch: called on RESET_GAME instead of resetting in place, so the app can replay the
 	 *  ink-veil entrance and remount a fresh duel under it (no pieces snapping back on screen). */
 	onRematch?: () => void;
+	/** Leaving the duel: called instead of `session.leave()`, so the app can slash the ink veil in
+	 *  first and swap back to the lobby under it. */
+	onLeave?: () => void;
 }
 
 /**
@@ -22,10 +25,12 @@ export interface GameProviderProps {
  *  - let the host drive + relay the reveal sequence (the guest applies what it receives).
  * The reducer itself stays pure and unaware of the network.
  */
-export const GameProvider = ({ children, config, onRematch }: GameProviderProps) => {
+export const GameProvider = ({ children, config, onRematch, onLeave }: GameProviderProps) => {
 	const [state, rawDispatch] = useReducer(reducer, config, createInitialState);
 	const session = useSession();
 	const { mode, viewerTeam, isHost, bindReceiver } = session;
+	const sessionLeave = session.leave;
+	const leave = useCallback(() => (onLeave ? onLeave() : sessionLeave()), [onLeave, sessionLeave]);
 
 	// Let incoming P2P messages apply to this engine instance.
 	useEffect(() => bindReceiver(rawDispatch), [bindReceiver, rawDispatch]);
@@ -65,13 +70,13 @@ export const GameProvider = ({ children, config, onRematch }: GameProviderProps)
 						session.resetActiveTeam();
 						if (onRematch) onRematch();
 						else rawDispatch(action);
-					} else session.leave();
+					} else leave();
 					return;
 			}
 		},
-		[state, mode, viewerTeam, isHost, session, rawDispatch, onRematch]
+		[state, mode, viewerTeam, isHost, session, rawDispatch, onRematch, leave]
 	);
 
-	const value = useMemo(() => ({ state, dispatch }), [state, dispatch]);
+	const value = useMemo(() => ({ state, dispatch, leave }), [state, dispatch, leave]);
 	return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 };

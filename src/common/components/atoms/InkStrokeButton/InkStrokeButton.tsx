@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { motion, useIsPresent } from "motion/react";
 import { inkStrokes, INK_TONE_FALLBACK, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
-import { INK } from "../../../layout";
+import { INK, INK_LABEL_SHIFT } from "../../../layout";
 import { InkDelayContext } from "../../../ink/inkDelay";
 
 export interface InkStrokeButtonProps {
@@ -15,6 +15,9 @@ export interface InkStrokeButtonProps {
 	/** False = still hidden (intro choreography); flipping to true lays the stroke NOW. */
 	visible?: boolean;
 	style?: CSSProperties;
+	/** Downward nudge that optically centres the label on the stroke. Defaults to the text value
+	 *  (INK_LABEL_SHIFT, from the label font's metrics); an icon label has none of those — pass 0. */
+	labelShift?: string | number;
 }
 
 /**
@@ -24,7 +27,7 @@ export interface InkStrokeButtonProps {
  * state-driven trigger of the choreography (an intro skip flips every beat at once and each
  * stroke starts pouring that frame).
  */
-export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, visible = true, style }: InkStrokeButtonProps) => {
+export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", variant = 0, visible = true, style, labelShift = INK_LABEL_SHIFT }: InkStrokeButtonProps) => {
 	const ref = useRef<HTMLButtonElement>(null);
 	const [id] = useState(newInkStrokeId);
 	const [hovered, setHovered] = useState(false);
@@ -50,8 +53,10 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 			onHoverEnd={() => setHovered(false)}
 			initial="hidden"
 			animate={visible ? "painted" : "hidden"}
-			whileHover={disabled ? undefined : "bleed"}
-			whileTap={disabled ? undefined : { scale: 0.97 }}
+			// No hover/tap states while hidden: Motion's whileHover outranks `animate`, so a button hidden
+			// under a still-hovering pointer (the gate's ENTRA, the moment it is clicked) kept its label.
+			whileHover={disabled || !visible ? undefined : "bleed"}
+			whileTap={disabled || !visible ? undefined : { scale: 0.97 }}
 			style={{
 				position: "relative",
 				width: "100%",
@@ -77,7 +82,8 @@ export const InkStrokeButton = ({ children, onClick, disabled, tone = "ink", var
 					painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: delay + INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 					bleed: { opacity: 1, letterSpacing: "4.5px", filter: "blur(0px)", transition: { duration: 0.25 } },
 				}}
-				style={{ position: "relative", color: "#f2ead9", fontSize: 16, fontWeight: 700, letterSpacing: 3, whiteSpace: "nowrap" }}
+				// `top`: optical centring of the label on the stroke (`labelShift`).
+				style={{ position: "relative", top: labelShift, color: "#f2ead9", fontSize: 16, fontWeight: 700, letterSpacing: 3, whiteSpace: "nowrap" }}
 			>
 				{children}
 			</motion.span>

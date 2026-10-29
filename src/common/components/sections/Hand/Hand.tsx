@@ -18,6 +18,7 @@ import {
 	HAND_LIFTED_BIAS,
 	TOUCH_HINT,
 	TOUCH_DRAG,
+	AUDIO,
 	type SceneFrame,
 	type CardTransform,
 	type FanConfig,
@@ -34,6 +35,7 @@ import { useDuelIntroReached } from "../../../state/duelIntro";
 import { useLagged } from "../../../hooks/useLagged";
 import { useGame, currentHandViews, placedViews, setAsideViews, type CardView } from "../../../state";
 import { useSession } from "../../../net";
+import { playSound } from "../../../audio";
 import type { Side, Slot } from "../../../game";
 
 interface Renderable {
@@ -157,6 +159,12 @@ export const Hand = ({ frame = DEFAULT_SCENE_FRAME, orientation = "landscape" }:
 	const isPlacing = state.phase === "place" && !state.confirmed[viewerTeam];
 	const handViews = isPlacing && fanShown && turnOpen && !handoffPending ? currentHandViews(state, viewerTeam) : [];
 	const hoveredIndex = handViews.findIndex((v) => v.key === hoveredKey);
+	// A flick each time a different HAND card is selected (hover lift / touch arm / browsing the fan);
+	// throttled so sweeping across the fan doesn't machine-gun. Played-card raises stay silent.
+	const pickedKey = hoveredIndex >= 0 ? hoveredKey : null;
+	useEffect(() => {
+		if (pickedKey) playSound("cardPick", AUDIO.pickThrottleMs);
+	}, [pickedKey]);
 
 	// Tight, overlapping fan anchored to the bottom edge of the viewport. When it would
 	// overflow the visible width, step *and* card size shrink together so every card

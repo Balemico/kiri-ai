@@ -8,7 +8,6 @@ export const SEAL = "#b73225";
 
 /** Team colours — match the pawns and the card-name reveal. */
 export const TEAM_INK: Record<Team, string> = { red: "#d8303d", blue: "#579cb1" };
-export const TEAM_NAME: Record<Team, string> = { red: "ROSSO", blue: "BLU" };
 /** 赤 (aka, red) / 青 (ao, blue) — the traditional kendo match colours. */
 export const TEAM_KANJI: Record<Team, string> = { red: "赤", blue: "青" };
 

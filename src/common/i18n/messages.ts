@@ -1,0 +1,121 @@
+import type { Lang } from "../state/langPref";
+
+/**
+ * Every player-facing string, as react-intl (ICU) messages — Italian is the source table, English
+ * must define the same ids (typed). Debug-only text (Leva, the lobby's network diagnostics line)
+ * stays untranslated.
+ */
+const it = {
+	"team.red": "ROSSO",
+	"team.blue": "BLU",
+	// Entry gate — one message per verse line (VERSE_LINES in gateBeats: one clock beat per line)
+	"gate.verse.0": "Due samurai si fronteggiano sull'orlo della scogliera.",
+	"gate.verse.1": "Un cielo di nubi oscura la notte.",
+	"gate.verse.2": "La luna squarcia le nubi mentre colpiscono.",
+	"gate.enter": "ENTRA",
+	"corner.soundOn": "Audio attivo",
+	"corner.soundOff": "Audio disattivato",
+	"corner.language": "Lingua",
+	// Menu
+	"menu.passAndPlay": "PASSA E GIOCA",
+	"menu.multiplayer": "MULTIPLAYER",
+	"menu.caption": "Passa e gioca sullo stesso dispositivo, oppure sfida un avversario online.",
+	// Multiplayer lobby
+	"mp.title": "Multiplayer",
+	"mp.subtitle": "Crea una partita o unisciti a una esistente",
+	"mp.createMatch": "CREA PARTITA",
+	"mp.join": "UNISCITI",
+	"mp.back": "← INDIETRO",
+	"mp.createTitle": "Crea partita",
+	"mp.createSubtitle": "Scegli una parola chiave e il tuo colore",
+	"mp.keywordExample": "Parola chiave (es. duello)",
+	"mp.createAndWait": "CREA E ATTENDI",
+	"mp.joinTitle": "Unisciti",
+	"mp.joinSubtitle": "Inserisci la parola chiave della partita",
+	"mp.keyword": "Parola chiave",
+	"mp.joinNote": "Ti verrà assegnato il colore opposto a chi ha creato la partita.",
+	"mp.waitingShare": "In attesa… condividi la parola chiave",
+	"mp.waitingNote": "Non appena si unisce, la partita inizia.",
+	"mp.cancel": "ANNULLA",
+	"mp.peerLeft": "Avversario uscito — la partita è stata interrotta",
+	"mp.backToMenu": "TORNA AL MENU",
+	// Duel HUD
+	"hud.winner": "VINCITORE",
+	"hud.ready": "PRONTO",
+	"hud.choosing": "STA SCEGLIENDO",
+	"hud.menu": "MENU",
+	"hud.waitingOpponent": "IN ATTESA DELL'AVVERSARIO…",
+	"duel.confirm": "CONFERMA",
+	"duel.newMatch": "NUOVA PARTITA",
+	"duel.counter": "Contrattacco!",
+	"duel.feint": "Finta!",
+	// Hand-over veil: <team> wraps the (coloured) team name
+	"handoff.title": "TOCCA AL <team>{name}</team>",
+	"handoff.note": "Passa il dispositivo · tocca per iniziare",
+	"handoff.aria": "Tocca al {team}: tocca per iniziare",
+	// Quit dialog
+	"quit.title": "abbandonare il duello?",
+	"quit.online": "la partita online verrà chiusa",
+	"quit.local": "la partita in corso andrà persa",
+	"quit.leave": "ESCI",
+	"quit.cancel": "ANNULLA",
+	// Victory ({team} arrives lower-cased)
+	"win.title": "vince il {team}",
+	"win.tally": "in {rounds} round · {lives, plural, one {# vita rimasta} other {# vite rimaste}}",
+} as const;
+
+export type MessageId = keyof typeof it;
+
+const en: Record<MessageId, string> = {
+	"team.red": "RED",
+	"team.blue": "BLUE",
+	"gate.verse.0": "Two samurai face each other on the cliff's edge.",
+	"gate.verse.1": "Cloudy skies darken the night.",
+	"gate.verse.2": "The moon breaks through as they strike.",
+	"gate.enter": "ENTER",
+	"corner.soundOn": "Sound on",
+	"corner.soundOff": "Sound off",
+	"corner.language": "Language",
+	"menu.passAndPlay": "PASS & PLAY",
+	"menu.multiplayer": "MULTIPLAYER",
+	"menu.caption": "Pass and play on the same device, or challenge an opponent online.",
+	"mp.title": "Multiplayer",
+	"mp.subtitle": "Create a match or join an existing one",
+	"mp.createMatch": "CREATE MATCH",
+	"mp.join": "JOIN",
+	"mp.back": "← BACK",
+	"mp.createTitle": "Create match",
+	"mp.createSubtitle": "Pick a keyword and your colour",
+	"mp.keywordExample": "Keyword (e.g. duel)",
+	"mp.createAndWait": "CREATE & WAIT",
+	"mp.joinTitle": "Join",
+	"mp.joinSubtitle": "Enter the match keyword",
+	"mp.keyword": "Keyword",
+	"mp.joinNote": "You'll get the opposite colour of whoever created the match.",
+	"mp.waitingShare": "Waiting… share the keyword",
+	"mp.waitingNote": "The match starts as soon as they join.",
+	"mp.cancel": "CANCEL",
+	"mp.peerLeft": "Opponent left — the match was interrupted",
+	"mp.backToMenu": "BACK TO MENU",
+	"hud.winner": "WINNER",
+	"hud.ready": "READY",
+	"hud.choosing": "CHOOSING",
+	"hud.menu": "MENU",
+	"hud.waitingOpponent": "WAITING FOR THE OPPONENT…",
+	"duel.confirm": "CONFIRM",
+	"duel.newMatch": "NEW MATCH",
+	"duel.counter": "Counter!",
+	"duel.feint": "Feint!",
+	"handoff.title": "<team>{name}</team> TO PLAY",
+	"handoff.note": "Pass the device · tap to start",
+	"handoff.aria": "{team} to play: tap to start",
+	"quit.title": "abandon the duel?",
+	"quit.online": "the online match will be closed",
+	"quit.local": "the match in progress will be lost",
+	"quit.leave": "QUIT",
+	"quit.cancel": "CANCEL",
+	"win.title": "{team} wins",
+	"win.tally": "in {rounds, plural, one {# round} other {# rounds}} · {lives, plural, one {# life left} other {# lives left}}",
+};
+
+export const MESSAGES: Record<Lang, Record<MessageId, string>> = { it, en };

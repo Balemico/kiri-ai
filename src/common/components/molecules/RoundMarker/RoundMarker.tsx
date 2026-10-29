@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { INK, kanjiNumeral } from "../../../hudPalette";
+import { useT } from "../../../i18n";
 import { ENSO, ENSO_HEAD } from "../../../enso";
 
 export interface RoundMarkerProps {
@@ -16,6 +17,7 @@ export interface RoundMarkerProps {
  * Each new round re-draws the circle and stamps the numeral in, so the round change is felt.
  */
 export const RoundMarker = ({ round, scale = 1, onMenu }: RoundMarkerProps) => {
+	const t = useT();
 	const filterId = useId().replace(/:/g, "");
 	const size = 76 * scale;
 	// The ensō + its MENU hint form one tap target (the HUD itself lets pointers through).
@@ -112,7 +114,7 @@ export const RoundMarker = ({ round, scale = 1, onMenu }: RoundMarkerProps) => {
 						pointerEvents: "auto",
 					}}
 				>
-					MENU
+					{t("hud.menu")}
 				</span>
 			)}
 		</div>

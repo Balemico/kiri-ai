@@ -94,13 +94,24 @@ export const portraitLineBand = (
 // The "RED/BLUE WINS" title overlay shown on game-over: a brush stroke sweeps in, then the
 // words appear one by one. `testVictory`/`testTeam` force it on (without winning) to tune in Leva.
 export const WIN_BANNER = {
-	offsetTop: 0.2, // vertical position from the top, as a fraction of viewport height
+	offsetTop: 0.13, // vertical position from the top, as a fraction of viewport height (landscape: in the sky)
 	fontScale: 0.5, // multiplier on the base display size (1 = Typography "display")
 	inkColor: "#0a0a0a", // brush-stroke ink colour
 	spreadSeconds: 1.1, // time for the brush to sweep across, before the words appear
 	letterStagger: 0.06, // delay between each letter STARTING (< letterDuration → letters overlap)
 	letterDuration: 0.4, // how long each letter takes to fade/rise in
-	afterFall: 0.6, // pause after the loser has fallen flat, before the victory screen comes in (s)
+	afterFall: 0.8, // zanshin: silence after the loser has fallen flat, before the victory screen comes in (s)
+	// Landscape closing beat (from `shown`): the camera closes slowly on the winner while maple leaves
+	// drift across the stage, then the title stroke is laid in the sky, 一本 stamped on its corner, the
+	// tally, and finally the actions.
+	titleDelay: 0.7, // camera push already under way when the title stroke is laid (s)
+	actionsDelay: 3, // NUOVA PARTITA / MENU arrive after the tally (s, landscape)
+	actionsDelayPortrait: 3.4, // same, after the portrait screen's own beats
+	cameraDur: 4.5, // the slow push-in (s)
+	cameraPush: 0.16, // fraction of the camera distance closed on the winner
+	cameraShift: 0.45, // fraction of the winner's x the view centre drifts toward
+	cameraLift: 0.12, // world-Y the view centre rises (toward the figures' heads)
+	leafCount: 16, // falling maple leaves over the victory stage
 	testVictory: false, // Leva: show the banner without a real winner
 	testTeam: "red" as Team, // Leva: which team's victory to preview
 } as const;
@@ -125,7 +136,6 @@ export const GAME_HUD = {
 	hitLagMs: 950, // a life seal breaks this long after the reveal, once the blade has landed
 	splashSeconds: 0.9, // how long the screen-edge ink wash of a landed hit lingers
 	hitInk: "#8a1610", // the spilled ink of a landed blow — blood red (the screen-edge wash)
-	phaseCaptionTop: 0.21, // landscape: the phase caption (SCELTA DELLE CARTE…) floats apart from the ensō, this fraction of the viewport height down
 	idleOpacity: 0.6, // a banner whose player is NOT acting fades to this, alongside its corner resting in black
 	// Corner vignette behind the banners (sections/HudVignette → atoms/CornerVignette): a gradual glow in
 	// each top corner, drawn in the 3D scene under the cards — it glows in the team colour while that
@@ -147,6 +157,17 @@ export const GAME_HUD = {
 	edgeVignetteOpacity: 0.45, // alpha in the corners (edges get about half, the centre none)
 	edgeVignetteOpacityPortrait: 0.2, // portrait (mobile): lighter — the tall screen puts the board close to the edges
 } as const;
+
+// --- Ink button labels: optical vertical centring ---
+// CSS centres a line's ascent+descent box, but Hirokawa (the label face) reserves a deep descender
+// the uppercase labels never use: box centre = (1614 − 807) / 2 / 2048 ≈ 0.197 em above the
+// baseline, the brushed capitals' ink ≈ −0.06 … +0.70 em (centre ≈ 0.32 em) → the text sat ≈ 0.125 em
+// HIGH (fontTools on HirokawaRegular.ttf). This shift puts the capitals on the BUTTON BOX's centre.
+// Not on the stroke's: each stroke's body lands a little up or down at random (its shape is seeded
+// per mount — measured −1.5…+2 CSS px around the box centre across the lobby's buttons), so a
+// stroke-calibrated shift was right for one button and low on the others. The box centre is the
+// one place that's uniform, and the strokes scatter around it.
+export const INK_LABEL_SHIFT = "0.125em";
 
 // --- Sumi ink (TSL shader) ---
 // Action sumi-e (haboku / hatsuboku): fast dry-brush slashes whose bristles split into streaks,
@@ -205,16 +226,26 @@ export const PAWN = {
 	// renderOrder − 1, offset by a stack bias, so two overlapping figures stack as whole sheets instead of
 	// interleaving their layers. `front` / `back` = the two figures at rest (landscape: red over blue;
 	// portrait: the nearer, bottom team over the far one); `swaying` = a struck figure while it totters
-	// back, sent behind the other so it never cuts through it.
-	stack: { front: 0.8, back: 0.4, swaying: 0 },
+	// back, sent behind the other so it never cuts through it; `lying` = a figure flat on the floor (before
+	// the stand-up, or fallen), always behind a standing one.
+	stack: { front: 0.8, back: 0.4, swaying: 0, lying: 0 },
 	frames: {
-		// aspect = imgW/imgH; bodyCol = leg-mass x (0..1 from left); feetRow = lowest opaque row (0..1 from top).
+		// aspect = imgW/imgH; bodyCol = leg-mass x (0..1 from left); feetRow = lowest opaque row (0..1 from top);
+		// headRow = highest opaque row (0..1 from top) — where the Finta!/Contrattacco! callout sits.
 		// `scale` multiplies `height` per stance: the earth pose reads bigger (wide stance + extended sword),
 		// so the heaven pose is bumped up a touch to match it visually.
-		heaven: { aspect: 1024 / 1536, bodyCol: 0.451, feetRow: 0.956, scale: 1.12 },
-		earth: { aspect: 1641 / 1536, bodyCol: 0.338, feetRow: 0.933, scale: 1.0 },
+		heaven: { aspect: 1024 / 1536, bodyCol: 0.451, feetRow: 0.956, headRow: 0.043, scale: 1.12 },
+		earth: { aspect: 1641 / 1536, bodyCol: 0.338, feetRow: 0.933, headRow: 0.066, scale: 1.0 },
 	},
+	// World gap between the top of the figure and the bottom of its combat callout (Finta! / Contrattacco!).
+	calloutGap: 0.03,
 } as const;
+
+/** Height of a figure's head above its feet (world), in the given stance — its measured top row. */
+export const pawnHeadHeight = (stance: "heaven" | "earth", height: number): number => {
+	const f = PAWN.frames[stance];
+	return height * f.scale * (f.feetRow - f.headRow);
+};
 
 // The samurai as PAPER CUT-OUTS: a cream paper rim around the coloured silhouette, a faint offset
 // edge for the sheet's thickness, a contact shadow at the feet — and the entrance: hinged at the
@@ -303,6 +334,41 @@ export const RESOLUTION: ResolutionConfig = {
 export const AUDIO = {
 	muted: false,
 	volume: 0.7,
+	// Per-event gain for the card sounds (× volume). The clips are peak-normalised, so these set the mix:
+	// the deal slide stays soft (it fires once per card in the cascade), the pick flick a touch louder,
+	// the place snap is the most present.
+	cardDeal: 0.35,
+	cardPick: 0.45,
+	cardPlace: 0.8,
+	// Lobby→duel ink veil whoosh (a hot clip, ~−14 LUFS: kept under the music's level). Played as the first
+	// slash lands, and again — re-pitched by the jitter — at `veilSecondAt` × INK.veilPour into the cover.
+	veil: 0.55,
+	veilSecondAt: 0.45,
+	// Pass & play hand-over: a shorter, lighter whoosh as the washi veil covers the table and as it's lifted.
+	handoff: 0.5,
+	// Derived from the whoosh master by scripts/make_fx.sh (both −20 LUFS). `rise`: a paper cut-out
+	// raised to its feet (a reversed swell peaking as it comes upright). `cardCover`: a placed card
+	// turning face-down — both cards of a pair flip together, so it's throttled to one fwip.
+	rise: 0.45,
+	cardCover: 0.5,
+	coverThrottleMs: 120,
+	/** Minimum gap between two pick flicks — sweeping the pointer across the fan must not machine-gun. */
+	pickThrottleMs: 70,
+	// Card sounds only: random per-play nudge (± fraction) of playback speed (= pitch) and volume.
+	pitchJitter: 0.05,
+	gainJitter: 0.1,
+} as const;
+
+// Defaults for the "Music" Leva folder (background music, src/common/music.ts). The files are
+// loudness-normalised to −18 LUFS by scripts/encode_music.sh, so `volume` alone sets how far the
+// music sits under the SFX. Fades in seconds: `fadeIn`/`fadeOut` at each track's start/end (and the
+// overlap between consecutive tracks), `crossfade` on a lobby ↔ battle change.
+export const MUSIC = {
+	muted: false,
+	volume: 0.5,
+	fadeIn: 3,
+	fadeOut: 4,
+	crossfade: 2,
 } as const;
 
 export const PAPER = "#f4eee0"; // washi cream — scene background behind the panels
@@ -464,6 +530,40 @@ export const INTRO = {
 	flightStartDist: 1.4, // start z as a MULTIPLE of the final camera distance (> 1 = farther)
 } as const;
 
+// --- Entry gate (net/components/EntryGate + Lobby) ---
+// The box-art emblem stacked above the title (one logo block). Heights are CSS lengths so they
+// follow the viewport; `emblemGap` is the clear paper between the emblem's foot and the title.
+export const ENTRY_GATE = {
+	emblemHeight: "min(34vh, 300px)",
+	emblemHeightPortrait: "min(30vh, 260px)",
+	emblemHeightPortraitLobby: "min(17vh, 150px)", // portrait lobby: logo at the top, over the panorama
+	emblemGap: 10, // px
+	// The gate's opening, one clock (seconds after the page has settled): bare paper → the full logo
+	// appears, centred → it rises to make room → the verse, line after line, each rising out of the
+	// paper (a pale, diffuse stain that condenses into sharp ink) → ENTRA → the audio icon (bottom-left).
+	settleFrames: 6, // the clock waits for this many consecutive smooth frames (< 1/24 s) after mount…
+	settleCap: 3, // s — …or this long at most
+	logoAt: 0.6, // s — after a beat of bare paper
+	logoDur: 1.4, // s — the logo appearing
+	liftAt: 2.4, // s — the logo rises (the verse's room opens under it)
+	liftDur: 1.0, // s
+	lineStart: 2.8, // s — first verse line: starts rising while the logo settles from its lift
+	lineStagger: 1.0, // s — between line starts
+	lineDur: 1.8, // s — one line rising out of the paper
+	entraAfter: 0.3, // s — after the last line has risen
+	audioAfter: 0.6, // s — after ENTRA
+	// ENTRA → lobby, a second clock from the tap: the lines sink back into the paper one by one, the
+	// logo dissolves scaling down, THEN the cinematic starts; the logo returns in its menu place growing
+	// back from the same scale (Lobby's first menu beat), then the buttons.
+	outLineStart: 0.1, // s
+	outLineStagger: 0.28, // s
+	outLineDur: 0.6, // s — one line sinking back
+	logoOutAfter: 0.05, // s — after the last line has gone
+	logoOutDur: 0.7, // s — the logo dissolving
+	logoScale: 0.86, // the hidden logo's scale (dissolves down to it, grows back from it)
+	logoInDur: 1.0, // s — the logo returning in the lobby
+} as const;
+
 /** Camera pose (y, z) of the locked front view for a frame + aspect — FitCamera's fit rule as a pure function. */
 export interface CameraPose {
 	y: number;
@@ -552,6 +652,8 @@ export const PLAYED_CARDS = {
 	actionEdgeMargin: 0.7, // x gap from the viewport edge to the card centre
 	actionY: 0, // Y offset from the page centre (mid-page)
 	actionZ: 0.5,
+	actionBelowRest: 0.08, // with the pair lifted to the top corner: min gap from the lower resting card down to the revealed one
+
 	// First card leaving toward the hand once its action is resolved (slides down off the bottom).
 	toHandX: 0.4, // x distance from centre (signed by team) on the way down
 	toHandY: -0.7, // Y relative to the viewport bottom (negative = below, toward the hand)
@@ -703,6 +805,7 @@ export interface PlayedCardConfig {
 	actionEdgeMargin: number;
 	actionY: number;
 	actionZ: number;
+	actionBelowRest: number;
 	toHandX: number;
 	toHandY: number;
 	toHandScale: number;
@@ -742,6 +845,14 @@ export const playedCardTransform = (
 ): CardTransform => {
 	const sign = teamEdgeSign(team);
 	const edgeX = (margin: number) => sign * (viewport.width / 2 - margin);
+	// Landscape: a card's TOP (the "forward" end — e.g. Approach's arrow) points toward the opponent, as
+	// on a real table: red (left) turns it right (−π/2), blue (right) turns it left (+π/2).
+	const towardOpponent = sign * (Math.PI / 2);
+	// Landscape, narrow window: the resting pair lifts to the TOP corner (see "rest"), stacked first
+	// above second just under the HUD's banners.
+	const crowded = viewport.width < cfg.restTopWidth;
+	const liftedFirstY = viewport.centerY + viewport.height / 2 - Math.max(cfg.restTopMargin, (viewport.topReserve ?? 0) + cfg.restBelowHud);
+	const liftedSecondY = liftedFirstY - cfg.restGap * cfg.restTopScale;
 	// Portrait: the cards stand UPRIGHT (portrait) in a vertical COLUMN at the team's lateral edge —
 	// the turn player (bottom team) on the LEFT, the opponent on the RIGHT. The committed pair stacks
 	// first-on-top → second, with the set-aside card below them, slightly scaled. Sizes are a fraction
@@ -758,13 +869,16 @@ export const playedCardTransform = (
 		// Sized by the visible FACE (the card model's footprint is wider than its painted face), narrowed
 		// by the turn (cos) so the outer edge still meets the viewport edge.
 		const x = side * (viewport.width / 2 - pp.edge - (CARD_FACE_WIDTH * scale * Math.cos(lean)) / 2);
+		// The top team advances DOWNWARD, so its cards are turned upside down (top = toward the opponent),
+		// as across a real table; the bottom team's stay upright.
+		const facing = team === pp.bottomTeam ? 0 : Math.PI;
 		const step = cardH + pp.gap; // centre-to-centre of two full cards touching with `gap`
 		switch (mode) {
 			case "toHand":
 				// First card leaving toward the hand (slides down off the bottom on its side).
 				return {
 					position: [side * cfg.toHandX, viewport.bottom + cfg.toHandY, cfg.actionZ],
-					rotationZ: 0,
+					rotationZ: facing,
 					rotationX: 0,
 					scale: cfg.toHandScale,
 				};
@@ -773,7 +887,7 @@ export const playedCardTransform = (
 				const saH = cardH * pp.setAsideScale;
 				return {
 					position: [x, pp.centerY - (cardH / 2 + pp.gap + saH / 2) + pp.setAsideOffset, cfg.restZ],
-					rotationZ: 0,
+					rotationZ: facing,
 					rotationY: lean,
 					rotationX: 0,
 					scale: scale * pp.setAsideScale,
@@ -785,19 +899,29 @@ export const playedCardTransform = (
 				// First on top, second at the column centre. A revealed card (action) stays exactly on its
 				// resting spot — it just flips face-up in place, it does NOT move.
 				const y = slot === "first" ? pp.centerY + step : pp.centerY;
-				return { position: [x, y, cfg.restZ], rotationZ: 0, rotationX: 0, rotationY: lean, scale };
+				return { position: [x, y, cfg.restZ], rotationZ: facing, rotationX: 0, rotationY: lean, scale };
 			}
 		}
 	}
 	switch (mode) {
-		case "action":
+		case "action": {
 			// Revealed: rises landscape (horizontal) up to mid-page on its team's side, held for the action.
+			// With the pair lifted to the top corner, mid-page can reach into the lower resting card (the
+			// still-covered second during the first action), so the revealed card then drops just under
+			// it. Heights are the visible FACE's (a landscape card shows its face width vertically).
+			let y = viewport.centerY + cfg.actionY;
+			if (crowded) {
+				const restHalf = (CARD_FACE_WIDTH * cfg.restScale * cfg.restTopScale) / 2;
+				const actionHalf = (CARD_FACE_WIDTH * cfg.actionScale) / 2;
+				y = Math.min(y, liftedSecondY - restHalf - cfg.actionBelowRest - actionHalf);
+			}
 			return {
-				position: [edgeX(cfg.actionEdgeMargin), viewport.centerY + cfg.actionY, cfg.actionZ],
-				rotationZ: -Math.PI / 2,
+				position: [edgeX(cfg.actionEdgeMargin), y, cfg.actionZ],
+				rotationZ: towardOpponent,
 				rotationX: -cfg.actionTilt,
 				scale: cfg.actionScale,
 			};
+		}
 		case "toHand":
 			return {
 				position: [sign * cfg.toHandX, viewport.bottom + cfg.toHandY, cfg.actionZ],
@@ -809,7 +933,7 @@ export const playedCardTransform = (
 			// Laid flat near the battleline on the team's side (just outside its end of the line).
 			return {
 				position: [teamOriginX(team, viewport.width) + sign * cfg.setAsideInset, cfg.setAsideY, cfg.setAsideZ],
-				rotationZ: cfg.setAsideRotZ,
+				rotationZ: -sign * cfg.setAsideRotZ, // mirrored for blue (see towardOpponent)
 				rotationX: -cfg.setAsideTilt,
 				scale: cfg.setAsideScale,
 			};
@@ -822,26 +946,23 @@ export const playedCardTransform = (
 			// to the TOP corner instead (empty scenery up there → it clears at any width), below the HUD's
 			// player banners (`topReserve`).
 			const isFirst = slot === "first";
-			const crowded = viewport.width < cfg.restTopWidth;
 			if (crowded) {
 				// Lifted to the top corner: the pair stays STACKED (first above second) just under the HUD's
 				// banners, a touch smaller and closer together so it fits between the banners and the
 				// samurai's raised swords. Where the band is too short a sword tip may brush the lower card
 				// — acceptable: the pawn draws over the (face-down) resting cards, hiding nothing.
-				const k = cfg.restTopScale;
-				const firstY = viewport.centerY + viewport.height / 2 - Math.max(cfg.restTopMargin, (viewport.topReserve ?? 0) + cfg.restBelowHud);
 				return {
-					position: [edgeX(cfg.restEdgeMargin), isFirst ? firstY : firstY - cfg.restGap * k, cfg.restZ],
-					rotationZ: -Math.PI / 2,
+					position: [edgeX(cfg.restEdgeMargin), isFirst ? liftedFirstY : liftedSecondY, cfg.restZ],
+					rotationZ: towardOpponent,
 					rotationX: 0,
-					scale: cfg.restScale * k,
+					scale: cfg.restScale * cfg.restTopScale,
 				};
 			}
 			return {
 				// Same z for both cards: a z difference would parallax-shift their apparent x (they sit
 				// near the frustum edge) and break the vertical alignment.
 				position: [edgeX(cfg.restEdgeMargin), viewport.bottom + cfg.restY + (isFirst ? cfg.restGap : 0), cfg.restZ],
-				rotationZ: -Math.PI / 2, // landscape (fixed)
+				rotationZ: towardOpponent, // landscape (fixed)
 				rotationX: 0,
 				scale: cfg.restScale,
 			};

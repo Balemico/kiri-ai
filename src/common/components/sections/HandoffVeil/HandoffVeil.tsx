@@ -6,8 +6,11 @@ import { useSession } from "../../../net";
 import { useLagged } from "../../../hooks/useLagged";
 import { useGameHudControls } from "../../../hooks/useGameHudControls";
 import { SealDisc } from "../../atoms";
-import { INK, TEAM_INK, TEAM_KANJI, TEAM_NAME, kanjiNumeral } from "../../../hudPalette";
+import { useIntl } from "react-intl";
+import { INK, TEAM_INK, TEAM_KANJI, kanjiNumeral } from "../../../hudPalette";
+import { useT } from "../../../i18n";
 import { PAPER } from "../../../layout";
+import { playSound } from "../../../audio";
 
 /**
  * Pass & play only: whenever the device has to change hands (a new placing turn), an opaque washi
@@ -20,6 +23,8 @@ import { PAPER } from "../../../layout";
  */
 export const HandoffVeil = () => {
 	const { state } = useGame();
+	const t = useT();
+	const intl = useIntl();
 	const { mode, viewerTeam } = useSession();
 	const { handoffDelayMs } = useGameHudControls();
 	// The dismissed key lives in a shared store so the HUD can hold its turn highlight until the tap.
@@ -37,6 +42,14 @@ export const HandoffVeil = () => {
 	const turnKey = handoffTurnKey(state, mode === "local", viewerTeam);
 	const settledKey = useLagged(turnKey, handoffDelayMs);
 	const show = turnKey !== null && settledKey === turnKey && dismissed !== turnKey;
+	// A short whoosh as the veil sweeps over the table (the lift plays its own, from the tap).
+	useEffect(() => {
+		if (show) playSound("handoff");
+	}, [show]);
+	const lift = (key: string) => {
+		playSound("handoff");
+		setDismissed(key);
+	};
 
 	const team = viewerTeam;
 	// The seal's bevel/shadows are px-based, so size it in px: ~22vmin, clamped 110–180.
@@ -48,10 +61,10 @@ export const HandoffVeil = () => {
 					key={turnKey}
 					role="button"
 					tabIndex={0}
-					aria-label={`Tocca al ${TEAM_NAME[team]}: tocca per iniziare`}
-					onClick={() => setDismissed(turnKey)}
+					aria-label={t("handoff.aria", { team: t(`team.${team}`) })}
+					onClick={() => lift(turnKey)}
 					onKeyDown={(e) => {
-						if (e.key === "Enter" || e.key === " ") setDismissed(turnKey);
+						if (e.key === "Enter" || e.key === " ") lift(turnKey);
 					}}
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
@@ -90,7 +103,10 @@ export const HandoffVeil = () => {
 						transition={{ duration: 0.45, delay: 0.3 }}
 						style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: "clamp(30px, 6vmin, 52px)", letterSpacing: "0.08em", textAlign: "center" }}
 					>
-						TOCCA AL <span style={{ color: TEAM_INK[team] }}>{TEAM_NAME[team]}</span>
+						{intl.formatMessage(
+							{ id: "handoff.title" },
+							{ name: t(`team.${team}`), team: (chunks) => <span style={{ color: TEAM_INK[team] }}>{chunks}</span> },
+						)}
 					</motion.h2>
 					<motion.p
 						initial={{ opacity: 0 }}
@@ -98,7 +114,7 @@ export const HandoffVeil = () => {
 						transition={{ opacity: { duration: 2.4, repeat: Infinity, ease: "easeInOut", delay: 0.6 } }}
 						style={{ margin: 0, fontSize: 13, letterSpacing: "0.18em", textAlign: "center", lineHeight: 1.6 }}
 					>
-						Passa il dispositivo · tocca per iniziare
+						{t("handoff.note")}
 					</motion.p>
 				</motion.div>
 			)}

@@ -1,23 +1,19 @@
 import { motion, type Variants } from "motion/react";
-import { typographyVariants } from "../../atoms/Typography/typographyVariants";
 import { InkStrokeLabel, SealDisc } from "../../atoms";
 import { useGame } from "../../../state";
 import { useWinBannerControls } from "../../../hooks/useWinBannerControls";
 import { useIsPortrait } from "../../../hooks/useIsPortrait";
 import { useVictoryShown } from "../../../state/victoryReveal";
-import { INK, PAPER_LIGHT, SEAL, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
+import { INK, PAPER_LIGHT, SEAL, TEAM_INK, TEAM_KANJI } from "../../../hudPalette";
+import { useT } from "../../../i18n";
 import { MAX_HITS, type Stance } from "../../../game";
 import { characterImagePath } from "../../../hooks/useCharacterTextures";
 import { PAWN } from "../../../layout";
 
-// NOTE: the sumi-e brush-stroke background (atoms/InkBrush) is temporarily disabled — we'll
-// revisit the look later. To re-enable: restore the `InkBrush` import + the text-measuring
-// `useLayoutEffect` and render `<InkBrush ... />` behind the words (see git history).
-
-/** Big centered victory title, revealed letter by letter. */
+/** The victory screen: landscape = a title stroke in the sky over the bare stage; portrait = its own veil. */
 export const WinBanner = () => {
 	const { state } = useGame();
-	const { testVictory, testTeam, offsetTop, fontScale, letterStagger, letterDuration } = useWinBannerControls();
+	const { testVictory, testTeam, offsetTop, fontScale, letterStagger, letterDuration, titleDelay } = useWinBannerControls();
 	const portrait = useIsPortrait();
 	// A real win waits for its closing beat: the blow lands, the loser falls, THEN the screen comes in.
 	const revealed = useVictoryShown();
@@ -25,6 +21,8 @@ export const WinBanner = () => {
 	// Real winner takes priority; the Leva toggle previews the banner without a win.
 	const winner = state.winner ? (revealed ? state.winner : null) : testVictory ? testTeam : null;
 	if (!winner) return null;
+	const rounds = state.round;
+	const lives = MAX_HITS - state[winner].damage;
 
 	if (portrait) {
 		return (
@@ -32,8 +30,8 @@ export const WinBanner = () => {
 				key={`${winner}-${letterStagger}-${letterDuration}`}
 				team={winner}
 				stance={state[winner].stance}
-				rounds={state.round}
-				lives={MAX_HITS - state[winner].damage}
+				rounds={rounds}
+				lives={lives}
 				letterStagger={letterStagger}
 				letterDuration={letterDuration}
 			/>
@@ -42,89 +40,100 @@ export const WinBanner = () => {
 
 	return (
 		<Banner
-			key={`${winner}-${offsetTop}-${fontScale}-${letterStagger}-${letterDuration}`}
+			key={`${winner}-${offsetTop}-${fontScale}-${letterStagger}-${letterDuration}-${titleDelay}`}
 			team={winner}
+			rounds={rounds}
+			lives={lives}
 			offsetTop={offsetTop}
 			fontScale={fontScale}
 			letterStagger={letterStagger}
 			letterDuration={letterDuration}
+			titleDelay={titleDelay}
 		/>
 	);
 };
 
 interface BannerProps {
 	team: "red" | "blue";
+	rounds: number;
+	lives: number;
 	offsetTop: number;
 	fontScale: number;
 	letterStagger: number;
 	letterDuration: number;
+	titleDelay: number;
 }
 
-/** Keyed remount per win so the letter reveal replays from the start. */
-const Banner = ({ team, offsetTop, fontScale, letterStagger, letterDuration }: BannerProps) => {
-	// Fluid: the title size tracks the window width (vw), scaled by the Leva multiplier — no
-	// px cap, so it stays proportional to the window at any size.
-	const fontSize = `${(12 * fontScale).toFixed(2)}vw`;
-	const titleClass = typographyVariants({ variant: "display", color: team });
+/**
+ * Landscape victory, one gesture over the bare stage (the HUD, callouts and markers have already
+ * stepped aside, and the camera is closing on the winner): the title is laid in the SKY as white
+ * letters on a team-coloured sumi stroke — clear of the figures — 一本 is stamped on the stroke's
+ * corner like a hanko, then a quiet tally. Keyed remount per win so it replays from the start.
+ */
+const Banner = ({ team, rounds, lives, offsetTop, fontScale, letterStagger, letterDuration, titleDelay }: BannerProps) => {
+	const t = useT();
+	// Fluid: the title size tracks the window width (vw), scaled by the Leva multiplier.
+	const fontSize = `${(10 * fontScale).toFixed(2)}vw`;
 	// One span per character so each letter staggers in (the space is a fixed-width gap, since the
 	// brush font's space glyph is nearly zero-width).
-	const chars = [...`vince il ${TEAM_NAME[team].toLowerCase()}`];
-	// The ippon seal stamps down once the title has finished writing itself.
-	const stampDelay = letterStagger * chars.length + letterDuration;
+	const chars = [...t("win.title", { team: t(`team.${team}`).toLowerCase() })];
+	// Beats (s): stroke laid → letters write themselves → 一本 stamped → tally.
+	const lettersAt = titleDelay + 0.2;
+	const ipponAt = lettersAt + letterStagger * chars.length + letterDuration;
+	const tallyAt = ipponAt + 0.45;
 
-	// staggerChildren = the gap between letters STARTING. It is independent of each letter's
-	// duration, so when letterStagger < letterDuration the next letter begins while the current
-	// one is still animating (they overlap).
-	const container: Variants = {
-		hidden: {},
-		show: { transition: { staggerChildren: letterStagger } },
-	};
+	const container: Variants = { hidden: {}, show: { transition: { delayChildren: lettersAt, staggerChildren: letterStagger } } };
 	const letter: Variants = {
-		hidden: { opacity: 0, x: 15, filter: "blur(10px)" },
-		show: { opacity: 1, x: 0, filter: "blur(0px)", transition: { duration: letterDuration, ease: [0.22, 1, 0.36, 1] } },
+		hidden: { opacity: 0, y: 10, filter: "blur(8px)" },
+		show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: letterDuration, ease: EASE_OUT } },
 	};
 
 	return (
-		<div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
-			{/* Brush stroke background temporarily disabled — see note at top of file. */}
-			<div
-				style={{
-					position: "absolute",
-					top: `${(offsetTop * 100).toFixed(1)}vh`,
-					left: "50%",
-					transform: "translateX(-50%)",
-					display: "flex",
-					flexDirection: "column",
-					alignItems: "center",
-				}}
-			>
+		<div
+			style={{
+				position: "fixed",
+				top: `${(offsetTop * 100).toFixed(1)}vh`,
+				left: 0,
+				right: 0,
+				zIndex: 2000,
+				pointerEvents: "none",
+				display: "flex",
+				flexDirection: "column",
+				alignItems: "center",
+				gap: "clamp(10px, 2vh, 20px)",
+			}}
+		>
+			<div style={{ position: "relative" }}>
+				<InkStrokeLabel tone={team} variant={team === "red" ? 1 : 2} delay={titleDelay} style={{ padding: "0.5em 1.7em 0.32em" }}>
+					<motion.span
+						variants={container}
+						initial="hidden"
+						animate="show"
+						style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize, lineHeight: 1, whiteSpace: "nowrap", letterSpacing: "0.04em" }}
+					>
+						{chars.map((c, i) => (
+							<motion.span key={i} variants={letter} style={{ display: "inline-block", width: c === " " ? "0.35em" : undefined }}>
+								{c === " " ? "" : c}
+							</motion.span>
+						))}
+					</motion.span>
+				</InkStrokeLabel>
+				{/* 一本 (ippon) — the decisive blow, stamped on the stroke's end like a hanko on a scroll. */}
 				<motion.div
-					variants={container}
-					initial="hidden"
-					animate="show"
-					className={titleClass}
-					style={{ fontSize, lineHeight: 1, whiteSpace: "nowrap" }}
-				>
-					{chars.map((c, i) => (
-						<motion.span key={i} variants={letter} style={{ display: "inline-block", width: c === " " ? "0.35em" : undefined }}>
-							{c === " " ? "" : c}
-						</motion.span>
-					))}
-				</motion.div>
-				{/* 一本 (ippon) — the decisive blow, slammed down as a vermilion seal. */}
-				<motion.div
-					initial={{ opacity: 0, scale: 2.2, rotate: -14 }}
-					animate={{ opacity: 1, scale: 1, rotate: -5 }}
-					transition={{ delay: stampDelay, duration: 0.32, ease: [0.5, 0, 0.3, 1.35] }}
+					initial={{ opacity: 0, scale: 2.2, rotate: -16 }}
+					animate={{ opacity: 1, scale: 1, rotate: -8 }}
+					transition={{ delay: ipponAt, duration: 0.32, ease: STAMP_EASE }}
 					style={{
-						marginTop: "clamp(10px, 2vh, 24px)",
-						padding: "clamp(6px, 1vmin, 12px) clamp(8px, 1.3vmin, 14px)",
+						position: "absolute",
+						right: "-1.2em",
+						bottom: "-0.9em",
+						fontSize: "clamp(18px, 2.6vw, 40px)",
+						padding: "0.18em 0.24em",
 						background: SEAL,
 						color: PAPER_LIGHT,
 						borderRadius: 6,
 						boxShadow: `inset 0 0 0 3px ${SEAL}, inset 0 0 0 5px ${PAPER_LIGHT}, 0 8px 22px rgba(0, 0, 0, 0.3)`,
 						fontFamily: "var(--font-display)",
-						fontSize: "clamp(30px, 6vmin, 64px)",
 						lineHeight: 1.05,
 						writingMode: "vertical-rl",
 						letterSpacing: "0.05em",
@@ -133,8 +142,23 @@ const Banner = ({ team, offsetTop, fontScale, letterStagger, letterDuration }: B
 					一本
 				</motion.div>
 			</div>
+			{/* Tally: how the duel was won. */}
+			<motion.p
+				initial={{ opacity: 0, y: 6 }}
+				animate={{ opacity: 0.7, y: 0 }}
+				transition={{ delay: tallyAt, duration: 0.5, ease: EASE_OUT }}
+				style={{ margin: 0, color: INK, fontSize: "clamp(12px, 1.1vw, 16px)", letterSpacing: "0.22em", textTransform: "uppercase" }}
+			>
+				<Tally rounds={rounds} lives={lives} />
+			</motion.p>
 		</div>
 	);
+};
+
+/** "in N round · X vite rimaste" (ICU plurals) — shared by both orientations. */
+const Tally = ({ rounds, lives }: { rounds: number; lives: number }) => {
+	const t = useT();
+	return <>{t("win.tally", { rounds, lives })}</>;
 };
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
@@ -172,6 +196,7 @@ const CUTOUT_FILTER = [
  * layer (1450) so the title's stroke and the NUOVA PARTITA button stay on top of it.
  */
 const PortraitVictory = ({ team, stance, rounds, lives, letterStagger, letterDuration }: PortraitVictoryProps) => {
+	const t = useT();
 	const colour = TEAM_INK[team];
 	// Sized in px from the window (SealDisc sizes its bevels in px; the screen is transient, read once).
 	const stage = Math.round(Math.min(window.innerHeight * 0.42, window.innerWidth * 0.95, 380));
@@ -181,7 +206,7 @@ const PortraitVictory = ({ team, stance, rounds, lives, letterStagger, letterDur
 	const frame = stance === "heaven" ? PAWN.frames.heaven : PAWN.frames.earth;
 	const figureH = Math.round(stage * 0.88);
 	const figureW = Math.min(stage, Math.round(figureH * frame.aspect));
-	const chars = [...`vince il ${TEAM_NAME[team].toLowerCase()}`];
+	const chars = [...t("win.title", { team: t(`team.${team}`).toLowerCase() })];
 	// Beats (s): veil → seal stamp → samurai raised → stroke + letters → 一本 → tally.
 	const sealAt = 0.35;
 	const standAt = sealAt + 0.3;
@@ -339,7 +364,7 @@ const PortraitVictory = ({ team, stance, rounds, lives, letterStagger, letterDur
 					transition={{ delay: tallyAt, duration: 0.5, ease: EASE_OUT }}
 					style={{ margin: 0, color: INK, fontSize: "clamp(12px, 3.6vw, 16px)", letterSpacing: "0.18em", textTransform: "uppercase" }}
 				>
-					in {rounds} round · {lives === 1 ? "1 vita rimasta" : `${lives} vite rimaste`}
+					<Tally rounds={rounds} lives={lives} />
 				</motion.p>
 			</div>
 		</>

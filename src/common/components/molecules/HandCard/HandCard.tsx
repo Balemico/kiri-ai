@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import * as THREE from "three";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
@@ -6,6 +6,7 @@ import { Card } from "../Card";
 import { TOUCH_HINT, type CardTransform, type CardEntry } from "../../../layout";
 import type { CardView } from "../../../state";
 import type { Side } from "../../../game";
+import { playSound } from "../../../audio";
 
 // One shared invisible material for the hover hit area (no per-card allocation).
 const HOVER_HIT_MATERIAL = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
@@ -56,6 +57,17 @@ export const HandCard = ({ view, target, entry, exit, onHover, onHoverEnd, onPla
 
 	const rotX = target.rotationX ?? 0;
 	const rotY = target.rotationY ?? 0;
+
+	// Hand cascade: each card's slide sound lands as it starts rising (own mount-only effect, so a target
+	// change mid-cascade — a hover — never cancels it).
+	useEffect(() => {
+		const initial = entryRef.current;
+		if (!initial || exitRef.current) return;
+		const call = gsap.delayedCall(initial.delay, () => playSound("cardDeal"));
+		return () => {
+			call.kill();
+		};
+	}, []);
 
 	useLayoutEffect(() => {
 		const g = ref.current;

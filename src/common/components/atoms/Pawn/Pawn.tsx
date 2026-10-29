@@ -8,6 +8,7 @@ import { useCharacterTexture, makeCharacterMaterial } from "../../../hooks/useCh
 import type { SlashControls } from "../../../hooks/useSlashControls";
 import type { PaperCutoutControls } from "../../../hooks/usePaperCutoutControls";
 import { cutOf, syncCutLayer, withCut } from "../../../pawnCut";
+import { playSound } from "../../../audio";
 
 // Tints applied to the white silhouette (multiply), matched to the duel-card palette.
 const COLORS: Record<Team, string> = { red: "#cf463f", blue: "#4a8aa0" };
@@ -382,8 +383,24 @@ export const Pawn = ({
 	// contact shadow fades in. Plays once per mount; the Leva
 	// "play stand-up" (`standTick`) lays it back down and replays it.
 	const stood = useRef(false);
+	// Draw band (`PAWN.stack`): a figure lying on the floor (before the stand-up, or fallen) is drawn
+	// BEHIND the other one — a standing figure is nearer the viewer than a sheet laid flat at its feet.
+	const lying = useRef(!standing);
+	const stackRef = useRef(stack);
+	const applyStack = (bias: number) =>
+		STANCES.forEach((st) => {
+			[edgeRefs[st], rimRefs[st], meshRefs[st]].forEach((ref, layer) => {
+				if (ref.current) ref.current.renderOrder = layerOrder(layer, bias);
+			});
+		});
+	const restingStack = () => (lying.current ? PAWN.stack.lying : stackRef.current);
+	const setLying = (on: boolean) => {
+		lying.current = on;
+		applyStack(restingStack());
+	};
 	const shadowMatOf = () => shadowRef.current?.material as THREE.MeshBasicMaterial | undefined;
 	const layDown = () => {
+		setLying(true);
 		if (hingeRef.current) hingeRef.current.rotation.x = paper.lieAngle;
 		const sm = shadowMatOf();
 		if (sm) sm.opacity = 0;
@@ -392,11 +409,16 @@ export const Pawn = ({
 		const h = hingeRef.current;
 		if (!h) return;
 		// Paper theatre: raised slowly by an unseen hand — a long sine-eased lift that drifts just past
-		// vertical, then one soft ease back into place (no spring, no wobble).
+		// vertical, then one soft ease back into place (no spring, no wobble). The rise swell starts with
+		// the lift and peaks as the figure comes upright.
 		const lift = paper.standDur * paper.liftShare;
 		gsap.killTweensOf(h.rotation);
 		gsap
 			.timeline({ delay })
+			.call(() => {
+				setLying(false);
+				playSound("rise");
+			})
 			.to(h.rotation, { x: paper.overshoot, duration: lift, ease: "sine.inOut" })
 			.to(h.rotation, { x: 0, duration: paper.standDur - lift, ease: "sine.inOut" });
 		const sm = shadowMatOf();
@@ -429,6 +451,7 @@ export const Pawn = ({
 		gsap.killTweensOf(h.rotation);
 		gsap
 			.timeline({ delay })
+			.call(() => setLying(true))
 			.to(h.rotation, { x: paper.overshoot, duration: paper.standDur - lift, ease: "sine.inOut" })
 			.to(h.rotation, { x: paper.lieAngle, duration: lift, ease: "sine.inOut" });
 		const sm = shadowMatOf();
@@ -503,16 +526,9 @@ export const Pawn = ({
 	// hinge, so it composes with (never cancels) the lie/stand/fall tweens on the hinge itself.
 	// While it totters the figure is drawn BEHIND the other one (its stack band dropped to `swaying`), then
 	// back to its resting band once upright — so a close pair never cuts through each other.
-	const applyStack = (bias: number) =>
-		STANCES.forEach((st) => {
-			[edgeRefs[st], rimRefs[st], meshRefs[st]].forEach((ref, layer) => {
-				if (ref.current) ref.current.renderOrder = layerOrder(layer, bias);
-			});
-		});
-	const stackRef = useRef(stack);
 	useLayoutEffect(() => {
 		stackRef.current = stack;
-		applyStack(stack);
+		applyStack(restingStack());
 		// applyStack reads stable refs.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [stack]);
@@ -531,7 +547,7 @@ export const Pawn = ({
 			.to(s.rotation, { x: -a * 0.5, duration: d * 0.3, ease: "sine.inOut" })
 			.to(s.rotation, { x: a * 0.2, duration: d * 0.26, ease: "sine.inOut" })
 			.to(s.rotation, { x: 0, duration: d * 0.26, ease: "sine.out" })
-			.call(() => applyStack(stackRef.current));
+			.call(() => applyStack(restingStack()));
 	};
 	const prevHitTick = useRef(hitTick);
 	useEffect(() => {

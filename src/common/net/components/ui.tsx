@@ -2,7 +2,11 @@ import { LayoutGroup, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { LOBBY } from "../../layout";
-import { InkStrokeButton } from "../../components/atoms";
+import { InkSegmentedStroke, InkStrokeButton, type InkSegmentOption } from "../../components/atoms";
+import { soundPref, useSoundOn } from "../../state/soundPref";
+import { langPref, useLang, type Lang } from "../../state/langPref";
+import { useT } from "../../i18n";
+import { playSound } from "../../audio";
 
 /** Single-line text field styled for the dark paper card. */
 export const TextField = ({
@@ -84,16 +88,21 @@ export const HankoStamp = ({ children }: { children: ReactNode }) => (
  * The menu's home: a FIXED right column in landscape (the panorama flows behind it — no panel),
  * a centred stack in portrait. Pointer events re-enabled here (the backdrop layer disables them).
  */
-export const LobbyColumn = ({ children }: { children: ReactNode }) => {
+export const LobbyColumn = ({ children, centered = false }: { children: ReactNode; centered?: boolean }) => {
 	const portrait = usePortraitWindow();
+	const center = portrait || centered;
 	return (
+		// `centered` = the entry gate. The switch to the menu column happens while the logo is dissolved
+		// (Lobby's ENTRA exit), so the column simply moves — nothing visible travels with it. Centring
+		// uses left/right + auto margins, so no transform competes with the children's layout glides.
 		<div
 			style={{
 				position: "absolute",
 				top: 0,
 				bottom: 0,
-				right: portrait ? "50%" : "4%",
-				transform: portrait ? "translateX(50%)" : "none",
+				left: center ? 0 : "auto",
+				right: center ? 0 : "4%",
+				marginInline: center ? "auto" : 0,
 				width: portrait ? "min(420px, 88vw)" : `${LOBBY.columnWidthPct}%`,
 				maxWidth: 460,
 				display: "flex",
@@ -108,6 +117,85 @@ export const LobbyColumn = ({ children }: { children: ReactNode }) => {
 			{/* One layout group for the whole column: when any screen/view inside changes height, the
 			    re-centred column's elements (logo included) glide to their new place together. */}
 			<LayoutGroup>{children}</LayoutGroup>
+		</div>
+	);
+};
+
+/**
+ * Brush-drawn speaker: the cone, then two sound waves (on) or a slash across it (off). Hand-wobbled
+ * paths with round caps so it reads as a few quick strokes, not a UI glyph. Inherits the label colour.
+ */
+const SoundIcon = ({ on }: { on: boolean }) => (
+	<svg width="30" height="24" viewBox="0 0 30 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+		<path d="M3.2 9.1 L8.4 8.7 L14.6 3.6 L14.9 20.6 L8.6 15.4 L3.1 15.1 Z" fill="currentColor" strokeWidth={1.6} />
+		{on ? (
+			<>
+				<path d="M18.6 8.4 C20.4 10.3 20.5 13.6 18.7 15.7" strokeWidth={2.2} />
+				<path d="M22.2 4.9 C26.1 8.6 26.3 15.3 22.4 19.2" strokeWidth={2.2} />
+			</>
+		) : (
+			<path d="M19.4 7.6 L27.2 16.6 M27.0 7.4 L19.6 16.9" strokeWidth={2.3} />
+		)}
+	</svg>
+);
+
+const LANGS: [Lang, Lang] = ["it", "en"];
+// Module constant: a stable identity, so the toggle doesn't re-register its stroke every render.
+const LANG_OPTIONS: [InkSegmentOption, InkSegmentOption] = [
+	{ label: "ITA", tone: "ink" },
+	{ label: "ENG", tone: "ink" },
+];
+
+/**
+ * The lobby's settings corner, pinned BOTTOM-LEFT on the entry gate and in the lobby, both still
+ * InkStrokeButton strokes like every button:
+ * - sound on/off (SFX + music): a speaker icon on a short stroke. Ink when on, ghost when off; the
+ *   choice persists (`soundPref`). Switching on answers with a card flick, so the player hears it took.
+ * - language: ITA | ENG on ONE segmented stroke (`langPref`, persisted); every string follows `useT`.
+ */
+export const SoundCorner = ({ visible = true }: { visible?: boolean }) => {
+	const on = useSoundOn();
+	const lang = useLang();
+	const t = useT();
+	const toggle = () => {
+		soundPref.set(!on);
+		if (!on) playSound("cardPick");
+	};
+	return (
+		<div
+			style={{
+				position: "absolute",
+				// The stroke's ink bleeds ~20px past the button box — keep that inside the screen.
+				left: "max(28px, env(safe-area-inset-left, 0px))",
+				bottom: "max(14px, env(safe-area-inset-bottom, 0px))",
+				display: "flex",
+				alignItems: "center",
+				// Clear paper between the two strokes, so they read as two controls, not one long smear.
+				gap: 28,
+				pointerEvents: "auto",
+			}}
+		>
+			<div style={{ width: 84 }}>
+				{/* labelShift 0: the text shift compensates font metrics an SVG icon doesn't have (measured: the
+				    icon sits on its stroke's centre unshifted, 4 px low with the text value). */}
+				<InkStrokeButton tone={on ? "ink" : "ghost"} variant={2} visible={visible} onClick={toggle} style={{ height: 52 }} labelShift={0}>
+					<span role="img" aria-label={on ? t("corner.soundOn") : t("corner.soundOff")} style={{ display: "inline-flex", verticalAlign: "middle" }}>
+						<SoundIcon on={on} />
+					</span>
+				</InkStrokeButton>
+			</div>
+			<div style={{ width: 132 }} aria-label={t("corner.language")}>
+				<InkSegmentedStroke
+					options={LANG_OPTIONS}
+					value={LANGS.indexOf(lang) as 0 | 1}
+					onChange={(i) => langPref.set(LANGS[i])}
+					variant={1}
+					visible={visible}
+					height={52}
+					fontSize={13}
+					letterSpacing={2}
+				/>
+			</div>
 		</div>
 	);
 };

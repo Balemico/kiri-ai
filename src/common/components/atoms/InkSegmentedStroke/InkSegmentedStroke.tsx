@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { motion, useIsPresent } from "motion/react";
 import { inkStrokes, INK_TONE_FALLBACK, inkSupported, newInkStrokeId, type InkTone } from "../../../ink/inkRegistry";
-import { INK } from "../../../layout";
+import { INK, INK_LABEL_SHIFT } from "../../../layout";
 import { InkDelayContext } from "../../../ink/inkDelay";
 
 export interface InkSegmentOption {
@@ -17,6 +17,12 @@ export interface InkSegmentedStrokeProps {
 	onChange: (value: 0 | 1) => void;
 	variant?: number;
 	visible?: boolean;
+	/** Box height (px) — the stroke is drawn to fit it. */
+	height?: number;
+	/** Label size (px). */
+	fontSize?: number;
+	/** Label tracking once painted (px). */
+	letterSpacing?: number;
 }
 
 /**
@@ -24,7 +30,7 @@ export interface InkSegmentedStrokeProps {
  * half carries its colour, the other half fades to ghost-grey, and on change the colour glides
  * across the seam. Each half is a real button over its side of the stroke (labels stay DOM).
  */
-export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visible = true }: InkSegmentedStrokeProps) => {
+export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visible = true, height = 70, fontSize = 16, letterSpacing = 3 }: InkSegmentedStrokeProps) => {
 	const ref = useRef<HTMLDivElement>(null);
 	const [id] = useState(newInkStrokeId);
 	const [hovered, setHovered] = useState(false);
@@ -59,7 +65,7 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 			onHoverEnd={() => setHovered(false)}
 			initial="hidden"
 			animate={visible ? "painted" : "hidden"}
-			style={{ position: "relative", display: "flex", width: "100%", height: 70 }}
+			style={{ position: "relative", display: "flex", width: "100%", height }}
 		>
 			{options.map((o, i) => {
 				const selected = value === i;
@@ -88,10 +94,11 @@ export const InkSegmentedStroke = ({ options, value, onChange, variant = 0, visi
 					>
 						<motion.span
 							variants={{
-								hidden: { opacity: 0, letterSpacing: "6px", filter: "blur(3px)" },
-								painted: { opacity: 1, letterSpacing: "3px", filter: "blur(0px)", transition: { delay: delay + INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+								hidden: { opacity: 0, letterSpacing: `${letterSpacing * 2}px`, filter: "blur(3px)" },
+								painted: { opacity: 1, letterSpacing: `${letterSpacing}px`, filter: "blur(0px)", transition: { delay: delay + INK.strokePour * 0.45, duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 							}}
-							style={{ position: "relative", color: "#f2ead9", fontSize: 16, fontWeight: 700, letterSpacing: 3, whiteSpace: "nowrap" }}
+							// `top`: optical centring of the capitals on the stroke (INK_LABEL_SHIFT).
+							style={{ position: "relative", top: INK_LABEL_SHIFT, color: "#f2ead9", fontSize, fontWeight: 700, letterSpacing, whiteSpace: "nowrap" }}
 						>
 							{o.label}
 						</motion.span>

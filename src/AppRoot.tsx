@@ -4,6 +4,11 @@ import { GameProvider } from "./common/state";
 import { Scene, InkTransition } from "./common/components/sections";
 import { useSession, Lobby } from "./common/net";
 import type { EngineConfig } from "./common/game";
+import { useMusicControls } from "./common/hooks/useMusicControls";
+import { setMusicScene, type MusicScene } from "./common/music";
+import { useEntered } from "./common/state/entryGate";
+import { useShowdown } from "./common/state/duelMusic";
+import { useVictoryShown } from "./common/state/victoryReveal";
 
 /**
  * Gate between the lobby and the game. The swap happens UNDER the ink veil: when the session
@@ -13,9 +18,11 @@ import type { EngineConfig } from "./common/game";
  */
 /** Longest the veil waits, once covered, for the duel to report it renders smoothly. */
 const READY_TIMEOUT_MS = 3500;
+/** Leaving the duel: how long the veil holds over the freshly mounted lobby before drying out. */
+const LOBBY_SETTLE_MS = 600;
 
 export const AppRoot = () => {
-	const { status, mode, specials, roomKeyword } = useSession();
+	const { status, mode, specials, roomKeyword, leave } = useSession();
 	const reduced = !!useReducedMotion();
 	const playing = status === "playing";
 	const [covered, setCovered] = useState(false);
@@ -68,8 +75,33 @@ export const AppRoot = () => {
 		// One committed frame with the veil idle re-arms it; the timer callback then starts the cover.
 		window.setTimeout(() => setRematch("cover"), 60);
 	};
+	// Leaving the duel (MENU after the victory, ESCI from the quit dialog, online RESET_GAME): the same
+	// change of view in reverse. The veil is re-armed and slashes in over the duel; on full cover the
+	// session leaves (the lobby mounts underneath, its intro already played, so fully painted) and the
+	// veil holds (`reveal`) until the lobby has settled, then dries over it (`dry`) and goes idle once
+	// the ink is gone. Reduced motion: at once.
+	const [exit, setExit] = useState<"idle" | "rearm" | "cover" | "reveal" | "dry">("idle");
+	const requestLeave = () => {
+		if (exit !== "idle" || rematch !== "idle") return;
+		if (reduced) {
+			leave();
+			return;
+		}
+		setExit("rearm");
+		window.setTimeout(() => setExit((e) => (e === "rearm" ? "cover" : e)), 60);
+	};
+	// The session ended on its own before the veil covered (online: the opponent left) — drop the leave.
+	if (!playing && (exit === "rearm" || exit === "cover")) setExit("idle");
+	useEffect(() => {
+		if (exit !== "reveal") return;
+		const t = window.setTimeout(() => setExit("dry"), LOBBY_SETTLE_MS);
+		return () => window.clearTimeout(t);
+	}, [exit]);
 	const onVeilCovered = () => {
-		if (rematch === "cover") {
+		if (exit === "cover") {
+			leave();
+			setExit("reveal");
+		} else if (rematch === "cover") {
 			setMatch((m) => m + 1);
 			setSceneReady(false);
 			setForceRelease(false);
@@ -77,26 +109,47 @@ export const AppRoot = () => {
 		} else if (playingRef.current) setCovered(true);
 	};
 
-	const config: EngineConfig = { firstPlayer: "red", ...(mode === "online" && specials ? { specials } : {}) };
+	// Background music follows the session, not the mounted view: the lobby → battle crossfade starts
+	// as the veil slashes in, so the swap happens under the ink. A rematch (`match`) draws a new track.
+	// Within a duel the mood escalates: both on their last life → showdown; the victory screen → end.
+	// Silent until the lobby's entry gate is passed (its ENTRA tap starts the lobby track itself, inside
+	// the gesture — this effect then sees the same scene and is a no-op).
+	useMusicControls();
+	const entered = useEntered();
+	const showdown = useShowdown();
+	const victory = useVictoryShown();
+	const duelScene: MusicScene = victory ? "end" : showdown ? "showdown" : "battle";
+	useEffect(() => {
+		if (entered) setMusicScene(playing ? duelScene : "lobby", playing ? String(match) : "");
+	}, [entered, playing, match, duelScene]);
+
+	const config: EngineConfig ={ firstPlayer: "red", ...(mode === "online" && specials ? { specials } : {}) };
 	return (
 		<>
 			{!showGame && <Lobby />}
 			{showGame && (
 				// Remount the engine per session so a new game never inherits stale state.
-				<GameProvider key={`${mode}-${roomKeyword ?? "local"}-${match}`} config={config} onRematch={requestRematch}>
+				<GameProvider key={`${mode}-${roomKeyword ?? "local"}-${match}`} config={config} onRematch={requestRematch} onLeave={requestLeave}>
 					<Scene entrance={reduced ? "none" : "fly"} onReady={() => setSceneReady(true)} />
 				</GameProvider>
 			)}
 			{/* Guarded on the LIVE session (ref): see the leave-during-cover race note above. */}
 			{!reduced && (
 				<InkTransition
-					covering={playing && rematch !== "rearm"}
-					// Held during a rematch: the OLD scene is still "ready" while the veil covers it, and a
-					// release seen at the moment of cover would start drying over the old duel.
-					release={(sceneReady || forceRelease) && rematch === "idle"}
+					// Leaving keeps it covering past the end of the session, over the lobby, until it dries.
+					covering={(playing && rematch !== "rearm" && exit !== "rearm") || exit === "reveal" || exit === "dry"}
+					// Held during a rematch / a leave: the OLD scene is still "ready" while the veil covers it,
+					// and a release seen at the moment of cover would start drying over the old duel.
+					release={exit === "dry" || ((sceneReady || forceRelease) && rematch === "idle" && exit === "idle")}
 					onCovered={onVeilCovered}
+					onDone={() => {
+						if (exit === "dry") setExit("idle");
+					}}
 				/>
 			)}
+			{/* The lobby under a drying veil takes no taps: a session started before the ink is gone
+			    would find the veil mid-session and never cover. */}
+			{exit !== "idle" && <div style={{ position: "fixed", inset: 0, zIndex: 4001 }} />}
 		</>
 	);
 };

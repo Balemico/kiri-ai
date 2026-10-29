@@ -5,6 +5,7 @@ import { InkStrokeLabel } from "../../components/atoms";
 import { useGameHudControls } from "../../hooks/useGameHudControls";
 import { useIsPortrait } from "../../hooks/useIsPortrait";
 import { GAME_HUD } from "../../layout";
+import { useT } from "../../i18n";
 
 const other = (t: "red" | "blue") => (t === "red" ? "blue" : "red");
 
@@ -21,6 +22,7 @@ export const WaitingOverlay = () => {
 	const { mode, localTeam } = useSession();
 	const hud = useGameHudControls();
 	const portrait = useIsPortrait();
+	const t = useT();
 
 	const opponent = localTeam != null ? other(localTeam) : "blue";
 	const waiting =
@@ -54,7 +56,7 @@ export const WaitingOverlay = () => {
 							transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
 							style={{ width: 7, height: 7, borderRadius: "50%", background: "#f0c26a" }}
 						/>
-						IN ATTESA DELL'AVVERSARIO…
+						{t("hud.waitingOpponent")}
 					</InkStrokeLabel>
 				</motion.div>
 			)}

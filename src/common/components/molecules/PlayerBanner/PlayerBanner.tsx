@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { LifeSeal, SealDisc, StanceDiamonds } from "../../atoms";
 import { MAX_HITS, type Stance, type Team } from "../../../game";
-import { INK, TEAM_INK, TEAM_KANJI, TEAM_NAME } from "../../../hudPalette";
+import { INK, TEAM_INK, TEAM_KANJI } from "../../../hudPalette";
+import { useT } from "../../../i18n";
 import { GAME_HUD } from "../../../layout";
 
 export interface PlayerBannerProps {
@@ -29,6 +30,7 @@ export interface PlayerBannerProps {
  * like the lobby menu.
  */
 export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, caption, align, scale = 1, compact = false }: PlayerBannerProps) => {
+	const t = useT();
 	const colour = TEAM_INK[team];
 	const disc = 64 * scale;
 	const right = align === "right";
@@ -83,7 +85,7 @@ export const PlayerBanner = ({ team, damage, stance, active, idleOpacity = 1, ca
 				) : (
 					<>
 						<div style={{ position: "relative", fontWeight: 700, fontSize: 21 * scale, lineHeight: 1, letterSpacing: "0.16em" }}>
-							{TEAM_NAME[team]}
+							{t(`team.${team}`)}
 							{underline}
 						</div>
 						<div style={{ display: "flex", flexDirection: row, gap: 7 * scale, marginTop: 6 * scale }}>{seals}</div>

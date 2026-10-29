@@ -20,8 +20,6 @@ export interface GameHudControls {
 	/** How long the hit ink lingers (s). */
 	splashSeconds: number;
 	/** Opacity of a banner whose player is not acting. */
-	/** Landscape: how far down (fraction of viewport height) the phase caption floats. */
-	phaseCaptionTop: number;
 	idleOpacity: number;
 	/** Resting tone of the top-corner vignette behind the banners. */
 	vignetteShade: string;
@@ -63,7 +61,6 @@ export const useGameHudControls = (): GameHudControls =>
 			introTurnDelay: { value: GAME_HUD.introTurnDelay, min: 0, max: 3, step: 0.05, label: "intro: turn after HUD (s)" },
 			hitLagMs: { value: GAME_HUD.hitLagMs, min: 0, max: 1500, step: 50, label: "hit lag (ms)" },
 			splashSeconds: { value: GAME_HUD.splashSeconds, min: 0.4, max: 4, step: 0.1, label: "splash (s)" },
-			phaseCaptionTop: { value: GAME_HUD.phaseCaptionTop, min: 0.1, max: 0.6, step: 0.01, label: "phase caption top" },
 			idleOpacity: { value: GAME_HUD.idleOpacity, min: 0, max: 1, step: 0.05, label: "idle banner opacity" },
 			vignetteShade: { value: GAME_HUD.vignetteShade, label: "vignette shade" },
 			vignetteShadeOpacity: { value: GAME_HUD.vignetteShadeOpacity, min: 0, max: 1, step: 0.05, label: "shade opacity" },

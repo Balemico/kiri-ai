@@ -4,9 +4,11 @@ import { InkStrokeButton } from "../../atoms";
 import { useSession } from "../../../net";
 import { InkDelayContext } from "../../../ink/inkDelay";
 import { quitMenu, useQuitMenuOpen } from "../../../state/quitMenu";
+import { useGame } from "../../../state/useGame";
 import { INK } from "../../../hudPalette";
 import { PAPER } from "../../../layout";
 import { EXIT_DURATION } from "../../../motionPresets";
+import { useT } from "../../../i18n";
 
 const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 const STROKE_WIDTH = "min(260px, 70vw)";
@@ -25,7 +27,9 @@ const EXIT_VEIL = EXIT_TITLE + EXIT_DURATION * 0.7;
  */
 export const QuitDialog = () => {
 	const open = useQuitMenuOpen();
-	const { mode, leave } = useSession();
+	const { mode } = useSession();
+	const { leave } = useGame();
+	const t = useT();
 
 	useEffect(() => {
 		if (!open) return;
@@ -62,7 +66,7 @@ export const QuitDialog = () => {
 					<div
 						role="dialog"
 						aria-modal="true"
-						aria-label="Abbandonare il duello?"
+						aria-label={t("quit.title")}
 						style={{
 							position: "fixed",
 							inset: 0,
@@ -82,13 +86,13 @@ export const QuitDialog = () => {
 							{...rise(0.22, 1, EXIT_TITLE)}
 							style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(24px, 7vw, 40px)", lineHeight: 1.1, textAlign: "center" }}
 						>
-							abbandonare il duello?
+							{t("quit.title")}
 						</motion.p>
 						<motion.p
 							{...rise(0.32, 0.65, EXIT_NOTE)}
 							style={{ margin: "0 0 18px", fontSize: 12, letterSpacing: "0.2em", textAlign: "center", textTransform: "uppercase" }}
 						>
-							{mode === "online" ? "la partita online verrà chiusa" : "la partita in corso andrà persa"}
+							{t(mode === "online" ? "quit.online" : "quit.local")}
 						</motion.p>
 						{/* The strokes are laid after the text (InkDelayContext), and lift first on the way out. Each row
 						    has its OWN exit (label fading with its stroke's lift): the button itself has none, so
@@ -96,14 +100,14 @@ export const QuitDialog = () => {
 						<InkDelayContext.Provider value={{ enter: 0.42, exit: EXIT_STROKES[0] }}>
 							<motion.div exit={rowExit(EXIT_STROKES[0])} style={{ width: STROKE_WIDTH, pointerEvents: "auto" }}>
 								<InkStrokeButton tone="blood" variant={1} onClick={() => leave()}>
-									ESCI
+									{t("quit.leave")}
 								</InkStrokeButton>
 							</motion.div>
 						</InkDelayContext.Provider>
 						<InkDelayContext.Provider value={{ enter: 0.54, exit: EXIT_STROKES[1] }}>
 							<motion.div exit={rowExit(EXIT_STROKES[1])} style={{ width: STROKE_WIDTH, pointerEvents: "auto" }}>
 								<InkStrokeButton variant={2} onClick={() => quitMenu.close()}>
-									ANNULLA
+									{t("quit.cancel")}
 								</InkStrokeButton>
 							</motion.div>
 						</InkDelayContext.Provider>

@@ -322,9 +322,13 @@ export const createStrokeMaterial = (): { material: MeshBasicNodeMaterial; u: St
 	const dir = vec2(cos(tilt), sin(tilt));
 	// Hover reaches out: the stroke lengthens equally at both ends (eased in InkLayer).
 	const len = box.x.add(u.margin.mul(0.5)).add(u.hover.mul(u.margin.mul(0.6)));
-	const centre = u.size.mul(0.5);
 	const width = box.y.mul(INK_LOOK.strokeHeight).mul(u.hover.mul(0.07).add(1));
 	const bend = box.y.mul(0.03).mul(sin(u.seed.mul(7.31)));
+	// The bow (`brush`: sin(s·π)·bend) peaks at the stroke's MIDDLE — right under the label — so it
+	// used to lift or drop the body there by up to ±2 px per seed, and labels looked off-centre at
+	// random. Anchor the bow at the middle instead: shift the stroke by −bend, so its centre sits on
+	// the button's centre line and the same curvature shows at the ends.
+	const centre = u.size.mul(0.5).sub(vec2(0, bend));
 	const { ink, wash, drops, s: along, n: across, bristle } = brush({
 		P,
 		centre,

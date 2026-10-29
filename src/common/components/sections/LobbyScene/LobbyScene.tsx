@@ -29,6 +29,9 @@ export interface LobbySceneProps {
 	reducedLeaves?: boolean;
 	/** True = stop rendering frames (the game veil is covering the lobby). */
 	paused?: boolean;
+	/** True = the cinematic waits on bare paper (the entry gate is up); it starts when this flips false.
+	 *  The canvas still mounts underneath, so textures load and shaders compile behind the gate. */
+	hold?: boolean;
 }
 
 interface PanoramaProps extends LobbySceneProps {
@@ -40,7 +43,7 @@ interface PanoramaProps extends LobbySceneProps {
  * it is the leaves' source), plus mist and the falling leaves. The entry cinematic is ONE gsap
  * timeline over the layer materials (paint-on far → near) so a tap can `progress(1)` all of it.
  */
-const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleRef }: PanoramaProps) => {
+const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleRef, hold = false }: PanoramaProps) => {
 	const c = useLobbyControls();
 	const size = useThree((s) => s.size);
 	const frame = DEFAULT_SCENE_FRAME;
@@ -79,6 +82,12 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 	const materials = useRef(new Map<string, THREE.MeshBasicMaterial>());
 	const timeline = useRef<gsap.core.Timeline | null>(null);
 	const done = useRef(!intro);
+	// Mirrors `hold` for the material callback (built paused while held); releasing plays it.
+	const holdRef = useRef(hold);
+	useEffect(() => {
+		holdRef.current = hold;
+		if (!hold) timeline.current?.play();
+	}, [hold]);
 
 	const finish = useCallback(() => {
 		if (done.current) return;
@@ -99,7 +108,7 @@ const Panorama = ({ intro, registerSkip, onIntroEnd, reducedLeaves, leafVisibleR
 			materials.current.set(url, mat);
 			if (materials.current.size < EXPECTED_MATERIALS || timeline.current) return;
 			// All layers ready → paint them on far → near, then release the leaves, then hand off to the DOM.
-			const tl = gsap.timeline({ defaults: { ease: "power2.out", overwrite: true } });
+			const tl = gsap.timeline({ paused: holdRef.current, defaults: { ease: "power2.out", overwrite: true } });
 			[...materials.current.entries()].forEach(([, m], i) => {
 				tl.to(m, { opacity: 1, duration: INTRO.layerFade }, i * INTRO.layerStagger);
 			});
@@ -230,7 +239,7 @@ const StaticFallback = () => (
 );
 
 /** The lobby's animated backdrop canvas. Fills its parent; pointer events pass through to the page. */
-export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves, paused = false }: LobbySceneProps) => {
+export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves, paused = false, hold = false }: LobbySceneProps) => {
 	const coarse = useCoarsePointer();
 	const leafVisibleRef = useRef(!intro);
 	return (
@@ -242,7 +251,7 @@ export const LobbyScene = ({ intro, registerSkip, onIntroEnd, reducedLeaves, pau
 				{/* Paused while the game veil covers the lobby: one less full-screen canvas competing
 				    with the ink for the GPU — the panorama is about to be inked over anyway. */}
 				<Canvas dpr={coarse ? [1, 1.5] : [1, 2]} frameloop={paused ? "demand" : "always"} camera={{ position: [0, 0, 6], fov: 30 }} fallback={<StaticFallback />}>
-					<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} reducedLeaves={reducedLeaves} leafVisibleRef={leafVisibleRef} />
+					<Panorama intro={intro} registerSkip={registerSkip} onIntroEnd={onIntroEnd} reducedLeaves={reducedLeaves} leafVisibleRef={leafVisibleRef} hold={hold} />
 				</Canvas>
 			</div>
 		</>

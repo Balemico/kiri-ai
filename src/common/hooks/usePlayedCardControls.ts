@@ -29,6 +29,7 @@ const landscape = () => ({
 	actionTilt: { value: PLAYED_CARDS.actionTilt, min: 0, max: 1.57, step: 0.01 },
 	actionEdgeMargin: { value: PLAYED_CARDS.actionEdgeMargin, min: 0, max: 2.5, step: 0.02 },
 	actionY: { value: PLAYED_CARDS.actionY, min: -2, max: 2, step: 0.02 },
+	actionBelowRest: { value: PLAYED_CARDS.actionBelowRest, min: 0, max: 1, step: 0.01, label: "action below lifted pair" },
 	setAsideScale: { value: PLAYED_CARDS.setAsideScale, min: 0.2, max: 1.0, step: 0.02 },
 	setAsideRotZ: { value: PLAYED_CARDS.setAsideRotZ, min: -Math.PI, max: Math.PI, step: 0.01 },
 	setAsideTilt: { value: PLAYED_CARDS.setAsideTilt, min: 0, max: 1.57, step: 0.01 },

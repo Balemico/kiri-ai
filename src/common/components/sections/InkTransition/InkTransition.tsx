@@ -8,7 +8,8 @@ import { createVeilMaterial, inkUniforms, type VeilUniforms } from "../../../ink
 import { phaseProgress, veilStrokes } from "../../../ink/inkMath";
 import { inkSupported } from "../../../ink/inkRegistry";
 import { useInkControls } from "../../../hooks/useInkControls";
-import { INK } from "../../../layout";
+import { AUDIO, INK } from "../../../layout";
+import { playSound } from "../../../audio";
 import { VEIL_OPEN_AT, veilSignal } from "../../../ink/veilSignal";
 
 const PLANE = new PlaneGeometry(1, 1);
@@ -130,6 +131,8 @@ export interface InkTransitionProps {
 	/** True once the far side is ready — lets the ink dry out and reveal it. */
 	release: boolean;
 	onCovered: () => void;
+	/** The ink has dried out (or the safety net gave up waiting): the session is over. */
+	onDone?: () => void;
 }
 
 /**
@@ -138,8 +141,15 @@ export interface InkTransitionProps {
  * so it costs nothing over the duel. It blocks input while covering. `done` resets whenever
  * `covering` drops, re-arming the veil for the next session.
  */
-export const InkTransition = ({ covering, release, onCovered }: InkTransitionProps) => {
+export const InkTransition = ({ covering, release, onCovered, onDone }: InkTransitionProps) => {
 	const [done, setDone] = useState(false);
+	const onDoneRef = useRef(onDone);
+	useEffect(() => {
+		onDoneRef.current = onDone;
+	}, [onDone]);
+	useEffect(() => {
+		if (done) onDoneRef.current?.();
+	}, [done]);
 	// Re-arm for the next session — adjusted during render ("state from props"), not in an effect.
 	if (!covering && done) setDone(false);
 	const running = covering && !done;
@@ -162,6 +172,14 @@ export const InkTransition = ({ covering, release, onCovered }: InkTransitionPro
 		const t = window.setTimeout(onCoveredOnce, (INK.veilPour + 2) * 1000);
 		return () => window.clearTimeout(t);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- armed once per session
+	}, [running]);
+	// The slashes' whoosh: as the first one cuts across (the session starts inside the click, so autoplay
+	// allows it), and once more mid-cover — re-pitched by the audio jitter, so it reads as a second blade.
+	useEffect(() => {
+		if (!running) return;
+		playSound("veil");
+		const t = window.setTimeout(() => playSound("veil"), AUDIO.veilSecondAt * INK.veilPour * 1000);
+		return () => window.clearTimeout(t);
 	}, [running]);
 	useEffect(() => {
 		if (!running || !release) return;

@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import * as THREE from "three";
+import { playSound } from "../audio";
+import { AUDIO } from "../layout";
 
 /**
  * Flip a card's group to show its front (faceUp) or back.
@@ -19,6 +21,8 @@ export const useCardFlip = (faceUp: boolean) => {
 	useEffect(() => {
 		if (!ref.current || !mounted.current) return;
 		gsap.to(ref.current.rotation, { z: faceUp ? 0 : Math.PI, duration: 0.6, ease: "power2.inOut" });
+		// Covering (face-down) gets a fwip; a pair flipping together is throttled to one.
+		if (!faceUp) playSound("cardCover", AUDIO.coverThrottleMs);
 	}, [faceUp]);
 
 	return ref;

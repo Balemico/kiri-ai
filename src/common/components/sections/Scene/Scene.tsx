@@ -1,7 +1,7 @@
-import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Leva, useControls } from "leva";
-import { FitCamera, Floor, IntroFlight } from "../../atoms";
+import { FallingLeaves, FitCamera, Floor, IntroFlight } from "../../atoms";
 import { Battlefield } from "../Battlefield";
 import { Stage } from "../Stage";
 import { Hand } from "../Hand";
@@ -20,12 +20,16 @@ import { useSceneFrame } from "../../../hooks/useSceneFrame";
 import { useFloorControls } from "../../../hooks/useFloorControls";
 import { useAudioControls } from "../../../hooks/useAudioControls";
 import { useCombatAudio } from "../../../hooks/useCombatAudio";
+import { useCardAudio } from "../../../hooks/useCardAudio";
 import { useAutoReveal } from "../../../hooks/useAutoReveal";
 import { useCoarsePointer } from "../../../hooks/useCoarsePointer";
-import { PAPER, PORTRAIT_SCENE_FRAME } from "../../../layout";
+import { frameViewport, LOBBY, PAPER, PORTRAIT_SCENE_FRAME, type SceneFrame } from "../../../layout";
 import { veilSignal } from "../../../ink/veilSignal";
 import { duelIntro } from "../../../state/duelIntro";
-import { victoryReveal } from "../../../state/victoryReveal";
+import { useVictoryShown, victoryReveal } from "../../../state/victoryReveal";
+import { useWinBannerControls } from "../../../hooks/useWinBannerControls";
+import { duelMusic } from "../../../state/duelMusic";
+import { useShowdownDriver } from "../../../hooks/useShowdownDriver";
 import { prioritizedEvents } from "../../../eventPriority";
 
 // The scene counts as ready once it renders this many consecutive smooth frames (< ~24 fps
@@ -52,6 +56,36 @@ const ReadySignal = ({ onReady }: { onReady: () => void }) => {
 		}
 	});
 	return null;
+};
+
+// The victory leaves are released the moment they mount (mounted only once the victory screen is in).
+const LEAVES_ARMED = { current: true };
+
+/**
+ * Landscape victory: a few maple leaves drift across the stage — the lobby's leaf field, its emitter
+ * stretched along the top of the duel view (no tree canopy here) so they fall in from the sky and
+ * sweep right on the wind. Sizes and speeds follow the visible height, so the field reads the same
+ * at any window size.
+ */
+const VictoryLeaves = ({ frame, count }: { frame: SceneFrame; count: number }) => {
+	const size = useThree((s) => s.size);
+	const vp = frameViewport(frame, size.width / size.height);
+	const cfg = useMemo(
+		() => ({
+			...LOBBY.leaves,
+			count,
+			emitterX: -vp.width * 0.2,
+			emitterWidth: vp.width * 0.9,
+			emitterY: vp.bottom + vp.height + 0.15,
+			emitterHeight: vp.height * 0.15,
+			floorY: vp.bottom - 0.2,
+			fallSpeed: vp.height * 0.06,
+			minScale: vp.height * 0.018,
+			maxScale: vp.height * 0.034,
+		}),
+		[count, vp.width, vp.height, vp.bottom],
+	);
+	return <FallingLeaves cfg={cfg} armedRef={LEAVES_ARMED} />;
 };
 
 /**
@@ -90,6 +124,9 @@ const SceneContents = ({
 	const veilOpen = useSyncExternalStore(veilSignal.subscribe, veilSignal.isOpen);
 	const showBoard = showInterface;
 	const showHand = showInterface;
+	// Landscape victory: VictoryCamera (in Battlefield) takes the camera for the closing push-in.
+	const victory = useVictoryShown() && !isPortrait;
+	const win = useWinBannerControls();
 	return (
 		<>
 			{/* Paper fill behind everything — kept here (not only in Stage) so portrait, with the
@@ -97,7 +134,7 @@ const SceneContents = ({
 			<color attach="background" args={[PAPER]} />
 			{/* Single locked front view — no orbit; auto-fits the whole frame at any width. Yields the
 			    camera to IntroFlight for the duration of the approach. */}
-			<FitCamera frame={frame} enabled={!flying} />
+			<FitCamera frame={frame} enabled={!flying && !victory} />
 			{flying && <IntroFlight frame={frame} start={ready} onDone={() => setFlying(false)} />}
 			{/* Fires once the scene renders smoothly — releases the ink veil and starts the approach. */}
 			<ReadySignal
@@ -112,6 +149,11 @@ const SceneContents = ({
 			<Floor frame={frame} controls={floor} orientation={orientation} />
 			{/* Separate Suspense boundaries so a (re)loading hand never blanks the battlefield —
 			    and card textures are preloaded (useCardTextures), so passing the turn doesn't suspend. */}
+			{victory && (
+				<Suspense fallback={null}>
+					<VictoryLeaves frame={frame} count={win.leafCount} />
+				</Suspense>
+			)}
 			{showBoard && (
 				<>
 					{/* Corner vignette behind the DOM HUD banners — in the scene so the cards paint over it. */}
@@ -151,6 +193,9 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 	// Sound effects play on resolved actions regardless of the interface toggle.
 	useAudioControls();
 	useCombatAudio();
+	useCardAudio();
+	// Both players on their last life → the music turns tenser (read by AppRoot).
+	useShowdownDriver();
 	// Once both players confirm, the reveal sequence plays out automatically every 2s.
 	useAutoReveal();
 	// The duel-opening stage outlives the duel (module store): rewind it on leaving, so the next duel
@@ -159,6 +204,7 @@ export const Scene = ({ entrance = "none", onReady }: SceneProps) => {
 		() => () => {
 			duelIntro.reset();
 			victoryReveal.reset();
+			duelMusic.reset();
 		},
 		[],
 	);

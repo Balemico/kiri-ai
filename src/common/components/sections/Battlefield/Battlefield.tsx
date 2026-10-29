@@ -2,11 +2,12 @@ import { useCallback, useState } from "react";
 import { Html } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { motion } from "motion/react";
-import { BoardLine, Pawn, ClashEffect } from "../../atoms";
+import { BoardLine, Pawn, ClashEffect, InkStrokeLabel, VictoryCamera } from "../../atoms";
+import type { InkTone } from "../../../ink/inkRegistry";
 import { useGame } from "../../../state";
 import { useSession } from "../../../net";
 import { spaceToX, type Stance, type Team } from "../../../game";
-import { frameViewport, landscapeLineScale, lineCoord, BATTLEFIELD_HALF_WIDTH, portraitLateralSign, portraitLineBand, rakeLine, PAWN, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
+import { frameViewport, landscapeLineScale, lineCoord, BATTLEFIELD_HALF_WIDTH, portraitLateralSign, portraitLineBand, rakeLine, PAWN, pawnHeadHeight, DEFAULT_SCENE_FRAME, MARKER_REF_HEIGHT, type Orientation, type SceneFrame } from "../../../layout";
 import { useBattlegroundControls } from "../../../hooks/useBattlegroundControls";
 import { useBottomTeam } from "../../../hooks/useBottomTeam";
 import { usePawnControls } from "../../../hooks/usePawnControls";
@@ -19,7 +20,9 @@ import { useDuelIntroDriver } from "../../../hooks/useDuelIntroDriver";
 import { useVictoryRevealDriver } from "../../../hooks/useVictoryRevealDriver";
 import { useWinBannerControls } from "../../../hooks/useWinBannerControls";
 import { useDuelIntroReached } from "../../../state/duelIntro";
+import { useVictoryCleared, useVictoryShown } from "../../../state/victoryReveal";
 import { useHitPreviewTick } from "../../../state/hitPreview";
+import { useT } from "../../../i18n";
 
 /** The battlefield line with both samurai pawns, positioned by the "Battleground" controls. */
 export const Battlefield = ({
@@ -35,6 +38,7 @@ export const Battlefield = ({
 	standUp?: boolean;
 }) => {
 	const { state } = useGame();
+	const t = useT();
 	const { viewerTeam } = useSession();
 	const bg = useBattlegroundControls(orientation);
 	const pawn = usePawnControls();
@@ -135,7 +139,12 @@ export const Battlefield = ({
 	const fallDelay = (resolution ? attackBeat(resolution, res) : 0) + 0.8;
 	const over = state.phase === "game-over" && state.winner !== null;
 	const fallenOf = (team: Team) => over && state.winner !== team;
-	useVictoryRevealDriver(over, fallDelay + cutout.standDur + win.afterFall);
+	useVictoryRevealDriver(over, fallDelay, fallDelay + cutout.standDur + win.afterFall);
+	// Zanshin: as the loser starts to fall the callouts and team markers step aside (the HUD too), so
+	// only the stage and the two figures remain; once the victory screen is in, the camera closes on the
+	// winner (landscape — portrait has its own full-screen result).
+	const cleared = useVictoryCleared();
+	const victoryShown = useVictoryShown();
 
 	// On a parry the X crosses at the midpoint between the pawns, struck at the attack beat. The Leva
 	// "Play clash" button previews it (clashTick) regardless of phase, played immediately.
@@ -157,17 +166,19 @@ export const Battlefield = ({
 	// (An in-stance attack that only misses on range is not flagged.) Stays through game-over (a winning
 	// counter skips straight past the reveal phase).
 	const resolved = isReveal || state.phase === "game-over";
-	const calloutFor = (team: Team): { text: string; color: string } | null => {
+	const calloutFor = (team: Team): { text: string; tone: InkTone } | null => {
 		if (!resolved || !resolution) return null;
 		const o = resolution[team];
-		if (o.countered) return { text: "Contrattacco!", color: "#e6812c" };
-		if (o.wrongStance) return { text: "Finta!", color: "#111111" };
+		if (o.countered) return { text: t("duel.counter"), tone: "orange" };
+		if (o.wrongStance) return { text: t("duel.feint"), tone: "ink" };
 		return null;
 	};
-	// A pawn's callout floats above its head: landscape at a fixed height over the line, portrait above
+	// A pawn's callout sits just over its head — the figure's measured top in its attack-time stance (a
+	// crouched earth pose is shorter than heaven) + a small gap: landscape over the line, portrait above
 	// each pawn at its own raked line position + lateral side.
 	const calloutX = (team: Team) => (portrait ? lateralOf(team) : lineOf(team));
-	const calloutYOf = (team: Team) => (portrait ? rakeLine(lineOf(team), portraitTilt, pawnBaseY).y + bg.pawnLift + pawnHeight + 0.2 : bg.y + pawn.height + 0.2);
+	const headOf = (team: Team) => pawn.yLift + pawnHeadHeight(attackStance(team), pawnHeight) + PAWN.calloutGap;
+	const calloutYOf = (team: Team) => (portrait ? rakeLine(lineOf(team), portraitTilt, pawnBaseY).y + bg.pawnLift + headOf(team) : bg.y + headOf(team));
 	const calloutZOf = (team: Team) => (portrait ? rakeLine(lineOf(team), portraitTilt, pawnBaseY).z + pawn.z : pawn.z);
 
 	// Kesa/Zan-Tetsu attack in their stance and only flip afterwards. So during the strike the pawn must
@@ -180,7 +191,7 @@ export const Battlefield = ({
 
 	return (
 		<group position={[bg.x, 0, 0]}>
-			<BoardLine y={pawnBaseY} length={lineLength} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={portrait ? bg.spikeScale : 1} />
+			<BoardLine y={pawnBaseY} length={lineLength} diamondTilt={portrait ? portraitTilt : bg.diamondTilt} redSpace={state.red.space} blueSpace={state.blue.space} current={activeTeam} redMoveDelay={redDelay} blueMoveDelay={blueDelay} moveDur={res.moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={portrait ? bg.spikeScale : 1} hideMarkers={cleared} />
 			{(["red", "blue"] as Team[]).map((team) => {
 				const callout = calloutFor(team);
 				if (!callout) return null;
@@ -191,8 +202,9 @@ export const Battlefield = ({
 						y={calloutYOf(team)}
 						z={calloutZOf(team)}
 						text={callout.text}
-						color={callout.color}
+						tone={callout.tone}
 						delay={attackDelay}
+						leaving={cleared}
 					/>
 				);
 			})}
@@ -260,6 +272,9 @@ export const Battlefield = ({
 				standDelay={cutout.revealDelay + cutout.stagger}
 				standTick={standTick}
 			/>
+			{victoryShown && !portrait && state.winner && (
+				<VictoryCamera frame={frame} focusX={bg.x + lineOf(state.winner)} duration={win.cameraDur} push={win.cameraPush} shift={win.cameraShift} lift={win.cameraLift} />
+			)}
 			{showClash && (
 				<ClashEffect
 					key={`${clashing ? `${state.round}-${resolution!.slot}` : "preview"}-${clashTick}`}
@@ -281,37 +296,47 @@ interface PawnCalloutProps {
 	y: number;
 	z: number;
 	text: string;
-	color: string;
-	/** Seconds to wait before popping in (synced to the attack beat). */
+	/** Stroke tone: ink for a feint, orange for a counterattack. */
+	tone: InkTone;
+	/** Seconds to wait before it is slashed on (synced to the attack beat). */
 	delay: number;
+	/** The duel's closing beat: the callout fades away with the rest of the interface. */
+	leaving?: boolean;
 }
 
-/** A combat title (Finta! / Contrattacco!) that pops in above a pawn at the moment of the strike. */
-const PawnCallout = ({ x, y, z, text, color, delay }: PawnCalloutProps) => (
-	// zIndexRange: drei's default stacks Html above EVERY overlay — keep the callout over the HUD (1200)
-	// but under the victory veil (1400), so a final "Finta!" never pokes through the result screen.
-	<Html position={[x, y, z]} zIndexRange={[1300, 1300]} style={{ pointerEvents: "none" }}>
-		{/* Static wrapper bottom-centres the title over the pawn's head; motion owns the pop-in transform. */}
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
+/**
+ * A combat title (Finta! / Contrattacco!) slashed on just over a pawn's head at the moment of the
+ * strike: a short sumi stroke (drawn by the scene's `InkLayer`, like every ink label) with the word
+ * in white, condensing out of a blur as the brush passes.
+ */
+const PawnCallout = ({ x, y, z, text, tone, delay, leaving = false }: PawnCalloutProps) => (
+	// zIndexRange: above the duel's ink layer (1450) so the white word sits ON its stroke. It fades out
+	// with the HUD on the closing beat, before any victory veil comes in.
+	<Html position={[x, y, z]} zIndexRange={[1460, 1460]} style={{ pointerEvents: "none" }}>
+		{/* Static wrapper bottom-centres the label over the pawn's head; motion owns the transforms. */}
 		<div style={{ transform: "translate(-50%, -100%)" }}>
-			<motion.div
-				initial={{ opacity: 0, y: 10, scale: 0.8 }}
-				animate={{ opacity: 1, y: 0, scale: 1 }}
-				transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
-				className="font-sans"
-				style={{
-					color,
-					whiteSpace: "nowrap",
-					fontWeight: 800,
-					// Scales with the window width, clamped for phones / capped on desktop.
-					fontSize: "clamp(16px, 4.5vw, 32px)",
-					letterSpacing: "0.03em",
-					// Light halo + dark drop so it reads on both pale paper and dark ink.
-					textShadow: "0 0 5px rgba(255,255,255,0.9), 0 2px 10px rgba(0,0,0,0.55)",
-				}}
-			>
-				{text}
+			<motion.div initial={false} animate={leaving ? { opacity: 0, y: -6 } : { opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE_OUT }}>
+				<InkStrokeLabel tone={tone} variant={1} delay={delay} style={{ padding: "0.42em 1.1em 0.3em" }}>
+					<motion.span
+						initial={{ opacity: 0, scale: 1.15, filter: "blur(6px)" }}
+						animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+						transition={{ duration: 0.35, delay: delay + 0.12, ease: EASE_OUT }}
+						style={{
+							display: "inline-block",
+							fontFamily: "var(--font-display)",
+							whiteSpace: "nowrap",
+							// Scales with the window width, clamped for phones / capped on desktop.
+							fontSize: "clamp(15px, 3.2vw, 28px)",
+							lineHeight: 1,
+							letterSpacing: "0.04em",
+						}}
+					>
+						{text}
+					</motion.span>
+				</InkStrokeLabel>
 			</motion.div>
 		</div>
 	</Html>
 );
-

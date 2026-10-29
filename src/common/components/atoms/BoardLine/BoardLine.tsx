@@ -31,6 +31,8 @@ export interface BoardLineProps {
 	markerScale?: number;
 	/** Extra size multiplier for the coloured spike only (the diamond + line keep `markerScale`). */
 	spikeScale?: number;
+	/** The duel's closing beat: both team markers shrink away, leaving the bare white line. */
+	hideMarkers?: boolean;
 }
 
 // Card-palette team colours (match the pawns / card art).
@@ -91,7 +93,7 @@ const WHITE_DIAMOND_MAT = new THREE.MeshBasicMaterial({ color: "#ffffff", toneMa
  * Landscape: the marker rides ON the line, spike pointing toward that team's own side (red down, blue
  * up). Portrait: the marker rides on the raked vertical line at its diamond, spike turned to point
  * laterally toward its pawn's side (bottom team → right, top team → left). */
-const TeamMarker = ({ team, space, y, z, length, diamondTilt, active, moveDelay, moveDur, orientation, bottomTeam, markerScale, spikeScale }: { team: Team; space: number; y: number; z: number; length: number; diamondTilt: number; active: boolean; moveDelay: number; moveDur: number; orientation: Orientation; bottomTeam: Team; markerScale: number; spikeScale: number }) => {
+const TeamMarker = ({ team, space, y, z, length, diamondTilt, active, moveDelay, moveDur, orientation, bottomTeam, markerScale, spikeScale, hidden }: { team: Team; space: number; y: number; z: number; length: number; diamondTilt: number; active: boolean; moveDelay: number; moveDur: number; orientation: Orientation; bottomTeam: Team; markerScale: number; spikeScale: number; hidden: boolean }) => {
 	const ref = useRef<THREE.Group>(null); // slides with the pawn (x landscape, y portrait)
 	const spikeRef = useRef<THREE.Group>(null); // only the spike stretches (the diamond stays put)
 	const initialized = useRef(false);
@@ -151,6 +153,15 @@ const TeamMarker = ({ team, space, y, z, length, diamondTilt, active, moveDelay,
 		if (ref.current) gsap.from(ref.current.scale, { x: 0, y: 0, z: 0, duration: 0.4, delay: 0.55, ease: "back.out(2)", overwrite: true });
 	}, []);
 
+	// Closing beat: shrink away into the static diamond underneath (and back, should it ever un-hide).
+	const wasHidden = useRef(hidden);
+	useEffect(() => {
+		if (!ref.current || hidden === wasHidden.current) return;
+		wasHidden.current = hidden;
+		const s = hidden ? 0 : 1;
+		gsap.to(ref.current.scale, { x: s, y: s, z: s, duration: 0.5, ease: hidden ? "power2.in" : "back.out(2)", overwrite: true });
+	}, [hidden]);
+
 	// On this team's turn the marker breathes: the spike scales UNIFORMLY from its apex (anchored at the
 	// diamond vertex), so the shape just spreads bigger on the floor without deforming, and the colour
 	// softly pulses its opacity.
@@ -201,7 +212,7 @@ const TeamMarker = ({ team, space, y, z, length, diamondTilt, active, moveDelay,
 
 /** The battlefield line with a white diamond per space, plus a fading team-colour marker under each
  * pawn's diamond (tip on the upper vertex, opening downward), all raked onto the floor. */
-export const BoardLine = ({ y = 0.5, z = 0, length = 3.0, diamondTilt = 0, redSpace = RED_START, blueSpace = BLUE_START, current = "red", redMoveDelay = 0, blueMoveDelay = 0, moveDur = 0.6, orientation = "landscape", bottomTeam = "red", markerScale = 1, spikeScale = 1 }: BoardLineProps) => {
+export const BoardLine = ({ y = 0.5, z = 0, length = 3.0, diamondTilt = 0, redSpace = RED_START, blueSpace = BLUE_START, current = "red", redMoveDelay = 0, blueMoveDelay = 0, moveDur = 0.6, orientation = "landscape", bottomTeam = "red", markerScale = 1, spikeScale = 1, hideMarkers = false }: BoardLineProps) => {
 	const spaces = Array.from({ length: BOARD_SPACES }, (_, i) => i);
 	const lineRef = useRef<THREE.Mesh>(null);
 	const diamonds = useRef<(THREE.Mesh | null)[]>([]);
@@ -243,8 +254,8 @@ export const BoardLine = ({ y = 0.5, z = 0, length = 3.0, diamondTilt = 0, redSp
 				<boxGeometry args={lineArgs} />
 				<meshBasicMaterial color="#ffffff" toneMapped={false} transparent={portrait} depthWrite={!portrait} />
 			</mesh>
-			<TeamMarker team="red" space={redSpace} y={y} z={z} length={length} diamondTilt={diamondTilt} active={current === "red"} moveDelay={redMoveDelay} moveDur={moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={spikeScale} />
-			<TeamMarker team="blue" space={blueSpace} y={y} z={z} length={length} diamondTilt={diamondTilt} active={current === "blue"} moveDelay={blueMoveDelay} moveDur={moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={spikeScale} />
+			<TeamMarker team="red" space={redSpace} y={y} z={z} length={length} diamondTilt={diamondTilt} active={current === "red"} moveDelay={redMoveDelay} moveDur={moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={spikeScale} hidden={hideMarkers} />
+			<TeamMarker team="blue" space={blueSpace} y={y} z={z} length={length} diamondTilt={diamondTilt} active={current === "blue"} moveDelay={blueMoveDelay} moveDur={moveDur} orientation={orientation} bottomTeam={bottomTeam} markerScale={markerScale} spikeScale={spikeScale} hidden={hideMarkers} />
 			{spaces.map((i) => (
 				<mesh
 					key={i}

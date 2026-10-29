@@ -2,14 +2,18 @@ import { useEffect } from "react";
 import { victoryReveal } from "../state/victoryReveal";
 
 /**
- * Schedules the victory screen once the duel is `over`: `seconds` after game-over = the killing blow's
- * beat + the loser's fall + a short pause. The store only moves forward, so a re-render that
- * re-schedules the timer never replays it.
+ * Schedules the closing beat once the duel is `over` (seconds after game-over): `clearAt` = the loser
+ * starts to fall (the interface steps aside), `showAt` = it lies flat + a beat of silence (the victory
+ * screen comes in). The store only moves forward, so a re-render that re-schedules never replays it.
  */
-export const useVictoryRevealDriver = (over: boolean, seconds: number) => {
+export const useVictoryRevealDriver = (over: boolean, clearAt: number, showAt: number) => {
 	useEffect(() => {
 		if (!over) return;
-		const t = setTimeout(() => victoryReveal.show(), seconds * 1000);
-		return () => clearTimeout(t);
-	}, [over, seconds]);
+		const clear = setTimeout(() => victoryReveal.clear(), clearAt * 1000);
+		const show = setTimeout(() => victoryReveal.show(), showAt * 1000);
+		return () => {
+			clearTimeout(clear);
+			clearTimeout(show);
+		};
+	}, [over, clearAt, showAt]);
 };
